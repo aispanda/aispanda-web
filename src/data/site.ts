@@ -5,6 +5,9 @@ export const navigation = [
   { label: 'About', href: '/about' },
 ];
 
+const reusableAssetSource = (folder: string) =>
+  `https://github.com/aispanda/reusable-ai-assets/tree/main/${encodeURIComponent(folder)}`;
+
 export const assets = [
   {
     id: 'data-model-explorer',
@@ -91,6 +94,7 @@ export const assets = [
 export const assetDetails = [
   {
     slug: 'rapid-solution-delivery',
+    githubUrl: reusableAssetSource('AI-Native Rapid Solution Delivery Kit'),
     name: 'AI-Native Rapid Solution Delivery Kit',
     type: 'Delivery system',
     status: 'Pilot-ready',
@@ -116,6 +120,7 @@ export const assetDetails = [
   },
   {
     slug: 'model-routing',
+    githubUrl: reusableAssetSource('Model-Routing Template'),
     name: 'Model-Routing Template',
     type: 'Decision framework',
     status: 'Reusable',
@@ -141,6 +146,7 @@ export const assetDetails = [
   },
   {
     slug: 'deployment-automation',
+    githubUrl: reusableAssetSource('Deployment Automation'),
     name: 'Deployment Automation',
     type: 'Cloud delivery toolkit',
     status: 'Reusable',
@@ -154,6 +160,7 @@ export const assetDetails = [
   },
   {
     slug: 'create-reusable-asset',
+    githubUrl: reusableAssetSource('Asset-creation-skill'),
     name: 'Create Reusable Asset Skill',
     type: 'AI workflow',
     status: 'Reusable',
@@ -167,6 +174,7 @@ export const assetDetails = [
   },
   {
     slug: 'website-delivery-system',
+    githubUrl: reusableAssetSource('AI-Native Website Delivery System'),
     name: 'AI-Native Website Delivery System',
     type: 'Website delivery system',
     status: 'Pilot-ready',
@@ -180,6 +188,7 @@ export const assetDetails = [
   },
   {
     slug: 'indic-language-engine',
+    githubUrl: reusableAssetSource('Indic-language-tools'),
     name: 'Indic Translation & Summarization Engine',
     type: 'Language AI workflow',
     status: 'Draft',
@@ -193,6 +202,7 @@ export const assetDetails = [
   },
   {
     slug: 'multi-agent-orchestration',
+    githubUrl: reusableAssetSource('Multi-Agent-Orchestration'),
     name: 'Multi-Agent Orchestration Knowledge Base',
     type: 'Architecture reference',
     status: 'Draft',
