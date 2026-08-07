@@ -1,19 +1,145 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { principles } from '@/data/site';
+import { principles, principleGuardrails } from '@/data/site';
 ---
 
-<BaseLayout title="Engineering principles" description="The principles AIspanda uses to plan, design, build and verify AI-enabled systems.">
-  <header class="page-hero shell">
-    <p class="eyebrow">Engineering philosophy</p>
-    <h1>AI-native. Evidence-led. Human-accountable.</h1>
-    <p class="lede">AI changes how quickly work can move. These principles keep that speed aligned with user value, reliable engineering and transparent decisions.</p>
-  </header>
-  <section class="section section-alt">
-    <div class="shell principle-grid">
-      {principles.map(([title, description], index) => (
-        <article class="principle-card"><span class="principle-number">{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{description}</p></article>
-      ))}
+<BaseLayout
+  title="Engineering principles"
+  description="The 9 Sutras of AI-age software engineering: human intent, deterministic verification, open foundations, and value-driven economics guiding probabilistic AI."
+>
+  <article class="principles-page">
+    <header class="principles-hero">
+      <div class="shell principles-hero-inner">
+        <p class="eyebrow">Engineering philosophy</p>
+        <h1>The 9 Sutras of AI-age software engineering</h1>
+        <p class="lede principles-lede">
+          AI is the fast execution engine. Humans remain architects of intent, evidence and accountability.
+          These principles keep speed aligned with verified value—not theatre, lock-in or ungoverned token burn.
+        </p>
+        <div class="principles-hero-meta" aria-label="Page orientation">
+          <p><strong>99/10 direction</strong> Preserve near-complete practical quality while radically reducing delivery cost, operating burden and tokens. A compass, not a score to prove.</p>
+          <a class="button button-small" href="#sutras">Read the sutras <span aria-hidden="true">↓</span></a>
+        </div>
+      </div>
+    </header>
+
+    <section class="principles-north shell" aria-labelledby="north-star-heading">
+      <p class="eyebrow">North Star</p>
+      <h2 id="north-star-heading">Orchestrate intelligence without surrendering judgment</h2>
+      <div class="principles-prose">
+        <p>
+          Software delivery moved from rigid SDLC phases to Agile loops, then accelerated those loops with prototyping and platforms.
+          Agents and multi-agent orchestration mark a deeper shift: teams are no longer only writing syntax or managing static platforms.
+          They are orchestrating intelligence.
+        </p>
+        <p>
+          The bottleneck is rarely typing speed. It is how clearly a business can define intent.
+          Modern tools can collapse the distance between a problem and a deployed solution.
+          To use that speed without chaos, keep human authority, deterministic validation and outcome-linked economics in charge of probabilistic engines.
+        </p>
+      </div>
+    </section>
+
+    <div class="shell principles-layout" id="sutras">
+      <nav class="principles-toc sticky-aside" aria-label="Sutras">
+        <p class="eyebrow">On this page</p>
+        <ol>
+          {principles.map((principle) => (
+            <li>
+              <a href={`#${principle.id}`}>
+                <span>{principle.number}</span>
+                {principle.title}
+              </a>
+            </li>
+          ))}
+          <li><a href="#guardrails"><span>·</span> Guardrails</a></li>
+        </ol>
+      </nav>
+
+      <div class="principles-body">
+        {principles.map((principle, index) => (
+          <section
+            class:list={['sutra-block', index > 0 && 'sutra-block-deferred']}
+            id={principle.id}
+            aria-labelledby={`${principle.id}-title`}
+          >
+            <div class="sutra-head">
+              <span class="sutra-number" aria-hidden="true">{principle.number}</span>
+              <div>
+                <p class="sutra-phase">{principle.phase}</p>
+                <h2 id={`${principle.id}-title`}>{principle.title}</h2>
+                <p class="sutra-line"><em>{principle.sutra}</em></p>
+              </div>
+            </div>
+            <div class="principles-prose">
+              <p>{principle.rule}</p>
+            </div>
+            <dl class="sutra-checks">
+              <div>
+                <dt>Practical test</dt>
+                <dd>{principle.practicalTest}</dd>
+              </div>
+              <div>
+                <dt>In practice</dt>
+                <dd>{principle.example}</dd>
+              </div>
+            </dl>
+            {principle.note && <p class="sutra-note">{principle.note}</p>}
+          </section>
+        ))}
+
+        <section class="sutra-block sutra-block-deferred guardrails-block" id="guardrails" aria-labelledby="guardrails-heading">
+          <p class="eyebrow">Efficiency guardrails</p>
+          <h2 id="guardrails-heading">Cut waste. Never cut the obligation to verify.</h2>
+          <ul class="guardrail-list">
+            {principleGuardrails.map(([title, test]) => (
+              <li>
+                <strong>{title}</strong>
+                <span>{test}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="principles-close" aria-labelledby="close-heading">
+          <h2 id="close-heading">Use them as tests, not slogans</h2>
+          <p class="principles-prose">
+            Specific technologies belong in a decision register, not in this philosophy.
+            Tailor the sutras to project risk. Record any accepted exception with an owner and a revisit trigger.
+          </p>
+          <div class="hero-actions">
+            <a class="button" href="/assets">Explore reusable assets <span aria-hidden="true">→</span></a>
+            <a class="button button-secondary" href="/contact">Start a conversation</a>
+          </div>
+        </section>
+      </div>
     </div>
-  </section>
+  </article>
 </BaseLayout>
+
+<script>
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('.principles-toc a')];
+  const sections = links
+    .map((link) => document.querySelector(link.getAttribute('href') ?? ''))
+    .filter((node): node is HTMLElement => node instanceof HTMLElement);
+
+  const setActive = (id: string) => {
+    for (const link of links) {
+      const active = link.getAttribute('href') === `#${id}`;
+      link.toggleAttribute('aria-current', active);
+    }
+  };
+
+  if (sections.length && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target.id) setActive(visible.target.id);
+      },
+      { rootMargin: '-20% 0px -55% 0px', threshold: [0.1, 0.25, 0.5] },
+    );
+    for (const section of sections) observer.observe(section);
+  }
+</script>
