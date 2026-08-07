@@ -1,0 +1,21 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { insights } from '@/data/site';
+---
+
+<BaseLayout title="Insights" description="Short, practical AI strategy and engineering notes grounded in real delivery.">
+  <header class="page-hero shell">
+    <p class="eyebrow">Insights</p>
+    <h1>Notes from building with AI.</h1>
+    <p class="lede">Concise explanations of the decisions, patterns and trade-offs that matter when AI moves from possibility to production.</p>
+  </header>
+  <section class="section" style="padding-top: 1rem">
+    <div class="shell insight-list">
+      {insights.map((insight) => (
+        <a class="insight-row" href={`/insights/${insight.slug}`}>
+          <small>{insight.eyebrow}</small><div><h3>{insight.title}</h3><p>{insight.summary}</p></div><span>{insight.readTime} →</span>
+        </a>
+      ))}
+    </div>
+  </section>
+</BaseLayout>

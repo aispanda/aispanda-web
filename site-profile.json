@@ -1,0 +1,34 @@
+{
+  "site": {
+    "name": "AIspanda",
+    "baseUrl": "https://aispanda.com",
+    "promise": "Practical AI thinking, reusable systems, and working proof.",
+    "primaryAction": {"label": "Explore reusable assets", "href": "/assets"},
+    "contactEmail": "rajeevkasatai@gmail.com"
+  },
+  "audiences": [
+    {"id": "business-leaders", "need": "Understand where AI creates measurable value and how to begin safely."},
+    {"id": "technology-leaders", "need": "Evaluate architecture, governance, cost, scalability, and delivery evidence."},
+    {"id": "builders", "need": "Reuse practical patterns, code, tools, prompts, and working demonstrations."}
+  ],
+  "stages": {
+    "launch": ["insights", "engineering-principles", "asset-catalogue", "live-data-model-explorer", "about", "contact"],
+    "next": ["resume", "skills", "case-studies", "expanded-search"],
+    "later": ["comments", "contributions", "member-portal", "groups-and-chat"]
+  },
+  "sourceControl": {
+    "provider": "GitHub",
+    "organization": "aispanda",
+    "repository": "aispanda-web",
+    "visibility": "public",
+    "mfaRequired": true,
+    "backupOwnerRequired": true
+  },
+  "hosting": {
+    "provider": "Google Cloud",
+    "service": "Cloud Run",
+    "region": "us-east1",
+    "deploymentAutomation": "Reuse central Deployment Automation toolkit",
+    "costPolicy": "Request-based billing, minimum instances zero, budget alerts enabled"
+  }
+}

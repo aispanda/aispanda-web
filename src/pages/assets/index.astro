@@ -1,0 +1,16 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import AssetCard from '@/components/AssetCard.astro';
+import { assets } from '@/data/site';
+---
+
+<BaseLayout title="Reusable assets" description="Practical AI, architecture and delivery assets designed for evidence-backed reuse.">
+  <header class="page-hero shell">
+    <p class="eyebrow">Reusable asset library</p>
+    <h1>Find a useful starting point.</h1>
+    <p class="lede">Each asset combines method, documentation, automation, boundaries and proof. Select one asset, load only what you need, and adapt its project profile.</p>
+  </header>
+  <section class="section" style="padding-top: 1rem">
+    <div class="shell card-grid">{assets.map((asset, index) => <AssetCard asset={asset} featured={index === 0} />)}</div>
+  </section>
+</BaseLayout>

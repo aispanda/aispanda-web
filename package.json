@@ -1,0 +1,21 @@
+{
+  "name": "aispanda-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.16.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-content-boundary.mjs dist",
+    "preview": "astro preview",
+    "validate:profile": "node scripts/validate-site-profile.mjs",
+    "validate:content": "node scripts/validate-content-boundary.mjs"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "3.7.3",
+    "astro": "7.2.0"
+  }
+}

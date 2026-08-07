@@ -1,2 +1,16 @@
-# AISPANDA-WEBSITE
-Official website for AIspanda - AI insights, engineering principles, reusable assets, live demonstrations, and consulting expertise.
+# AIspanda Web
+
+Official website for AIspanda: practical AI insights, engineering principles, reusable assets, live demonstrations, and consulting expertise.
+
+## Local development
+
+```powershell
+pnpm install
+pnpm dev
+```
+
+The public site is generated into `dist/` with `pnpm build`. It is designed as a static-first Astro site and packaged for Google Cloud Run through the included container files.
+
+The live Data Model Explorer is a generated public artifact from reusable asset RA-001. Rebuild RA-001 with Vite base `/labs/data-model-explorer/`, then refresh it with the registered `scripts/sync-data-model-explorer.ps1` command described in the Automation Router.
+
+Read `docs/DOCUMENTATION_ROUTER.md` before changing strategy, content, design, or architecture. Read `docs/AUTOMATION_ROUTER.md` before running or changing scripts.

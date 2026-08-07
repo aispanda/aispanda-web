@@ -1,0 +1,53 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { assetDetails } from '@/data/site';
+
+export function getStaticPaths() {
+  return assetDetails.map((asset) => ({ params: { slug: asset.slug }, props: { asset } }));
+}
+
+const { asset } = Astro.props;
+---
+
+<BaseLayout title={asset.name} description={asset.summary}>
+  <article>
+    <header class="page-hero shell">
+      <p class="eyebrow">{asset.type} · {asset.status}</p>
+      <h1>{asset.name}</h1>
+      <p class="lede">{asset.summary}</p>
+      <div class="button-row">
+        <a class="button button-secondary" href="/assets">← All reusable assets</a>
+        <a class="button" href="/contact">Start a conversation</a>
+      </div>
+    </header>
+
+    <div class="shell page-grid">
+      <aside class="sticky-aside">
+        <p class="eyebrow">Use when</p>
+        <p>{asset.useWhen}</p>
+        <ul class="tag-list" aria-label="Asset topics">
+          {asset.tags.map((tag) => <li>{tag}</li>)}
+        </ul>
+      </aside>
+
+      <div class="content-stack">
+        <section class="content-card">
+          <h2>What it delivers</h2>
+          <ul>{asset.delivers.map((item) => <li>{item}</li>)}</ul>
+        </section>
+        <section class="content-card">
+          <h2>How it works</h2>
+          <ol>{asset.steps.map((step) => <li>{step}</li>)}</ol>
+        </section>
+        <section class="content-card">
+          <h2>Cost and dependencies</h2>
+          <p>{asset.cost}</p>
+        </section>
+        <section class="content-card">
+          <h2>Important boundaries</h2>
+          <ul>{asset.boundaries.map((item) => <li>{item}</li>)}</ul>
+        </section>
+      </div>
+    </div>
+  </article>
+</BaseLayout>

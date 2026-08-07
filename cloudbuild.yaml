@@ -1,0 +1,32 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+      - .
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - aispanda-web
+      - --image=us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+      - --region=us-east1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --min-instances=0
+      - --max-instances=3
+      - --cpu=1
+      - --memory=256Mi
+      - --concurrency=80
+      - --timeout=60
+images:
+  - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+options:
+  logging: CLOUD_LOGGING_ONLY

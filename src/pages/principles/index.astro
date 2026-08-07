@@ -1,0 +1,19 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { principles } from '@/data/site';
+---
+
+<BaseLayout title="Engineering principles" description="The principles AIspanda uses to plan, design, build and verify AI-enabled systems.">
+  <header class="page-hero shell">
+    <p class="eyebrow">Engineering philosophy</p>
+    <h1>AI-native. Evidence-led. Human-accountable.</h1>
+    <p class="lede">AI changes how quickly work can move. These principles keep that speed aligned with user value, reliable engineering and transparent decisions.</p>
+  </header>
+  <section class="section section-alt">
+    <div class="shell principle-grid">
+      {principles.map(([title, description], index) => (
+        <article class="principle-card"><span class="principle-number">{String(index + 1).padStart(2, '0')}</span><h3>{title}</h3><p>{description}</p></article>
+      ))}
+    </div>
+  </section>
+</BaseLayout>

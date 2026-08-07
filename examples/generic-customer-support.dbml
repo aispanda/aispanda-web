@@ -1,0 +1,164 @@
+Project Generic_Customer_Support {
+  database_type: 'PostgreSQL'
+  Note: 'Fictional reference model for demonstrating governed data-model exploration. It is a reusable starting point, not a production prescription.'
+}
+
+enum ticket_status {
+  new
+  open
+  waiting
+  resolved
+  closed
+}
+
+enum ticket_priority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum message_direction {
+  inbound
+  outbound
+  internal
+}
+
+enum suggestion_status {
+  proposed
+  accepted
+  rejected
+}
+
+Table organizations [headerColor: #2563EB] {
+  id uuid [pk, not null, note: 'Unique organization identifier. Example: 7bb26c61-7ef2-4bc0-90c2-4aca75f7af21.']
+  name varchar(200) [not null, note: 'Customer organization name, supplied by an agent or integration. Example: Example Manufacturing.']
+  industry varchar(100) [note: 'Optional business sector used for reporting. Example: Manufacturing.']
+  created_at timestamptz [not null, note: 'UTC creation time populated by the application. Example: 2026-08-06T14:30:00Z.']
+
+  Note: 'One row represents a fictional customer organization receiving support.'
+}
+
+Table contacts [headerColor: #2563EB] {
+  id uuid [pk, not null, note: 'Unique contact identifier. Example: 19c9c2f4-6e81-4f8d-98aa-4388363a9122.']
+  organization_id uuid [not null, note: 'Organization this person belongs to, selected during intake or matched by integration.']
+  full_name varchar(200) [not null, note: 'Customer name captured from a form, message or agent entry. Example: Alex Morgan.']
+  email varchar(320) [not null, note: 'Customer email used for correspondence. Example: alex@example.invalid.']
+  phone varchar(50) [note: 'Optional customer telephone number. Example: +1-555-0100.']
+  created_at timestamptz [not null, note: 'UTC creation time populated by the application. Example: 2026-08-06T14:31:00Z.']
+
+  Note: 'One row represents a fictional person who can raise or discuss support requests.'
+}
+
+Table service_agents [headerColor: #475569] {
+  id uuid [pk, not null, note: 'Unique service-agent identifier.']
+  display_name varchar(160) [not null, note: 'Name shown to customers and colleagues. Example: Taylor Lee.']
+  email varchar(320) [not null, unique, note: 'Work email used for identity and notifications. Example: taylor@example.invalid.']
+  active boolean [not null, default: true, note: 'Whether the person may currently receive work. Example: true.']
+
+  Note: 'One row represents a fictional employee who reviews and handles customer requests.'
+}
+
+Table support_tickets [headerColor: #2563EB] {
+  id uuid [pk, not null, note: 'Unique support-ticket identifier.']
+  ticket_number varchar(30) [not null, unique, note: 'Human-readable reference generated at creation. Example: TKT-000142.']
+  organization_id uuid [not null, note: 'Customer organization affected by the request.']
+  contact_id uuid [not null, note: 'Primary customer contact for the request.']
+  assigned_agent_id uuid [note: 'Agent currently responsible; blank while unassigned.']
+  subject varchar(255) [not null, note: 'Short description captured during intake. Example: Cannot access monthly report.']
+  description text [not null, note: 'Customer-provided problem details. Example: The report page returns an error.']
+  status ticket_status [not null, default: 'new', note: 'Current workflow stage controlled by the service process. Example: open.']
+  priority ticket_priority [not null, default: 'normal', note: 'Service urgency set by rules or an authorised employee. Example: high.']
+  category varchar(100) [note: 'Reporting category selected by an employee or approved automation. Example: access.']
+  source_channel varchar(40) [not null, note: 'How the request entered the system. Example: web.']
+  created_at timestamptz [not null, note: 'UTC creation time populated by the application.']
+  updated_at timestamptz [not null, note: 'UTC time of the latest material change.']
+  closed_at timestamptz [note: 'UTC closure time; blank until the ticket is closed.']
+
+  Note: 'One row represents an authoritative fictional customer-support request and its current workflow state.'
+}
+
+Table ticket_messages [headerColor: #2563EB] {
+  id uuid [pk, not null, note: 'Unique conversation-message identifier.']
+  ticket_id uuid [not null, note: 'Support ticket to which this message belongs.']
+  direction message_direction [not null, note: 'Whether the message came from the customer, went to the customer, or is internal.']
+  sender_address varchar(320) [note: 'Sender address captured from the channel. Example: alex@example.invalid.']
+  body_text text [not null, note: 'Message content captured from the channel or written by an employee.']
+  occurred_at timestamptz [not null, note: 'UTC time the message was sent or received.']
+
+  Note: 'One row represents one fictional message in a support-ticket conversation.'
+}
+
+Table knowledge_articles [headerColor: #7C3AED] {
+  id uuid [pk, not null, note: 'Unique knowledge-article identifier.']
+  title varchar(255) [not null, note: 'Article title maintained by a knowledge owner. Example: Restore report access.']
+  body_markdown text [not null, note: 'Published guidance used by employees and approved AI workflows.']
+  version integer [not null, default: 1, note: 'Version number increased when governed content changes. Example: 3.']
+  published boolean [not null, default: false, note: 'Whether this version is eligible for operational use.']
+  updated_at timestamptz [not null, note: 'UTC time of the latest approved change.']
+
+  Note: 'One row represents a fictional governed knowledge article used to support consistent answers.'
+}
+
+Table ai_suggestions [headerColor: #EA580C] {
+  id uuid [pk, not null, note: 'Unique AI-suggestion identifier.']
+  ticket_id uuid [not null, note: 'Ticket for which the suggestion was produced.']
+  proposed_category varchar(100) [note: 'Suggested reporting category for human review. Example: access.']
+  proposed_priority ticket_priority [note: 'Suggested urgency for human review. Example: high.']
+  draft_response text [note: 'Proposed response grounded in approved context; it is not sent automatically.']
+  rationale text [not null, note: 'Short explanation of the evidence and reasoning presented to the employee.']
+  status suggestion_status [not null, default: 'proposed', note: 'Human decision about the suggestion. Example: accepted.']
+  model_reference varchar(160) [not null, note: 'Provider-neutral identifier recorded for traceability. Example: provider/model-version.']
+  created_at timestamptz [not null, note: 'UTC time the suggestion was generated.']
+
+  Note: 'One row represents a fictional AI recommendation awaiting accountable human review.'
+}
+
+Table suggestion_sources [headerColor: #EA580C] {
+  id uuid [pk, not null, note: 'Unique evidence-link identifier.']
+  suggestion_id uuid [not null, note: 'AI suggestion supported by this evidence.']
+  article_id uuid [not null, note: 'Published knowledge article used as evidence.']
+  relevance_score numeric(5,4) [not null, note: 'Retrieval relevance recorded for review. Example: 0.8725.']
+
+  Note: 'One row links a fictional AI suggestion to one knowledge source used in its context.'
+}
+
+Table audit_events [headerColor: #DC2626] {
+  id uuid [pk, not null, note: 'Unique audit-event identifier.']
+  ticket_id uuid [note: 'Related ticket when the action concerns a support request.']
+  agent_id uuid [note: 'Employee responsible for the action when applicable.']
+  action varchar(120) [not null, note: 'Machine-readable activity name. Example: suggestion_accepted.']
+  outcome varchar(40) [not null, note: 'Result of the activity. Example: succeeded.']
+  occurred_at timestamptz [not null, note: 'UTC time at which the activity occurred.']
+
+  Note: 'One row represents a fictional, non-sensitive record of a material system or employee action.'
+}
+
+Ref: contacts.organization_id > organizations.id
+Ref: support_tickets.organization_id > organizations.id
+Ref: support_tickets.contact_id > contacts.id
+Ref: support_tickets.assigned_agent_id > service_agents.id
+Ref: ticket_messages.ticket_id > support_tickets.id
+Ref: ai_suggestions.ticket_id > support_tickets.id
+Ref: suggestion_sources.suggestion_id > ai_suggestions.id
+Ref: suggestion_sources.article_id > knowledge_articles.id
+Ref: audit_events.ticket_id > support_tickets.id
+Ref: audit_events.agent_id > service_agents.id
+
+TableGroup "Customer and service" {
+  organizations
+  contacts
+  service_agents
+  support_tickets
+  ticket_messages
+}
+
+TableGroup "Knowledge and AI" {
+  knowledge_articles
+  ai_suggestions
+  suggestion_sources
+}
+
+TableGroup "Governance" {
+  audit_events
+}

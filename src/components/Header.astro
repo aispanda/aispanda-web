@@ -1,0 +1,31 @@
+---
+import { navigation } from '@/data/site';
+const currentPath = Astro.url.pathname;
+---
+
+<header class="site-header">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="shell header-inner">
+    <a class="brand" href="/" aria-label="AIspanda home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
+      <span>AI<span>spanda</span></span>
+    </a>
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-navigation">Menu</button>
+    <nav id="site-navigation" class="site-navigation" aria-label="Primary">
+      {navigation.map((item) => (
+        <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
+      ))}
+      <a class="button button-small" href="/contact">Start a conversation</a>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const button = document.querySelector<HTMLButtonElement>('.menu-button');
+  const nav = document.querySelector<HTMLElement>('.site-navigation');
+  button?.addEventListener('click', () => {
+    const open = button.getAttribute('aria-expanded') === 'true';
+    button.setAttribute('aria-expanded', String(!open));
+    nav?.toggleAttribute('data-open', !open);
+  });
+</script>
