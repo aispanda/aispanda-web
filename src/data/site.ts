@@ -17,6 +17,16 @@ const reusableAssetSource = (folder: string) =>
 
 export const assets = [
   {
+    id: 'data-model-explorer',
+    name: 'Data Model Exploration Suite',
+    type: 'Interactive tool',
+    status: 'Live proof',
+    summary: 'Explore a fictional customer-support schema—tables, fields, relationships and business meaning—without reading database code.',
+    outcome: 'Shows how a governed model can remain understandable to product leaders and precise enough for engineers.',
+    href: '/labs/data-model-explorer/index.html',
+    tags: ['Data', 'Architecture', 'UI/UX'],
+  },
+  {
     id: 'rapid-solution-delivery',
     name: 'AI-Native Rapid Solution Delivery Kit',
     type: 'Delivery system',
