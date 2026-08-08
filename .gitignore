@@ -150,3 +150,12 @@ vite.config.ts.timestamp-*
 *.pem
 *.key
 service-account*.json
+
+# Private / personal / legal / brand capture — never publish to GitHub
+# Includes employment/visa posture, inner spiritual provenance, raw flow transcripts, unpublished drafts.
+# Reusable method lives in RA-005 / RA-006; keep project-specific personal detail local only.
+docs/seeds/SEED-002*.md
+docs/brand/VIBE_IDENTITY_BRIEF.md
+docs/brand/*-private*
+docs/content/
+docs/private/

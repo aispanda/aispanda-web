@@ -1,49 +1,51 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { principles, principleGuardrails } from '@/data/site';
+import { principles } from '@/data/site';
 ---
 
 <BaseLayout
   title="Engineering principles"
-  description="The 9 Sutras of AI-age software engineering: human intent, deterministic verification, open foundations, and value-driven economics guiding probabilistic AI."
+  description="The 10 principles of building with AI: human intent, proof before trust, owned foundations, and value that beats empty token burn."
 >
   <article class="principles-page">
     <header class="principles-hero">
       <div class="shell principles-hero-inner">
-        <p class="eyebrow">Engineering philosophy</p>
-        <h1>The 9 Sutras of AI-age software engineering</h1>
+        <p class="eyebrow">How we build</p>
+        <h1>The 10 principles of building with AI</h1>
         <p class="lede principles-lede">
-          AI is the fast execution engine. Humans remain architects of intent, evidence and accountability.
-          These principles keep speed aligned with verified value—not theatre, lock-in or ungoverned token burn.
+          AI is the fast execution engine. Humans remain architects of intent, evidence, and accountability.
+          These principles keep that speed pointed at proven value.
+          They push back on demo theatre, vendor lock-in, and token burn with no outcome attached.
         </p>
         <div class="principles-hero-meta" aria-label="Page orientation">
-          <p><strong>99/10 direction</strong> Preserve near-complete practical quality while radically reducing delivery cost, operating burden and tokens. A compass, not a score to prove.</p>
-          <a class="button button-small" href="#sutras">Read the sutras <span aria-hidden="true">↓</span></a>
+          <p><strong>99/10</strong> Keep almost all of the quality that matters, while cutting waste in cost, effort, and idle AI use. It is a compass for choices, not a score you must prove.</p>
+          <a class="button button-small" href="#sutras">Read the principles <span aria-hidden="true">↓</span></a>
         </div>
       </div>
     </header>
 
-    <section class="principles-north shell" aria-labelledby="north-star-heading">
-      <p class="eyebrow">North Star</p>
-      <h2 id="north-star-heading">Orchestrate intelligence without surrendering judgment</h2>
-      <div class="principles-prose">
-        <p>
-          Software delivery moved from rigid SDLC phases to Agile loops, then accelerated those loops with prototyping and platforms.
-          Agents and multi-agent orchestration mark a deeper shift: teams are no longer only writing syntax or managing static platforms.
-          They are orchestrating intelligence.
-        </p>
-        <p>
-          The bottleneck is rarely typing speed. It is how clearly a business can define intent.
-          Modern tools can collapse the distance between a problem and a deployed solution.
-          To use that speed without chaos, keep human authority, deterministic validation and outcome-linked economics in charge of probabilistic engines.
-        </p>
-      </div>
-    </section>
-
     <div class="shell principles-layout" id="sutras">
-      <nav class="principles-toc sticky-aside" aria-label="Sutras">
+      <details class="principles-jump">
+        <summary>On this page</summary>
+        <nav aria-label="On this page">
+          <ol>
+            <li><a href="#north-star"><span>·</span> North Star</a></li>
+            {principles.map((principle) => (
+              <li>
+                <a href={`#${principle.id}`}>
+                  <span>{principle.number}</span>
+                  {principle.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </details>
+
+      <nav class="principles-toc sticky-aside" aria-label="On this page">
         <p class="eyebrow">On this page</p>
         <ol>
+          <li><a href="#north-star"><span>·</span> North Star</a></li>
           {principles.map((principle) => (
             <li>
               <a href={`#${principle.id}`}>
@@ -52,11 +54,25 @@ import { principles, principleGuardrails } from '@/data/site';
               </a>
             </li>
           ))}
-          <li><a href="#guardrails"><span>·</span> Guardrails</a></li>
         </ol>
       </nav>
 
       <div class="principles-body">
+        <section class="principles-north" id="north-star" aria-labelledby="north-star-heading">
+          <p class="eyebrow">North Star</p>
+          <h2 id="north-star-heading">Intent is the scarce capital</h2>
+          <div class="principles-prose">
+            <p>
+              Doing the work got cheap. First drafts, busy tools, and fast helpers can rush a result into existence.
+              What stays scarce is clear thinking: what to build, when to invest, whom to bring along, and how to leave the system free to change.
+            </p>
+            <p>
+              Tools can shorten the walk from a wish to a working outcome.
+              They cannot invent what you mean, decide what is right, or put a human name on the choice.
+            </p>
+          </div>
+        </section>
+
         {principles.map((principle, index) => (
           <section
             class:list={['sutra-block', index > 0 && 'sutra-block-deferred']}
@@ -88,25 +104,7 @@ import { principles, principleGuardrails } from '@/data/site';
           </section>
         ))}
 
-        <section class="sutra-block sutra-block-deferred guardrails-block" id="guardrails" aria-labelledby="guardrails-heading">
-          <p class="eyebrow">Efficiency guardrails</p>
-          <h2 id="guardrails-heading">Cut waste. Never cut the obligation to verify.</h2>
-          <ul class="guardrail-list">
-            {principleGuardrails.map(([title, test]) => (
-              <li>
-                <strong>{title}</strong>
-                <span>{test}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section class="principles-close" aria-labelledby="close-heading">
-          <h2 id="close-heading">Use them as tests, not slogans</h2>
-          <p class="principles-prose">
-            Specific technologies belong in a decision register, not in this philosophy.
-            Tailor the sutras to project risk. Record any accepted exception with an owner and a revisit trigger.
-          </p>
+        <section class="principles-close" aria-label="Next steps">
           <div class="hero-actions">
             <a class="button" href="/assets">Explore reusable assets <span aria-hidden="true">→</span></a>
             <a class="button button-secondary" href="/contact">Start a conversation</a>
@@ -118,10 +116,15 @@ import { principles, principleGuardrails } from '@/data/site';
 </BaseLayout>
 
 <script>
-  const links = [...document.querySelectorAll<HTMLAnchorElement>('.principles-toc a')];
-  const sections = links
-    .map((link) => document.querySelector(link.getAttribute('href') ?? ''))
-    .filter((node): node is HTMLElement => node instanceof HTMLElement);
+  const links = [...document.querySelectorAll<HTMLAnchorElement>('.principles-toc a, .principles-jump a')];
+  const sections = [...new Map(
+    links
+      .map((link) => {
+        const target = document.querySelector(link.getAttribute('href') ?? '');
+        return target instanceof HTMLElement ? [target.id, target] as const : null;
+      })
+      .filter((entry): entry is readonly [string, HTMLElement] => Boolean(entry)),
+  ).values()];
 
   const setActive = (id: string) => {
     for (const link of links) {
@@ -129,6 +132,13 @@ import { principles, principleGuardrails } from '@/data/site';
       link.toggleAttribute('aria-current', active);
     }
   };
+
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('.principles-jump a')) {
+    link.addEventListener('click', () => {
+      const jump = link.closest('details');
+      if (jump) jump.open = false;
+    });
+  }
 
   if (sections.length && 'IntersectionObserver' in window) {
     const observer = new IntersectionObserver(
