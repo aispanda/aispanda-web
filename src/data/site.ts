@@ -223,28 +223,14 @@ export const assetDetails = [
   },
 ];
 
-export const insights = [
-  {
-    slug: 'ai-changes-the-build-vs-buy-equation',
-    eyebrow: 'AI delivery',
-    title: 'AI changes the build-versus-buy equation',
-    summary: 'When code becomes cheaper to create, flexibility, ownership and verification matter more than low-code convenience alone.',
-    readTime: '5 min',
-  },
-  {
-    slug: 'working-proof-earns-trust',
-    eyebrow: 'Engineering leadership',
-    title: 'Working proof earns more trust than an AI strategy deck',
-    summary: 'A small, inspectable system can reveal architecture, governance and delivery capability faster than broad claims.',
-    readTime: '4 min',
-  },
-  {
-    slug: 'design-for-model-change',
-    eyebrow: 'AI architecture',
-    title: 'Design for model change, not model permanence',
-    summary: 'Models, prices and capabilities move quickly. Stable contracts and measurable routing keep the product adaptable.',
-    readTime: '6 min',
-  },
+export const insights: {
+  slug: string;
+  eyebrow: string;
+  title: string;
+  summary: string;
+  readTime: string;
+}[] = [
+  // No public insights until owner ACCEPT from incubated seeds (see docs/seeds/SEED-004-*).
 ];
 
 export const principles = [

@@ -1,4 +1,5 @@
 ---
+import BrandMark from '@/components/BrandMark.astro';
 import { navigation } from '@/data/site';
 const currentPath = Astro.url.pathname;
 ---
@@ -6,16 +7,16 @@ const currentPath = Astro.url.pathname;
 <header class="site-header">
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="shell header-inner">
-    <a class="brand" href="/" aria-label="AIspanda home">
-      <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
-      <span>AI<span>spanda</span></span>
+    <a class="brand" href="/" aria-label="AI Spanda home">
+      <BrandMark size={64} ground="light" />
+      <span class="brand-wordmark">AI <span>Spanda</span></span>
     </a>
     <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-navigation">Menu</button>
     <nav id="site-navigation" class="site-navigation" aria-label="Primary">
       {navigation.map((item) => (
         <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
       ))}
-      <a class="button button-small" href="/contact">Start a conversation</a>
+      <a class="button button-small" href="/contact">Write</a>
     </nav>
   </div>
 </header>

@@ -1,40 +1,40 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import AssetCard from '@/components/AssetCard.astro';
-import { assets, insights, principles } from '@/data/site';
+import { assets, principles } from '@/data/site';
 ---
 
-<BaseLayout title="AIspanda" description="Practical AI thinking, reusable systems, and working proof for leaders and builders.">
-  <section class="hero">
-    <div class="shell hero-grid">
-      <div>
-        <p class="eyebrow">AI strategy · engineering · delivery</p>
-        <h1>Turn AI ideas into <em>working proof.</em></h1>
-        <p class="lede">Clear thinking for decision-makers. Inspectable architecture for technology leaders. Reusable tools for builders.</p>
-        <div class="hero-actions">
-          <a class="button" href="/assets">Explore reusable assets <span aria-hidden="true">→</span></a>
-          <a class="button button-secondary" href="/principles">See how we think</a>
-        </div>
-      </div>
-      <div class="proof-orbit" aria-label="From idea to working proof">
-        <div class="orbit-line" aria-hidden="true"></div>
-        <span class="orbit-card one">Plan with evidence</span>
-        <span class="orbit-card two">Build with AI</span>
-        <span class="orbit-card three">Verify what matters</span>
-        <div class="proof-core">
-          <p class="eyebrow">Public learning loop</p>
-          <strong>Think.<br />Build.<br />Show.</strong>
-          <p>Each asset explains the problem, decisions, implementation, evidence and path to reuse.</p>
-        </div>
+<BaseLayout
+  title="AI Spanda"
+  description="Personal writing on AI, judgment, and agency — with reusable systems and working proof you can inspect."
+>
+  <section class="hero hero-atmosphere">
+    <img
+      class="hero-media"
+      src="/social/hero.png"
+      alt=""
+      width="1920"
+      height="1080"
+      fetchpriority="high"
+      decoding="async"
+    />
+    <div class="hero-veil" aria-hidden="true"></div>
+    <div class="shell hero-copy">
+      <p class="brand-signal">AI Spanda</p>
+      <h1>Keep agency in the AI age.</h1>
+      <p class="lede">Clear thinking for ordinary work and serious decisions — open, right-fit paths over walled gardens and hype.</p>
+      <div class="hero-actions">
+        <a class="button" href="/principles">See how the work is judged <span aria-hidden="true">→</span></a>
+        <a class="button button-secondary" href="/assets">Explore reusable assets</a>
       </div>
     </div>
   </section>
 
-  <section class="trust-strip" aria-label="Audience pathways">
+  <section class="trust-strip" aria-label="Who this is for">
     <div class="shell trust-grid">
-      <div class="trust-item"><strong>Business leaders</strong><span>Value, risk and the smallest credible next step.</span></div>
-      <div class="trust-item"><strong>Technology leaders</strong><span>Architecture, governance, cost and scalability.</span></div>
-      <div class="trust-item"><strong>Builders</strong><span>Patterns, tools, prompts, code and demonstrations.</span></div>
+      <div class="trust-item"><strong>Everyday professionals</strong><span>Survive and evolve with AI without a priesthood.</span></div>
+      <div class="trust-item"><strong>Technology leaders</strong><span>Judgment, architecture, cost and evidence — not theatre.</span></div>
+      <div class="trust-item"><strong>Builders &amp; policy</strong><span>Reusable patterns and sober open-vs-closed questions.</span></div>
     </div>
   </section>
 
@@ -53,8 +53,8 @@ import { assets, insights, principles } from '@/data/site';
   <section class="section section-alt">
     <div class="shell">
       <div class="section-head">
-        <div><p class="eyebrow">How we build</p><h2>Fast does not mean careless.</h2></div>
-        <p>AI reduces the cost of producing code and analysis. Good product judgment, source ownership and verification become more important—not less.</p>
+        <div><p class="eyebrow">How the work is judged</p><h2>Fast does not mean careless.</h2></div>
+        <p>AI reduces the cost of producing code and analysis. Good judgment, source ownership and verification become more important—not less.</p>
       </div>
       <div class="principle-grid">
         {principles.slice(0, 4).map((principle) => (
@@ -66,22 +66,6 @@ import { assets, insights, principles } from '@/data/site';
         ))}
       </div>
       <p style="margin-top: 2rem"><a class="text-link" href="/principles">Read all principles <span aria-hidden="true">→</span></a></p>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="shell">
-      <div class="section-head">
-        <div><p class="eyebrow">Latest insights</p><h2>What we are learning.</h2></div>
-        <p>Short, practical notes drawn from building real systems—not commentary detached from delivery.</p>
-      </div>
-      <div class="insight-list">
-        {insights.map((insight) => (
-          <a class="insight-row" href={`/insights/${insight.slug}`}>
-            <small>{insight.eyebrow}</small><h3>{insight.title}</h3><span>{insight.readTime} →</span>
-          </a>
-        ))}
-      </div>
     </div>
   </section>
 </BaseLayout>

@@ -1,12 +1,17 @@
 ---
+import BrandMark from '@/components/BrandMark.astro';
 import { footerNavigation } from '@/data/site';
 ---
 
 <footer class="site-footer">
+  <div class="footer-motif" aria-hidden="true"></div>
   <div class="shell footer-grid">
     <div>
-      <p class="brand footer-brand">AI<span>spanda</span></p>
-      <p>Practical AI thinking, reusable systems, and working proof.</p>
+      <p class="brand footer-brand">
+        <BrandMark size={56} ground="light" />
+        <span class="brand-wordmark">AI <span>Spanda</span></span>
+      </p>
+      <p>Personal writing on AI, agency, and workable paths — not a firm, nothing for sale here.</p>
     </div>
     <nav aria-label="Footer">
       {footerNavigation.map((item) => (
@@ -14,8 +19,8 @@ import { footerNavigation } from '@/data/site';
       ))}
     </nav>
     <div class="footer-meta">
-      <p>Built openly. Improved continuously.</p>
-      <p>© {new Date().getFullYear()} AIspanda</p>
+      <p>Built in the open. Improved continuously.</p>
+      <p>© {new Date().getFullYear()} AI Spanda</p>
     </div>
   </div>
 </footer>

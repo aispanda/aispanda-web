@@ -22,20 +22,21 @@ One site serves all three through progressive depth. Business outcomes appear fi
 
 ## Brand direction
 
-New identity and brand. AIspanda should feel intelligent, curious, candid and practical—not corporate theatre or novelty AI imagery. The visual system combines strong black/white structure with lime and blue signals, generous readability and a small panda-derived CSS mark. Public claims require evidence or clear status labels.
+New identity for a **personal AI thought-leadership blog** (not a firm; nothing for sale on these surfaces). Public story: source sun + skill/judgment; colourful vibratory network. Avoid corporate theatre, novelty mascot, and any religious/Tantric iconography on public pages.
 
 ### Launch identity contract
 
 | Element | Launch direction | Status |
 |---|---|---|
-| Promise | Turn AI ideas into working proof | Accepted for launch copy |
-| Personality | Intelligent, curious, candid and practical; avoid hype, corporate theatre and novelty mascot treatment | Accepted |
-| Voice | Business meaning first, technical evidence available, concise claims with clear proof/status | Accepted |
-| Logo | Code-native compact panda-derived mark plus AIspanda wordmark; crisp, responsive and editable without image tooling | Draft pending Rajeev visual approval |
-| Colours | Warm off-white and black foundation; electric blue for primary emphasis and acid lime for proof/status accents | Draft pending visual approval |
-| Imagery | Abstract editorial systems imagery; no stock-AI clichés, copied interfaces or unlicensed brand assets | Accepted direction |
-| Social image | Project-owned abstract “ideas to working proof” raster at `public/social/aispanda-working-proof.png` | Generated draft pending approval |
-| Rights/provenance | Interface and mark are original project code; social visual was generated for this project with no embedded text or third-party identity | Recorded |
+| Promise | Help people keep agency in the AI age through clear writing, reusable systems and inspectable proof | Accepted |
+| Personality | Intelligent, candid, calm urgency; avoid hype, firm theatre, novelty mascot | Accepted (voice do/don’t may still DEFER) |
+| Voice | Business meaning first; evidence or honest status; personal “I/this blog” not “we advise clients” | Accepted for launch posture |
+| Logo | Sun/disc source + spectrum ripple mark; wordmark **AI Spanda** (two words); mono + favicon variants | Accepted — rasters in `public/brand/`; SVG recreation still open |
+| Colours | Warm light ground + ink structure; **solar** proof accent + **clarity** blue; spectrum reserved for the mark | Accepted for UI pass |
+| Typography | Sora (display) + Source Sans 3 (body) | Accepted for UI pass |
+| Imagery | Hero/OG abstract source+vibration; no stock robots or sacred symbols | Accepted — `public/social/hero.png`, `og.png` |
+| Social image | `public/social/og.png` | Accepted draft in use |
+| Rights/provenance | Project-owned generated rasters + site code; no third-party logos | Recorded |
 
 ## Architecture
 
@@ -64,7 +65,8 @@ Public source and generated output must not contain prohibited source-project or
 
 ## Release checks still pending
 
-- Rajeev must approve the draft brand/logo/colour direction and generated social image.
+- Live visual ACCEPT of the UI pass (home first) by Rajeev.
+- Compress public brand/social rasters; recreate production mark as true SVG geometry.
 - Exact Google Cloud project ID, region, Artifact Registry repository and service name remain project-owned deployment inputs.
 - No local container engine is installed; the approved Google Cloud build must verify the container before deployment.
 - Deployment, DNS, Git commit and Git push still require explicit authorization.
