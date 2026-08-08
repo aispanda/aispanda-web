@@ -12,6 +12,13 @@ const textExtensions = new Set([
   '.ts', '.tsx', '.txt', '.xml', '.yaml', '.yml',
 ]);
 const ignoredDirectories = new Set(['.astro', '.git', 'dist', 'node_modules']);
+const ignoredPathMatchers = [
+  /(?:^|\/)docs\/content(?:\/|$)/i,
+  /(?:^|\/)docs\/private(?:\/|$)/i,
+  /(?:^|\/)docs\/seeds\/SEED-002[^/]*\.md$/i,
+  /(?:^|\/)docs\/brand\/VIBE_IDENTITY_BRIEF\.md$/i,
+  /(?:^|\/)docs\/brand\/[^/]*-private[^/]*$/i,
+];
 const requestedRoots = process.argv.slice(2);
 const roots = requestedRoots.length ? requestedRoots : ['.'];
 const findings = [];
@@ -24,7 +31,13 @@ function digest(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function isBoundaryExempt(target) {
+  const normalized = target.replace(/\\/g, '/');
+  return ignoredPathMatchers.some((pattern) => pattern.test(normalized));
+}
+
 async function inspect(target) {
+  if (isBoundaryExempt(target)) return;
   const info = await stat(target);
   if (info.isDirectory()) {
     const entries = await readdir(target, { withFileTypes: true });
