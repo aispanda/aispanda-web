@@ -372,6 +372,30 @@ h3 { margin: 0; font-size: clamp(1.25rem, 2vw, 1.65rem); }
 .footer-grid p { color: var(--muted); }
 .footer-grid nav { display: grid; align-content: start; gap: .55rem; }
 .footer-meta { text-align: right; }
+.sitemap-page {
+  display: grid;
+  gap: clamp(2rem, 4vw, 3rem);
+  padding-top: 0;
+  padding-bottom: 5rem;
+}
+.sitemap-group h2 {
+  margin: 0 0 .85rem;
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+}
+.sitemap-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: .45rem;
+  max-inline-size: 66ch;
+}
+.sitemap-group a {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 650;
+}
+.sitemap-group a:hover { color: var(--ink); }
 
 @media (max-width: 850px) {
   .menu-button { display: inline-flex; }

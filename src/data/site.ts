@@ -5,20 +5,17 @@ export const navigation = [
   { label: 'About', href: '/about' },
 ];
 
+export const footerNavigation = [
+  ...navigation,
+  { label: 'Contact', href: '/contact' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Sitemap', href: '/sitemap' },
+];
+
 const reusableAssetSource = (folder: string) =>
   `https://github.com/aispanda/reusable-ai-assets/tree/main/${encodeURIComponent(folder)}`;
 
 export const assets = [
-  {
-    id: 'data-model-explorer',
-    name: 'Data Model Exploration Suite',
-    type: 'Interactive tool',
-    status: 'Live proof',
-    summary: 'Explore a fictional customer-support schema—tables, fields, relationships and business meaning—without reading database code.',
-    outcome: 'Shows how a governed model can remain understandable to product leaders and precise enough for engineers.',
-    href: '/labs/data-model-explorer/index.html',
-    tags: ['Data', 'Architecture', 'UI/UX'],
-  },
   {
     id: 'rapid-solution-delivery',
     name: 'AI-Native Rapid Solution Delivery Kit',

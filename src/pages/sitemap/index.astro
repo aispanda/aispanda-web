@@ -1,0 +1,73 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { assets, insights, navigation, principles } from '@/data/site';
+
+const sections = [
+  {
+    title: 'Primary pages',
+    links: [
+      { label: 'Home', href: '/' },
+      ...navigation,
+      { label: 'Contact', href: '/contact' },
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Sitemap', href: '/sitemap' },
+    ],
+  },
+  {
+    title: 'Principles',
+    links: principles.map((principle) => ({
+      label: `${principle.number} ${principle.title}`,
+      href: `/principles#${principle.id}`,
+    })),
+  },
+  {
+    title: 'Insights',
+    links: [
+      { label: 'All insights', href: '/insights' },
+      ...insights.map((insight) => ({
+        label: insight.title,
+        href: `/insights/${insight.slug}`,
+      })),
+    ],
+  },
+  {
+    title: 'Reusable assets',
+    links: [
+      { label: 'All reusable assets', href: '/assets' },
+      ...assets.map((asset) => ({
+        label: asset.name,
+        href: asset.href,
+      })),
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Sitemap"
+  description="A human-readable map of AIspanda pages, principles, insights, and reusable assets. Machine-readable sitemap XML is also published for search engines."
+>
+  <header class="page-hero shell">
+    <p class="eyebrow">Find your way</p>
+    <h1>Sitemap</h1>
+    <p class="lede">
+      Every public page in one place. Search engines also use the XML sitemap at
+      <a class="text-link" href="/sitemap-index.xml">/sitemap-index.xml</a>.
+    </p>
+  </header>
+
+  <section class="section shell sitemap-page">
+    {sections.map((section) => (
+      <div class="sitemap-group">
+        <h2>{section.title}</h2>
+        <ul>
+          {section.links.map((link) => (
+            <li>
+              <a href={link.href}>{link.label}</a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </section>
+</BaseLayout>

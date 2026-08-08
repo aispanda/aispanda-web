@@ -1,3 +1,7 @@
+---
+import { footerNavigation } from '@/data/site';
+---
+
 <footer class="site-footer">
   <div class="shell footer-grid">
     <div>
@@ -5,11 +9,9 @@
       <p>Practical AI thinking, reusable systems, and working proof.</p>
     </div>
     <nav aria-label="Footer">
-      <a href="/assets">Reusable assets</a>
-      <a href="/principles">Engineering principles</a>
-      <a href="/about">About</a>
-      <a href="/contact">Contact</a>
-      <a href="/privacy">Privacy</a>
+      {footerNavigation.map((item) => (
+        <a href={item.href}>{item.label}</a>
+      ))}
     </nav>
     <div class="footer-meta">
       <p>Built openly. Improved continuously.</p>
