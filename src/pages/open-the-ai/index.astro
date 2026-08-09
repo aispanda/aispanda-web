@@ -74,6 +74,11 @@ const toc = headings.filter((heading) => heading.depth === 2);
   </article>
 </BaseLayout>
 
+<script>
+  import { enhanceInsightTables } from '@/scripts/enhance-insight-tables';
+  enhanceInsightTables();
+</script>
+
 {
   toc.length > 0 && (
     <script>

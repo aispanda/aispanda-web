@@ -13,7 +13,7 @@ What those private products do **not** automatically give you is a public or ind
 
 **Own the shared track** does not mean one person, or even one university, buys the whole machine. Most students, startups, and single campuses are too small alone. It means different kinds of buyers pooling together (universities, public agencies, and paying firms) behind an **independent or public switchboard**: a shared front door that sends each job to a good enough path, pools purchasing power, and lets you leave when a better option wins on evidence. Providers then compete for that work. Brand and flag loyalty stop being the trap.
 
-That design is what this essay calls a **Competitive Public AI Switchboard**. It borrows the private lesson (shared serving, pay for use, open weights welcome) and asks public and consortium buyers to own the track so the market stays thick. Capitalist friendly. Competition first. Thought leadership and small experiments on limited means, not a program I can fund. If institutions pick it up, good.
+That design is what this essay calls a **Competitive Public AI Switchboard**. It borrows the private lesson (shared serving, pay for use, open weights welcome) and asks public and consortium buyers to own the track so the market stays thick—and providers keep competing for the work.
 
 Plain terms are in **Terminology** at the end. Hard terms get one plain gloss on first use.
 
