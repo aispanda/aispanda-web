@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { insights } from '@/data/site';
+import { insights, insightHref } from '@/data/site';
 ---
 
 <BaseLayout title="Insights" description="Essays and notes from AI Spanda — published only when ready, not as placeholders.">
@@ -20,7 +20,7 @@ import { insights } from '@/data/site';
       ) : (
         <div class="insight-list">
           {insights.map((insight) => (
-            <a class="insight-row" href={`/insights/${insight.slug}`}>
+            <a class="insight-row" href={insightHref(insight)}>
               <small>{insight.eyebrow}</small><div><h3>{insight.title}</h3><p>{insight.summary}</p></div><span>{insight.readTime} →</span>
             </a>
           ))}

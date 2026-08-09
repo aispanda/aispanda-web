@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { assets, insights, navigation, principles } from '@/data/site';
+import { assets, insights, insightHref, navigation, principles } from '@/data/site';
 
 const sections = [
   {
@@ -26,7 +26,7 @@ const sections = [
       { label: 'All insights', href: '/insights' },
       ...insights.map((insight) => ({
         label: insight.title,
-        href: `/insights/${insight.slug}`,
+        href: insightHref(insight),
       })),
     ],
   },

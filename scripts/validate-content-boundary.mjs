@@ -15,6 +15,8 @@ const ignoredDirectories = new Set(['.astro', '.git', 'dist', 'node_modules']);
 const ignoredPathMatchers = [
   /(?:^|\/)docs\/content(?:\/|$)/i,
   /(?:^|\/)docs\/private(?:\/|$)/i,
+  /(?:^|\/)docs\/research(?:\/|$)/i,
+  /(?:^|\/)docs\/seeds(?:\/|$)/i,
   /(?:^|\/)docs\/seeds\/SEED-002[^/]*\.md$/i,
   /(?:^|\/)docs\/brand\/VIBE_IDENTITY_BRIEF\.md$/i,
   /(?:^|\/)docs\/brand\/[^/]*-private[^/]*$/i,

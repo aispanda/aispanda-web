@@ -3,16 +3,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import { insights } from '@/data/site';
 import { getEntry, render } from 'astro:content';
 
-export async function getStaticPaths() {
-  return insights
-    .filter((insight) => !insight.path)
-    .map((insight) => ({
-      params: { slug: insight.slug },
-      props: { insight },
-    }));
+const insight = insights.find((entry) => entry.slug === 'open-the-ai');
+
+if (!insight) {
+  throw new Error('Missing insight catalog entry for open-the-ai');
 }
 
-const { insight } = Astro.props;
 const entry = await getEntry('insights', insight.slug);
 
 if (!entry) {

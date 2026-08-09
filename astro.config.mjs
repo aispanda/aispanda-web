@@ -6,4 +6,8 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'never',
   integrations: [sitemap()],
+  redirects: {
+    '/insights/open-the-ai': '/open-the-ai',
+    '/insights/public-ai-switchboard': '/open-the-ai',
+  },
 });

@@ -225,13 +225,25 @@ export const assetDetails = [
 
 export const insights: {
   slug: string;
+  path?: string;
   eyebrow: string;
   title: string;
   summary: string;
   readTime: string;
 }[] = [
-  // No public insights until owner ACCEPT from incubated seeds (see docs/seeds/SEED-004-*).
+  {
+    slug: 'open-the-ai',
+    path: '/open-the-ai',
+    eyebrow: 'Incentive design',
+    title: 'Own the Shared Track. Make AI Providers Compete for the Work.',
+    summary:
+      'Access to advanced AI is splitting opportunity. Students, startups, campuses, and countries across the Global South that cannot reach strong tools will not only move slower. They will live under rules written elsewhere, much as early COVID vaccine supply clustered with richer buyers when push came to shove. That is an equity problem, and for dependent nations a sovereignty risk. This essay argues for an independent or public shared track so providers compete for the work on results, not brand loyalty.',
+    readTime: '18 min read',
+  },
 ];
+
+export const insightHref = (insight: (typeof insights)[number]) =>
+  insight.path ?? `/insights/${insight.slug}`;
 
 export const principles = [
   {
