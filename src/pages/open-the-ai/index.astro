@@ -21,15 +21,6 @@ const toc = headings.filter((heading) => heading.depth === 2);
 
 <BaseLayout title={insight.title} description={insight.summary}>
   <article class="insight-article">
-    <header class="page-hero shell insight-hero">
-      <div class="insight-hero-meta">
-        <p class="eyebrow">{insight.eyebrow} · {insight.readTime}</p>
-        <a class="insight-back" href="/insights">← All insights</a>
-      </div>
-      <h1>{insight.title}</h1>
-      <p class="lede">{insight.summary}</p>
-    </header>
-
     <div class="shell insight-layout">
       {
         toc.length > 0 && (
@@ -63,7 +54,16 @@ const toc = headings.filter((heading) => heading.depth === 2);
         )
       }
 
-      <div class="insight-main content-stack">
+      <div class="insight-main">
+        <header class="insight-hero">
+          <div class="insight-hero-meta">
+            <p class="eyebrow">{insight.eyebrow} · {insight.readTime}</p>
+            <a class="insight-back" href="/insights">← All insights</a>
+          </div>
+          <h1>{insight.title}</h1>
+          <p class="lede">{insight.summary}</p>
+        </header>
+
         <section class="content-card insight-body">
           <div class="insight-prose">
             <Content />
