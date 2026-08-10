@@ -13,4 +13,16 @@ import { assets } from '@/data/site';
   <section class="section" style="padding-top: 1rem">
     <div class="shell card-grid">{assets.map((asset, index) => <AssetCard asset={asset} featured={index === 0} />)}</div>
   </section>
+  <section class="section section-alt" aria-labelledby="supportzero-demo-heading">
+    <div class="shell section-head">
+      <div>
+        <p class="eyebrow">Working demonstration</p>
+        <h2 id="supportzero-demo-heading">See what plain language delivery can produce.</h2>
+      </div>
+      <div>
+        <p>SupportZero is a fictional support workspace shaped through an agentic workflow. Explore responsive Account, Contact, and Case lists with transparent demo boundaries and no live customer data.</p>
+        <p><a class="button" href="/labs/supportzero-case-workspace/index.html">Open the SupportZero workspace</a></p>
+      </div>
+    </div>
+  </section>
 </BaseLayout>
