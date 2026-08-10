@@ -28,7 +28,7 @@ export const assets = [
   },
   {
     id: 'supportzero-workspace',
-    name: 'SupportZero Workspace',
+    name: 'Support Zero Workspace',
     type: 'Working demonstration',
     status: 'Live proof',
     summary: 'Explore fictional Account, Contact, and Case lists in a responsive support workspace with transparent demo boundaries.',
