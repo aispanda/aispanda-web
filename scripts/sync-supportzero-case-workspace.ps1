@@ -62,5 +62,13 @@ if (-not (Test-Path -LiteralPath $copiedIndex -PathType Leaf)) {
     throw 'SupportZero workspace copy did not produce index.html.'
 }
 
+$hostedAssetPrefix = '/support-workspace/assets/'
+$copiedIndexText = Get-Content -LiteralPath $copiedIndex -Raw
+$hostedIndexText = $copiedIndexText.Replace('./assets/', $hostedAssetPrefix)
+if ($hostedIndexText -eq $copiedIndexText -or $hostedIndexText -match '(?:src|href)="\./assets/') {
+    throw 'SupportZero workspace index did not receive the hosted asset prefix.'
+}
+Set-Content -LiteralPath $copiedIndex -Value $hostedIndexText -NoNewline
+
 $fileCount = (Get-ChildItem -LiteralPath $destination -Recurse -File).Count
 Write-Host "SupportZero Case Workspace synced: $fileCount files -> $destination"

@@ -27,6 +27,16 @@ export const assets = [
     tags: ['Data', 'Architecture', 'UI/UX'],
   },
   {
+    id: 'supportzero-workspace',
+    name: 'SupportZero Workspace',
+    type: 'Working demonstration',
+    status: 'Live proof',
+    summary: 'Explore fictional Account, Contact, and Case lists in a responsive support workspace with transparent demo boundaries.',
+    outcome: 'Shows how plain language requirements can become a polished, reviewed business experience without live customer data.',
+    href: '/support-workspace',
+    tags: ['Support', 'UI/UX', 'Agentic AI'],
+  },
+  {
     id: 'rapid-solution-delivery',
     name: 'AI-Native Rapid Solution Delivery Kit',
     type: 'Delivery system',
