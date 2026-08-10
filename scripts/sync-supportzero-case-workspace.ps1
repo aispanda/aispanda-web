@@ -43,12 +43,11 @@ foreach ($file in $sourceFiles.Where({ $_.Extension -in @('.html', '.js', '.css'
 
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $publicRoot = (Resolve-Path -LiteralPath (Join-Path $projectRoot 'public')).Path
-$labsRoot = Join-Path $publicRoot 'labs'
-$destination = Join-Path $labsRoot 'supportzero-case-workspace'
-$expectedPrefix = $labsRoot + [IO.Path]::DirectorySeparatorChar
+$destination = Join-Path $publicRoot 'support-workspace'
+$expectedPrefix = $publicRoot + [IO.Path]::DirectorySeparatorChar
 
 if (-not $destination.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "Refusing to write outside the project public/labs directory: $destination"
+    throw "Refusing to write outside the project public directory: $destination"
 }
 
 if (Test-Path -LiteralPath $destination) {
