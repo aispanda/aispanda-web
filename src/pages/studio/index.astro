@@ -44,6 +44,45 @@ const { Content } = await render(entry);
           <button class="studio-button" type="button" data-local-access hidden>Continue with local prototype</button>
           <button class="studio-button studio-button-secondary" type="button" data-access-retry hidden>Use another account</button>
         </div>
+        <form class="studio-profile-form" data-profile-form hidden>
+          <p>Signed in as <strong data-profile-email></strong></p>
+          <label>
+            <span>Professional role</span>
+            <select data-profile-professional-role>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+              <option value="student">Student</option>
+              <option value="educator-researcher">Educator or researcher</option>
+              <option value="technology-ai-practitioner">Technology or AI practitioner</option>
+              <option value="business-operations-leader">Business or operations leader</option>
+              <option value="public-sector-policy">Public sector or policy</option>
+              <option value="writer-creator">Writer or creator</option>
+              <option value="independent-learner">Independent learner</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Primary interest</span>
+            <select data-profile-primary-interest>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+              <option value="practical-ai">Practical AI use</option>
+              <option value="ai-strategy">AI strategy and leadership</option>
+              <option value="open-reusable-ai">Open and reusable AI</option>
+              <option value="ai-policy-social-impact">AI policy and social impact</option>
+              <option value="education-training">Education and training</option>
+              <option value="community-discussion">Community and discussion</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Country or area</span>
+            <select data-profile-country>
+              <option value="">Prefer not to say</option>
+            </select>
+          </label>
+          <small>These choices help us understand our community. They do not change your account permissions.</small>
+          <button class="studio-button" type="submit" data-profile-submit>Continue</button>
+          <small role="status" aria-live="polite" data-profile-status></small>
+        </form>
         <div class="studio-role-request" data-role-request-panel hidden>
           <p>Signed in as <strong data-role-request-email></strong></p>
           <label>
@@ -1258,6 +1297,11 @@ const { Content } = await render(entry);
   .studio-access-card h1 { margin: .2rem 0 0; font-size: clamp(2rem, 7vw, 2.7rem); letter-spacing: -.045em; line-height: 1.05; }
   .studio-access-card > p:not(.studio-kicker), .studio-access-card > small { margin: 0; color: var(--muted); line-height: 1.55; }
   .studio-access-actions { display: grid; gap: .65rem; }
+  .studio-profile-form { display: grid; gap: .85rem; }
+  .studio-profile-form[hidden] { display: none; }
+  .studio-profile-form > p, .studio-profile-form > small { margin: 0; color: var(--muted); line-height: 1.45; }
+  .studio-profile-form label { display: grid; gap: .35rem; font-weight: 700; }
+  .studio-profile-form select { width: 100%; min-height: 2.85rem; box-sizing: border-box; border: 1px solid var(--line); border-radius: .65rem; background: white; color: var(--ink); font: inherit; padding: .55rem .7rem; }
   .studio-role-request { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: #f8f7f3; }
   .studio-role-request p { margin: 0; color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
   .studio-role-request label { display: grid; gap: .35rem; color: var(--ink); font-size: .8rem; font-weight: 750; }

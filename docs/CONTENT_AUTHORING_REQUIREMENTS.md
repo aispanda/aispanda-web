@@ -50,7 +50,11 @@ Comment permissions are ownership-based. Commenters, Authors and Publishers may 
 ### Identity, analysis and outreach data
 
 - Use basic Google sign-in only; do not request Gmail, contacts or other expanded Google scopes.
-- Record the stable account ID, verified email, display name, profile image URL, provider, first/last sign-in times, privacy-notice version, role and necessary security/audit events.
+- Use one `Continue with Google` action for both account creation and returning sign-in. On first successful use, show a one-time profile step before continuing.
+- Record the stable account ID, verified email, display name, provider, first/last sign-in times, privacy-notice version, role and necessary security/audit events. Do not store or display the Google profile photo.
+- The profile step uses three optional native dropdowns: `Professional role`, `Primary interest` and `Country or area`. Each defaults to `Prefer not to say`; declining optional profile data must not block registration or change permissions.
+- Keep professional role and interest separate from authorization roles. Use a small product-owned category list rather than free text so analysis remains consistent and the form stays quick.
+- Store country/area as an ISO 3166-1 alpha-2 code sourced from the public UN M49 list; render localized names with `Intl.DisplayNames`, provide a no-answer option and do not use flags.
 - Use product activity for service operation and aggregated analysis under a documented purpose and retention period.
 - Do not use sign-in or content activity for outreach unless the person separately opts in. Store the consent purpose, notice version, timestamp and withdrawal state; provide unsubscribe and preference controls.
 - Do not infer or target people by religion, philosophy, politics, health or other sensitive traits from the sites, groups, articles or comments they use. Any future exceptional use requires a documented lawful basis, explicit product approval and appropriate consent/safeguards before collection.

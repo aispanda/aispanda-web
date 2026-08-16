@@ -21,6 +21,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { countryCodes } from '../data/countries';
 
 export type StudioDraftRecord = Record<string, unknown> & { updatedAt?: string };
 export type StudioRole = 'administrator' | 'publisher' | 'author' | 'commenter' | 'viewer';
@@ -34,6 +35,13 @@ export type RoleRequest = {
   createdAt: string;
   reviewedAt: string;
   reviewedBy: string;
+};
+
+type MemberProfileChoices = {
+  professionalRole: string;
+  primaryInterest: string;
+  countryCode: string;
+  profileCompletedAt: string;
 };
 
 export type StudioBackend = {
@@ -146,18 +154,126 @@ const rememberAuthorizedSession = (user: User, role: EditorialRole) => {
   }));
 };
 
+const professionalRoleValues = new Set([
+  'prefer-not-to-say',
+  'student',
+  'educator-researcher',
+  'technology-ai-practitioner',
+  'business-operations-leader',
+  'public-sector-policy',
+  'writer-creator',
+  'independent-learner',
+  'other',
+]);
+
+const primaryInterestValues = new Set([
+  'prefer-not-to-say',
+  'practical-ai',
+  'ai-strategy',
+  'open-reusable-ai',
+  'ai-policy-social-impact',
+  'education-training',
+  'community-discussion',
+  'other',
+]);
+
+const countryCodeValues = new Set<string>(countryCodes);
+
+const populateCountryOptions = (select: HTMLSelectElement) => {
+  if (select.options.length > 1) return;
+  let displayNames: Intl.DisplayNames | undefined;
+  try {
+    displayNames = new Intl.DisplayNames(navigator.languages, { type: 'region' });
+  } catch {
+    displayNames = undefined;
+  }
+  const collator = new Intl.Collator(navigator.languages, { sensitivity: 'base' });
+  const options = countryCodes
+    .map((code) => ({ code, label: displayNames?.of(code) ?? code }))
+    .sort((left, right) => collator.compare(left.label, right.label));
+  for (const { code, label } of options) {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = label;
+    select.append(option);
+  }
+};
+
+const requestProfileChoices = (user: User): Promise<MemberProfileChoices> => {
+  const form = find<HTMLFormElement>('[data-profile-form]');
+  const email = find<HTMLElement>('[data-profile-email]');
+  const professionalRole = find<HTMLSelectElement>('[data-profile-professional-role]');
+  const primaryInterest = find<HTMLSelectElement>('[data-profile-primary-interest]');
+  const country = find<HTMLSelectElement>('[data-profile-country]');
+  const submit = find<HTMLButtonElement>('[data-profile-submit]');
+  const status = find<HTMLElement>('[data-profile-status]');
+  const googleButton = find<HTMLButtonElement>('[data-google-signin]');
+  if (!form || !professionalRole || !primaryInterest || !country || !submit || !status) {
+    return Promise.reject(new Error('The profile form is unavailable.'));
+  }
+
+  populateCountryOptions(country);
+  if (email) email.textContent = user.email ?? '';
+  if (googleButton) googleButton.hidden = true;
+  showAccessState('Complete your profile', 'Three quick, optional choices help us understand the community.');
+  form.hidden = false;
+
+  return new Promise((resolve) => {
+    const handleSubmit = (event: SubmitEvent) => {
+      event.preventDefault();
+      const professionalRoleValue = professionalRole.value;
+      const primaryInterestValue = primaryInterest.value;
+      const countryCode = country.value;
+      if (
+        !professionalRoleValues.has(professionalRoleValue)
+        || !primaryInterestValues.has(primaryInterestValue)
+        || (countryCode !== '' && !countryCodeValues.has(countryCode))
+      ) {
+        status.textContent = 'Choose a listed option for each field.';
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = 'Saving…';
+      status.textContent = '';
+      form.removeEventListener('submit', handleSubmit);
+      form.hidden = true;
+      resolve({
+        professionalRole: professionalRoleValue,
+        primaryInterest: primaryInterestValue,
+        countryCode,
+        profileCompletedAt: new Date().toISOString(),
+      });
+    };
+    form.addEventListener('submit', handleSubmit);
+  });
+};
+
 const recordAuthorizedProfile = async (user: User) => {
   const db = getFirestore();
   const profileRef = doc(db, 'userProfiles', user.uid);
   const existing = await getDoc(profileRef);
+  const existingData = existing.exists() ? existing.data() : undefined;
   const now = new Date().toISOString();
+  const hasCompletedProfile = existingData
+    && typeof existingData.profileCompletedAt === 'string'
+    && professionalRoleValues.has(existingData.professionalRole)
+    && primaryInterestValues.has(existingData.primaryInterest)
+    && (existingData.countryCode === '' || countryCodeValues.has(existingData.countryCode));
+  const choices: MemberProfileChoices = hasCompletedProfile
+    ? {
+        professionalRole: existingData.professionalRole,
+        primaryInterest: existingData.primaryInterest,
+        countryCode: existingData.countryCode,
+        profileCompletedAt: existingData.profileCompletedAt,
+      }
+    : await requestProfileChoices(user);
   await setDoc(profileRef, {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName ?? '',
-    photoURL: user.photoURL ?? '',
     providerIds: user.providerData.map((provider) => provider.providerId),
-    firstSeenAt: existing.exists() ? existing.data().firstSeenAt : now,
+    ...choices,
+    firstSeenAt: existingData?.firstSeenAt ?? now,
     lastSeenAt: now,
     privacyNoticeVersion: '2026-08-16',
   });

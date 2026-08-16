@@ -59,7 +59,8 @@ service cloud.firestore {
 
     function validProfile(uid) {
       return request.resource.data.keys().hasOnly([
-          'uid', 'email', 'displayName', 'photoURL', 'providerIds',
+          'uid', 'email', 'displayName', 'providerIds', 'professionalRole',
+          'primaryInterest', 'countryCode', 'profileCompletedAt',
           'firstSeenAt', 'lastSeenAt', 'privacyNoticeVersion'
         ])
         && request.resource.data.uid == uid
@@ -67,10 +68,21 @@ service cloud.firestore {
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() <= 200
-        && request.resource.data.photoURL is string
-        && request.resource.data.photoURL.size() <= 2000
         && request.resource.data.providerIds is list
         && request.resource.data.providerIds.size() <= 10
+        && request.resource.data.professionalRole in [
+          'prefer-not-to-say', 'student', 'educator-researcher',
+          'technology-ai-practitioner', 'business-operations-leader',
+          'public-sector-policy', 'writer-creator', 'independent-learner', 'other'
+        ]
+        && request.resource.data.primaryInterest in [
+          'prefer-not-to-say', 'practical-ai', 'ai-strategy',
+          'open-reusable-ai', 'ai-policy-social-impact',
+          'education-training', 'community-discussion', 'other'
+        ]
+        && request.resource.data.countryCode is string
+        && request.resource.data.countryCode.size() <= 2
+        && request.resource.data.profileCompletedAt is string
         && request.resource.data.firstSeenAt is string
         && request.resource.data.lastSeenAt is string
         && request.resource.data.privacyNoticeVersion is string;

@@ -22,6 +22,7 @@ This document owns accepted solution decisions and their reasons. `SITE_FOUNDATI
 | AD-011 | Accepted | Collect necessary identity, role, security and audit data at sign-in; keep outreach consent separate and optional; do not infer sensitive beliefs for targeting. | Supports operations and useful analysis without turning participation in AI, spiritual or accountability communities into undisclosed sensitive profiling. |
 | AD-012 | Accepted | Launch the private Studio at the protected `/studio` route and expose `Sign in` when signed out, `Content Studio` when authorized, and contextual `Edit article` controls only to authorized staff. | Welcomes Commenters and View Only members without implying editorial access; role checks still protect Studio and editing controls. |
 | AD-013 | Accepted | Commit only Firebase's public web identifiers in `.env.production`; keep authorization in Firestore rules and private role records. | Ensures clean Cloud Build containers can initialize sign-in without treating client-visible identifiers as secrets or exposing private access data. |
+| AD-014 | Accepted | Use one Google continuation flow for account creation and sign-in, followed once by optional native dropdowns for professional role, primary interest and UN M49/ISO country or area; do not retain profile photos. | Keeps onboarding short, analyzable and privacy-conscious while avoiding duplicate auth choices, unnecessary image data and third-party country-list dependencies. |
 
 ## Activated foundation (2026-08-16)
 
