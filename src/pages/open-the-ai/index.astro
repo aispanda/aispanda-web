@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import Comments from '@/components/Comments.astro';
 import { insights } from '@/data/site';
 import { getEntry, render } from 'astro:content';
 
@@ -70,6 +71,8 @@ const toc = headings.filter((heading) => heading.depth === 2);
             <Content />
           </div>
         </section>
+
+        <Comments articleSlug={insight.slug} />
       </div>
     </div>
   </article>

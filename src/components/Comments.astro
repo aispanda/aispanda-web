@@ -1,0 +1,286 @@
+---
+interface Props {
+  articleSlug: string;
+}
+
+const { articleSlug } = Astro.props;
+---
+
+<section class="comments" id="comments" data-comments data-article-slug={articleSlug} aria-labelledby="comments-title">
+  <header class="comments-header">
+    <div>
+      <p class="eyebrow">Discussion</p>
+      <h2 id="comments-title">Join the conversation</h2>
+      <p>Share a useful question, experience or respectful disagreement.</p>
+    </div>
+    <span class="comments-count" data-comments-count>Loading…</span>
+  </header>
+
+  <div class="comments-notice" role="status" aria-live="polite" data-comments-notice hidden></div>
+
+  <div class="comments-account">
+    <div data-comments-signed-out>
+      <p>Sign in with Google to comment or reply.</p>
+      <button class="comments-button" type="button" data-comments-signin>Sign in to comment</button>
+    </div>
+
+    <form class="comments-profile" data-comments-profile hidden>
+      <div>
+        <strong>Complete your profile</strong>
+        <p>These optional choices help us understand the community. They never change your access.</p>
+      </div>
+      <div class="comments-profile-grid">
+        <label for="comment-profile-role">
+          <span>Professional role</span>
+          <select id="comment-profile-role" data-comments-profile-role>
+            <option value="prefer-not-to-say">Prefer not to say</option>
+            <option value="student">Student</option>
+            <option value="educator-researcher">Educator or researcher</option>
+            <option value="technology-ai-practitioner">Technology or AI practitioner</option>
+            <option value="business-operations-leader">Business or operations leader</option>
+            <option value="public-sector-policy">Public sector or policy</option>
+            <option value="writer-creator">Writer or creator</option>
+            <option value="independent-learner">Independent learner</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label for="comment-profile-interest">
+          <span>Primary interest</span>
+          <select id="comment-profile-interest" data-comments-profile-interest>
+            <option value="prefer-not-to-say">Prefer not to say</option>
+            <option value="practical-ai">Practical AI</option>
+            <option value="ai-strategy">AI strategy</option>
+            <option value="open-reusable-ai">Open and reusable AI</option>
+            <option value="ai-policy-social-impact">AI policy and social impact</option>
+            <option value="education-training">Education and training</option>
+            <option value="community-discussion">Community discussion</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label for="comment-profile-country">
+          <span>Country or area</span>
+          <select id="comment-profile-country" data-comments-profile-country>
+            <option value="">Prefer not to say</option>
+          </select>
+        </label>
+      </div>
+      <button class="comments-button" type="submit" data-comments-profile-submit>Continue</button>
+    </form>
+
+    <div class="comments-member" data-comments-member hidden>
+      <p>Signed in as <strong data-comments-member-name></strong> <span data-comments-member-role></span></p>
+      <button class="comments-link-button" type="button" data-comments-signout>Sign out</button>
+    </div>
+  </div>
+
+  <form class="comments-composer" data-comments-composer hidden>
+    <label for="new-comment">Add a comment</label>
+    <textarea id="new-comment" rows="4" maxlength="5000" placeholder="Write a thoughtful comment…" data-comments-body required></textarea>
+    <div class="comments-composer-actions">
+      <span data-comments-character-count>0 / 5,000</span>
+      <button class="comments-button" type="submit" data-comments-submit>Post comment</button>
+    </div>
+  </form>
+
+  <p class="comments-view-only" data-comments-view-only hidden>
+    Your account has View Only access. You can read the discussion but cannot comment or reply.
+  </p>
+
+  <div class="comments-list" data-comments-list aria-live="polite">
+    <p>Loading comments…</p>
+  </div>
+</section>
+
+<script>
+  import { initializeComments } from '@/scripts/comments';
+  initializeComments();
+</script>
+
+<style>
+  .comments :global([hidden]) { display: none !important; }
+
+  .comments {
+    margin-top: 2rem;
+    padding: clamp(1.2rem, 3vw, 2rem);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .comments-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .comments-header h2 { margin: .2rem 0 .45rem; font-size: clamp(1.55rem, 3vw, 2.25rem); }
+  .comments-header p { margin: 0; color: var(--muted); }
+  .comments-count { flex-shrink: 0; color: var(--muted); font-size: .86rem; font-weight: 750; }
+
+  .comments-notice,
+  .comments-view-only {
+    margin: 1rem 0 0;
+    padding: .8rem 1rem;
+    border-radius: .7rem;
+    background: #fff6dd;
+    color: #6c4b00;
+  }
+
+  .comments-account { margin-top: 1.25rem; }
+  .comments-account p { margin: 0 0 .7rem; color: var(--muted); }
+
+  .comments-button {
+    min-height: 42px;
+    padding: .65rem 1rem;
+    border: 1px solid var(--ink);
+    border-radius: .7rem;
+    background: var(--ink);
+    color: white;
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .comments-button:hover { background: #2a2d33; }
+  .comments-button:disabled { cursor: wait; opacity: .6; }
+
+  .comments-profile {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: .8rem;
+    background: #faf9f5;
+  }
+
+  .comments-profile p { margin: .25rem 0 0; }
+  .comments-profile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+  .comments-profile label { display: grid; gap: .35rem; color: var(--ink); font-size: .82rem; font-weight: 750; }
+  .comments-profile select {
+    width: 100%;
+    min-height: 42px;
+    padding: .55rem .65rem;
+    border: 1px solid var(--line);
+    border-radius: .6rem;
+    background: white;
+    color: var(--ink);
+    font: inherit;
+  }
+
+  .comments-profile .comments-button { justify-self: start; }
+
+  .comments-member {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .75rem 0;
+  }
+
+  .comments-member p { margin: 0; }
+  .comments-member [data-comments-member-role] { margin-left: .35rem; color: var(--muted); text-transform: capitalize; }
+
+  .comments-link-button {
+    border: 0;
+    background: transparent;
+    color: var(--blue);
+    font: inherit;
+    font-size: .86rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .comments-link-button:hover { text-decoration: underline; text-underline-offset: .16em; }
+
+  .comments-composer {
+    display: grid;
+    gap: .55rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: .8rem;
+    background: #faf9f5;
+  }
+
+  .comments-composer label { font-weight: 800; }
+  .comments-composer textarea,
+  .comment-editor textarea,
+  .comment-reply-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    padding: .8rem;
+    border: 1px solid #b9b6ae;
+    border-radius: .65rem;
+    background: white;
+    color: var(--ink);
+    font: inherit;
+    line-height: 1.5;
+  }
+
+  .comments-composer textarea:focus,
+  .comment-editor textarea:focus,
+  .comment-reply-form textarea:focus {
+    outline: 3px solid color-mix(in srgb, var(--blue), transparent 70%);
+    border-color: var(--blue);
+  }
+
+  .comments-composer-actions,
+  .comment-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .75rem;
+  }
+
+  .comments-composer-actions span { margin-right: auto; color: var(--muted); font-size: .8rem; }
+  .comments-list { margin-top: 1.5rem; }
+  .comments-empty { padding: 1.5rem 0; color: var(--muted); text-align: center; }
+
+  :global(.comment-thread) { padding: 1.1rem 0; border-top: 1px solid var(--line); }
+  :global(.comment-thread:first-child) { border-top: 0; }
+  :global(.comment-replies) { margin: .8rem 0 0 1.25rem; padding-left: 1rem; border-left: 2px solid #e3dfd5; }
+  :global(.comment-reply) { padding: .85rem 0; border-top: 1px solid #ebe8df; }
+  :global(.comment-reply:first-child) { border-top: 0; }
+  :global(.comment-meta) { display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; }
+  :global(.comment-author) { color: var(--ink); font-weight: 800; }
+  :global(.comment-date),
+  :global(.comment-edited) { color: var(--muted); font-size: .78rem; }
+  :global(.comment-pinned) {
+    padding: .12rem .38rem;
+    border-radius: 999px;
+    background: #fff0c2;
+    color: #6c4b00;
+    font-size: .7rem;
+    font-weight: 800;
+  }
+  :global(.comment-body) { margin: .45rem 0 .6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  :global(.comment-body.is-deleted) { color: var(--muted); font-style: italic; }
+  :global(.comment-actions) { display: flex; flex-wrap: wrap; gap: .75rem; }
+  :global(.comment-actions button) {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--blue);
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  :global(.comment-actions button:hover) { text-decoration: underline; text-underline-offset: .15em; }
+  :global(.comment-actions button:disabled) { color: var(--muted); cursor: default; text-decoration: none; }
+  :global(.comment-editor),
+  :global(.comment-reply-form) { display: grid; gap: .55rem; margin-top: .7rem; }
+  :global(.comment-form-actions .comments-link-button) { color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .comments-header { display: grid; }
+    .comments-profile-grid { grid-template-columns: 1fr; }
+    .comments-member { align-items: flex-start; }
+    :global(.comment-replies) { margin-left: .35rem; padding-left: .75rem; }
+  }
+</style>

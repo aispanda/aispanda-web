@@ -17,6 +17,7 @@ const currentPath = Astro.url.pathname;
         <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
       ))}
       <a href="/studio" data-staff-signin>Sign in</a>
+      <a href="/studio" data-member-entry hidden>My account</a>
       <a href="/studio" data-studio-entry hidden>Content Studio</a>
       <a class="button button-small" href="/contact">Write</a>
     </nav>
@@ -33,22 +34,30 @@ const currentPath = Astro.url.pathname;
   });
 
   const sessionKey = 'aispanda-studio-authorized-session-v1';
+  const memberSessionKey = 'aispanda-member-session-v1';
   const staffSignIn = document.querySelector<HTMLElement>('[data-staff-signin]');
+  const memberEntry = document.querySelector<HTMLElement>('[data-member-entry]');
   const studioEntry = document.querySelector<HTMLElement>('[data-studio-entry]');
   const refreshStudioNavigation = () => {
     let authorized = false;
+    let signedIn = false;
     try {
       const session = JSON.parse(window.localStorage.getItem(sessionKey) ?? '{}') as { role?: string; expiresAt?: number };
       authorized = ['administrator', 'publisher', 'author'].includes(session.role ?? '')
         && Number(session.expiresAt) > Date.now();
+      const memberSession = JSON.parse(window.localStorage.getItem(memberSessionKey) ?? '{}') as { role?: string; expiresAt?: number };
+      signedIn = ['administrator', 'publisher', 'author', 'commenter', 'viewer'].includes(memberSession.role ?? '')
+        && Number(memberSession.expiresAt) > Date.now();
     } catch {
       authorized = false;
+      signedIn = false;
     }
-    if (staffSignIn) staffSignIn.hidden = authorized;
+    if (staffSignIn) staffSignIn.hidden = authorized || signedIn;
+    if (memberEntry) memberEntry.hidden = authorized || !signedIn;
     if (studioEntry) studioEntry.hidden = !authorized;
   };
   refreshStudioNavigation();
   window.addEventListener('storage', (event) => {
-    if (event.key === sessionKey) refreshStudioNavigation();
+    if (event.key === sessionKey || event.key === memberSessionKey) refreshStudioNavigation();
   });
 </script>

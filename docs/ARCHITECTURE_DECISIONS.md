@@ -23,6 +23,7 @@ This document owns accepted solution decisions and their reasons. `SITE_FOUNDATI
 | AD-012 | Accepted | Launch the private Studio at the protected `/studio` route and expose `Sign in` when signed out, `Content Studio` when authorized, and contextual `Edit article` controls only to authorized staff. | Welcomes Commenters and View Only members without implying editorial access; role checks still protect Studio and editing controls. |
 | AD-013 | Accepted | Commit only Firebase's public web identifiers in `.env.production`; keep authorization in Firestore rules and private role records. | Ensures clean Cloud Build containers can initialize sign-in without treating client-visible identifiers as secrets or exposing private access data. |
 | AD-014 | Accepted | Use one Google continuation flow for account creation and sign-in, followed once by optional native dropdowns for professional role, primary interest and UN M49/ISO country or area; do not retain profile photos. | Keeps onboarding short, analyzable and privacy-conscious while avoiding duplicate auth choices, unnecessary image data and third-party country-list dependencies. |
+| AD-015 | Accepted | Own the article comments UI and permission logic; store bounded threads in Firestore rather than adopting a hosted comment plug-in. Keep public comment content separate from private ownership records. | Reuses the existing Google identity and roles, avoids another account/vendor, protects stable account identifiers, keeps the experience brand-consistent and preserves a future storage-migration path. |
 
 ## Activated foundation (2026-08-16)
 
@@ -32,6 +33,7 @@ This document owns accepted solution decisions and their reasons. `SITE_FOUNDATI
 - Firestore Standard was created in `us-east1`, matching Cloud Run, and production-deny-by-default rules were published.
 - Two initial administrator invitations were created privately; each verified invitee claims a UID-based role record on first successful sign-in. User records remain outside version-controlled documentation.
 - Verified accounts without an invitation receive Commenter access and may submit one editorial-role request; deployed Firestore rules reserve approval and role changes for existing Administrators.
+- The first article discussion uses two-level threads, one like per eligible member, top-level pins for Publishers/Administrators, owner edit/delete and Administrator edit/delete. Deleted text becomes a thread-preserving tombstone.
 
 ## Target responsibility boundary
 

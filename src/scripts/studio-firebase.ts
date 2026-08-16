@@ -143,10 +143,21 @@ const waitForLocalAccess = () => new Promise<StudioBackend>((resolve) => {
 });
 
 const authorizedSessionKey = 'aispanda-studio-authorized-session-v1';
+const memberSessionKey = 'aispanda-member-session-v1';
 
 const clearAuthorizedSession = () => window.localStorage.removeItem(authorizedSessionKey);
+const clearMemberSession = () => window.localStorage.removeItem(memberSessionKey);
+
+const rememberMemberSession = (user: User, role: StudioRole) => {
+  window.localStorage.setItem(memberSessionKey, JSON.stringify({
+    uid: user.uid,
+    role,
+    expiresAt: Date.now() + 60 * 60 * 1000,
+  }));
+};
 
 const rememberAuthorizedSession = (user: User, role: EditorialRole) => {
+  rememberMemberSession(user, role);
   window.localStorage.setItem(authorizedSessionKey, JSON.stringify({
     uid: user.uid,
     role,
@@ -422,6 +433,7 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
 
   retryButton?.addEventListener('click', async () => {
     clearAuthorizedSession();
+    clearMemberSession();
     await signOut(auth);
     window.location.reload();
   });
@@ -430,6 +442,7 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
     const stopObserving = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         clearAuthorizedSession();
+        clearMemberSession();
         showAccessState('Sign in to Content Studio', 'New accounts start as Commenters. Editorial tools require Administrator approval.');
         if (googleButton) googleButton.disabled = false;
         return;
@@ -462,13 +475,14 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
         const allowed = access.exists()
           && access.data().active === true
           && (role === 'administrator' || role === 'publisher' || role === 'author');
+        rememberMemberSession(user, role as StudioRole);
         await recordAuthorizedProfile(user);
         if (!allowed && (role === 'commenter' || role === 'viewer')) {
           clearAuthorizedSession();
           showAccessState(
             role === 'commenter' ? 'Commenter access active' : 'View-only access active',
             role === 'commenter'
-              ? 'You can participate in comments when they launch. Request an editorial role to enter Content Studio.'
+              ? 'You can participate in comments on published articles. Request an editorial role to enter Content Studio.'
               : 'This account can read permitted content but cannot create or edit content.',
           );
           if (googleButton) googleButton.hidden = true;
@@ -490,6 +504,7 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
         unlockStudio(backend);
         find<HTMLButtonElement>('[data-studio-signout]')?.addEventListener('click', async () => {
           clearAuthorizedSession();
+          clearMemberSession();
           await signOut(auth);
           window.location.reload();
         });

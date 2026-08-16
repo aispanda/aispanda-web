@@ -2,7 +2,7 @@
 
 Status: Proposed product baseline
 Audience: product, design and engineering
-Scope: authenticated blog authoring first; structured books, comments and community later
+Scope: authenticated blog authoring and article comments first; structured books and community later
 
 ## Outcome
 
@@ -33,11 +33,11 @@ The public site should remain fast and static-first. The first release should pr
 
 | Role | Capability |
 |---|---|
-| Administrator | All content and publishing capabilities; manage users and roles; create, reply to, edit or delete any comment; manage publication settings and integrations. |
-| Publisher | Create and edit articles; publish and unpublish articles; create and reply to comments; edit or delete their own comments; no user, role or security administration. |
-| Author | Create and edit articles, initially their own; create and reply to comments; edit or delete their own comments; cannot publish or unpublish. |
-| Commenter | Default role for a verified new account. Create and reply to comments; edit or delete their own comments; cannot change another person's comments or access Studio. May request an editorial role. |
-| View Only | Read permitted content; cannot create, reply to, edit or delete articles or comments. On public content this is equivalent to an ordinary reader. |
+| Administrator | All content and publishing capabilities; manage users and roles; create, reply to, like, edit or delete any comment; pin top-level comments; manage publication settings and integrations. |
+| Publisher | Create and edit articles; publish and unpublish articles; create, reply to and like comments; edit or delete their own comments; pin top-level comments; no user, role or security administration. |
+| Author | Create and edit articles, initially their own; create, reply to and like comments; edit or delete their own comments; cannot publish or unpublish. |
+| Commenter | Default role for a verified new account. Create, reply to and like comments; edit or delete their own comments; cannot change another person's comments or access Studio. May request an editorial role. |
+| View Only | Read permitted content; cannot create, reply to, like, edit or delete articles or comments. On public content this is equivalent to an ordinary reader. |
 
 Add another role only when it requires a distinct permission set. Permissions must be enforced by security rules and privileged APIs, not only hidden in the interface.
 
@@ -45,7 +45,9 @@ Role requests never grant access by themselves. Approval must update the private
 
 Published content cannot be deleted by any role. An Administrator or Publisher must unpublish it first; deletion then follows the protected unpublished-content workflow.
 
-Comment permissions are ownership-based. Commenters, Authors and Publishers may create comments and replies and may edit or delete only comments they authored. Administrators have all comment rights and may delete any comment, including their own. No non-Administrator may edit or delete another person's comment. These constraints must be enforced in Firestore rules or privileged APIs as well as reflected in the interface.
+Comment permissions are ownership-based. Commenters, Authors and Publishers may create comments and replies and may edit or delete only comments they authored. Administrators may edit or delete any comment. Publishers and Administrators may pin or unpin top-level comments. Every eligible signed-in member may like a comment once and remove their own like; View Only cannot mutate discussion data. These constraints must be enforced in Firestore rules or privileged APIs as well as reflected in the interface.
+
+The first discussion UI remains article-first: a minimal composer, chronological two-level threads, replies grouped under their top-level comment and pinned top-level comments first. Deleting text preserves a visible tombstone when needed so replies do not lose context. V1 excludes avatars, images, rich text, votes/dislikes, badges, follower mechanics, notifications and passage-level responses.
 
 ### Identity, analysis and outreach data
 

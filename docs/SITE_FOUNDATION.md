@@ -61,7 +61,7 @@ New identity for a **personal AI thought-leadership blog** (not a firm; nothing 
 
 ## Current boundaries
 
-No comments, accounts, uploads, payments, analytics, newsletter or application AI calls are active. The approved support-form demo is the only custom form: it accepts fictional non-confidential data, persists it to a separate private operational database, returns the case number, and may expose only case number, channel, status and received time for the three most recent live Cases. Names, email addresses, subjects, messages, provider identifiers and operational relationships remain private. Contact otherwise uses ordinary email with a warning not to send confidential information.
+Google member accounts and bounded article comments are active. Public comment documents contain the displayed name, comment text, timestamps, like count and pin/deletion state; stable account ownership and individual likes remain in separately protected records. No uploads, payments, analytics, newsletter or application AI calls are active. The approved support-form demo accepts fictional non-confidential data, persists it to a separate private operational database, returns the case number, and may expose only case number, channel, status and received time for the three most recent live Cases. Names, email addresses, subjects, messages, provider identifiers and operational relationships remain private. Contact otherwise uses ordinary email with a warning not to send confidential information.
 
 Public source and generated output must not contain prohibited source-project or third-party names, or copied identity/content. The production build enforces this boundary automatically without storing those names in readable repository text.
 

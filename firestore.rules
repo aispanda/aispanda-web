@@ -32,6 +32,146 @@ service cloud.firestore {
       return hasStudioAccess() && get(accessPath()).data.role == 'publisher';
     }
 
+    function canComment() {
+      return hasStudioAccess()
+        && get(accessPath()).data.role in [
+          'administrator', 'publisher', 'author', 'commenter'
+        ];
+    }
+
+    function profilePath() {
+      return /databases/$(database)/documents/userProfiles/$(request.auth.uid);
+    }
+
+    function commentPath(slug, commentId) {
+      return /databases/$(database)/documents/publishedContent/$(slug)/comments/$(commentId);
+    }
+
+    function commentOwnerPath(slug, commentId) {
+      return /databases/$(database)/documents/publishedContent/$(slug)/commentOwners/$(commentId);
+    }
+
+    function commentLikePath(slug, commentId) {
+      return /databases/$(database)/documents/publishedContent/$(slug)/commentLikes/$(commentId + '_' + request.auth.uid);
+    }
+
+    function canPinComments() {
+      return hasStudioAccess()
+        && get(accessPath()).data.role in ['administrator', 'publisher'];
+    }
+
+    function validNewComment(slug, commentId) {
+      return canComment()
+        && exists(profilePath())
+        && request.resource.data.keys().hasOnly([
+          'articleSlug', 'parentId', 'body', 'authorName',
+          'createdAt', 'updatedAt', 'edited', 'deleted', 'deletedAt',
+          'likeCount', 'pinned', 'pinnedAt'
+        ])
+        && request.resource.data.articleSlug == slug
+        && request.resource.data.parentId is string
+        && request.resource.data.parentId.size() <= 128
+        && (
+          request.resource.data.parentId == ''
+          || (
+            exists(commentPath(slug, request.resource.data.parentId))
+            && get(commentPath(slug, request.resource.data.parentId)).data.parentId == ''
+          )
+        )
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.authorName == get(profilePath()).data.displayName
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 200
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.edited == false
+        && request.resource.data.deleted == false
+        && request.resource.data.deletedAt == null
+        && request.resource.data.likeCount == 0
+        && request.resource.data.pinned == false
+        && request.resource.data.pinnedAt == null
+        && existsAfter(commentOwnerPath(slug, commentId))
+        && getAfter(commentOwnerPath(slug, commentId)).data.authorUid == request.auth.uid
+        && getAfter(commentOwnerPath(slug, commentId)).data.commentId == commentId
+        && getAfter(commentOwnerPath(slug, commentId)).data.createdAt == request.time;
+    }
+
+    function preservesCommentIdentity() {
+      return request.resource.data.articleSlug == resource.data.articleSlug
+        && request.resource.data.parentId == resource.data.parentId
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validOwnCommentEdit(slug, commentId) {
+      return (
+          get(commentOwnerPath(slug, commentId)).data.authorUid == request.auth.uid
+          || isAdministrator()
+        )
+        && resource.data.deleted == false
+        && request.resource.data.deleted == false
+        && request.resource.data.deletedAt == null
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.edited == true
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'body', 'edited', 'updatedAt'
+        ]);
+    }
+
+    function validCommentDeletion() {
+      return resource.data.deleted == false
+        && request.resource.data.deleted == true
+        && request.resource.data.body == ''
+        && request.resource.data.deletedAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.pinned == false
+        && request.resource.data.pinnedAt == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'body', 'deleted', 'deletedAt', 'updatedAt', 'pinned', 'pinnedAt'
+        ]);
+    }
+
+    function validLikeChange(slug, commentId) {
+      return resource.data.deleted == false
+        && request.resource.data.likeCount is int
+        && request.resource.data.likeCount >= 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+        && (
+          (
+            request.resource.data.likeCount == resource.data.likeCount + 1
+            && !exists(commentLikePath(slug, commentId))
+            && existsAfter(commentLikePath(slug, commentId))
+          )
+          || (
+            request.resource.data.likeCount == resource.data.likeCount - 1
+            && exists(commentLikePath(slug, commentId))
+            && !existsAfter(commentLikePath(slug, commentId))
+          )
+        );
+    }
+
+    function validPinChange() {
+      return canPinComments()
+        && resource.data.deleted == false
+        && resource.data.parentId == ''
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned', 'pinnedAt'])
+        && (
+          (
+            request.resource.data.pinned == true
+            && request.resource.data.pinnedAt == request.time
+          )
+          || (
+            request.resource.data.pinned == false
+            && request.resource.data.pinnedAt == null
+          )
+        );
+    }
+
     function validDraft() {
       return request.resource.data.keys().hasOnly([
           'title', 'body', 'excerpt', 'slug', 'tags', 'publicationStatus',
@@ -187,6 +327,58 @@ service cloud.firestore {
             && request.resource.data.ownerUid == request.auth.uid));
       allow delete: if isAdministrator() || isPublisher()
         || (isAuthor() && resource.data.ownerUid == request.auth.uid);
+    }
+
+    match /publishedContent/{slug}/comments/{commentId} {
+      allow read: if true;
+      allow create: if validNewComment(slug, commentId);
+      allow update: if canComment()
+        && preservesCommentIdentity()
+        && (
+          validOwnCommentEdit(slug, commentId)
+          || validLikeChange(slug, commentId)
+          || validPinChange()
+          || (
+            validCommentDeletion()
+            && (
+              get(commentOwnerPath(slug, commentId)).data.authorUid == request.auth.uid
+              || isAdministrator()
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /publishedContent/{slug}/commentOwners/{commentId} {
+      allow read: if signedIn()
+        && (resource.data.authorUid == request.auth.uid || isAdministrator());
+      allow create: if canComment()
+        && request.resource.data.keys().hasOnly(['commentId', 'authorUid', 'createdAt'])
+        && request.resource.data.commentId == commentId
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && existsAfter(commentPath(slug, commentId))
+        && getAfter(commentPath(slug, commentId)).data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /publishedContent/{slug}/commentLikes/{likeId} {
+      allow read: if signedIn()
+        && (resource.data.userUid == request.auth.uid || isAdministrator());
+      allow create: if canComment()
+        && request.resource.data.keys().hasOnly(['commentId', 'userUid', 'createdAt'])
+        && likeId == request.resource.data.commentId + '_' + request.auth.uid
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && exists(commentPath(slug, request.resource.data.commentId))
+        && getAfter(commentPath(slug, request.resource.data.commentId)).data.likeCount
+          == get(commentPath(slug, request.resource.data.commentId)).data.likeCount + 1;
+      allow update: if false;
+      allow delete: if canComment()
+        && resource.data.userUid == request.auth.uid
+        && likeId == resource.data.commentId + '_' + request.auth.uid
+        && getAfter(commentPath(slug, resource.data.commentId)).data.likeCount
+          == get(commentPath(slug, resource.data.commentId)).data.likeCount - 1;
     }
 
     match /{document=**} {
