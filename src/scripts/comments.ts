@@ -431,7 +431,7 @@ export const initializeComments = () => {
     const canWrite = Boolean(currentUser && currentRole && currentRole !== 'viewer');
     const ownsComment = ownedCommentIds.has(comment.id);
     const canDelete = Boolean(!comment.deleted && currentUser && (ownsComment || currentRole === 'administrator'));
-    const canEdit = Boolean(!comment.deleted && currentUser && (ownsComment || currentRole === 'administrator'));
+    const canEdit = Boolean(!comment.deleted && currentUser && ownsComment);
     const canPin = Boolean(!comment.deleted && comment.parentId === '' && ['administrator', 'publisher'].includes(currentRole ?? ''));
     if (!comment.deleted || canEdit || canDelete || canPin) {
       const actions = document.createElement('div');

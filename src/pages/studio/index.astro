@@ -93,9 +93,13 @@ const { Content } = await render(entry);
               <option value="administrator">Administrator</option>
             </select>
           </label>
-          <button class="studio-button" type="button" data-role-request-submit>Send request</button>
+          <div class="studio-role-request-actions">
+            <button class="studio-button" type="button" data-role-request-submit>Send request</button>
+            <button class="studio-button studio-button-secondary" type="button" data-role-request-cancel hidden>Cancel request</button>
+          </div>
           <small role="status" aria-live="polite" data-role-request-status>Only an existing administrator can approve this request.</small>
         </div>
+        <a class="studio-button studio-button-secondary studio-back-home" href="/">Back to AI Spanda</a>
         <small>New accounts start as Commenters. Editorial access requires Administrator approval.</small>
       </div>
     </section>
@@ -1307,6 +1311,9 @@ const { Content } = await render(entry);
   .studio-role-request label { display: grid; gap: .35rem; color: var(--ink); font-size: .8rem; font-weight: 750; }
   .studio-role-request select { width: 100%; padding: .65rem .7rem; border: 1px solid var(--line); border-radius: .55rem; background: white; color: var(--ink); }
   .studio-role-request small { color: var(--muted); line-height: 1.45; }
+  .studio-role-request-actions { display: grid; gap: .6rem; }
+  .studio-role-request-actions .studio-button { width: 100%; }
+  .studio-back-home { width: 100%; box-sizing: border-box; text-decoration: none; }
   .studio-google-button { display: flex; width: 100%; min-height: 46px; align-items: center; justify-content: center; gap: .7rem; border: 1px solid #c8ccd3; border-radius: .7rem; background: white; color: var(--ink); font: inherit; font-weight: 750; cursor: pointer; }
   .studio-google-button span { display: grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; background: #4285f4; color: white; font-size: .85rem; }
   .studio-google-button:disabled { cursor: wait; opacity: .65; }

@@ -24,7 +24,7 @@ The public site should remain fast and static-first. The first release should pr
 ### Initial release
 
 - A verified new account signs in with Google and receives Commenter access by default.
-- Commenters may request Author, Publisher or Administrator access; only an existing Administrator can approve or decline the request.
+- Commenters may request Author, Publisher or Administrator access; only an existing Administrator can approve or decline the request. A pending request may be cancelled and submitted again without granting or changing access.
 - Content Studio remains inaccessible until the account has an active Administrator, Publisher or Author role.
 - Firestore security rules verify access for draft data; Cloud Run verifies identity and role for every privileged mutation, preview-link and publish request.
 - The owner can create, edit, preview, publish, unpublish, archive and restore content.
@@ -33,7 +33,7 @@ The public site should remain fast and static-first. The first release should pr
 
 | Role | Capability |
 |---|---|
-| Administrator | All content and publishing capabilities; manage users and roles; create, reply to, like, edit or delete any comment; pin top-level comments; manage publication settings and integrations. |
+| Administrator | All content and publishing capabilities; manage users and roles; create, reply to and like comments; edit only their own comments; delete any comment for moderation; pin top-level comments; manage publication settings and integrations. |
 | Publisher | Create and edit articles; publish and unpublish articles; create, reply to and like comments; edit or delete their own comments; pin top-level comments; no user, role or security administration. |
 | Author | Create and edit articles, initially their own; create, reply to and like comments; edit or delete their own comments; cannot publish or unpublish. |
 | Commenter | Default role for a verified new account. Create, reply to and like comments; edit or delete their own comments; cannot change another person's comments or access Studio. May request an editorial role. |
@@ -41,11 +41,11 @@ The public site should remain fast and static-first. The first release should pr
 
 Add another role only when it requires a distinct permission set. Permissions must be enforced by security rules and privileged APIs, not only hidden in the interface.
 
-Role requests never grant access by themselves. Approval must update the private UID-based role record, record the reviewing Administrator and retain the request outcome for audit.
+Role requests never grant access by themselves. A requester may cancel a pending request and submit another one; the latest cancellation time remains recorded. Approval must update the private UID-based role record, record the reviewing Administrator and retain the request outcome for audit.
 
 Published content cannot be deleted by any role. An Administrator or Publisher must unpublish it first; deletion then follows the protected unpublished-content workflow.
 
-Comment permissions are ownership-based. Commenters, Authors and Publishers may create comments and replies and may edit or delete only comments they authored. Administrators may edit or delete any comment. Publishers and Administrators may pin or unpin top-level comments. Every eligible signed-in member may like a comment once and remove their own like; View Only cannot mutate discussion data. These constraints must be enforced in Firestore rules or privileged APIs as well as reflected in the interface.
+Comment permissions are ownership-based. Every role may edit only comments they authored. Commenters, Authors and Publishers may delete only comments they authored; Administrators may delete any comment for moderation but may not rewrite another person's words. Publishers and Administrators may pin or unpin top-level comments. Every eligible signed-in member may like a comment once and remove their own like; View Only cannot mutate discussion data. These constraints must be enforced in Firestore rules or privileged APIs as well as reflected in the interface.
 
 The first discussion UI remains article-first: a minimal composer, chronological two-level threads, replies grouped under their top-level comment and pinned top-level comments first. Deleting text preserves a visible tombstone when needed so replies do not lose context. V1 excludes avatars, images, rich text, votes/dislikes, badges, follower mechanics, notifications and passage-level responses.
 
@@ -314,7 +314,7 @@ These are planning ranges, not commitments. The largest uncertainty is lossless 
 
 ## Preparation checklist
 
-- Keep at least two recovery Administrators. New verified accounts default to Commenter; test request, approval, decline and self-escalation denial for every editorial role.
+- Keep at least two recovery Administrators. New verified accounts default to Commenter; test request, cancellation, re-request, approval, decline and self-escalation denial for every editorial role.
 - Keep the initial Studio at the protected `/studio` route; reassess a separate application only if scale or release independence requires it.
 - Create development and production Google/Firebase projects.
 - Register OAuth origins and redirect URLs.

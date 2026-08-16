@@ -32,8 +32,8 @@ This document owns accepted solution decisions and their reasons. `SITE_FOUNDATI
 - Authorized domains are `localhost`, `127.0.0.1`, `aispanda.com` and Firebase defaults.
 - Firestore Standard was created in `us-east1`, matching Cloud Run, and production-deny-by-default rules were published.
 - Two initial administrator invitations were created privately; each verified invitee claims a UID-based role record on first successful sign-in. User records remain outside version-controlled documentation.
-- Verified accounts without an invitation receive Commenter access and may submit one editorial-role request; deployed Firestore rules reserve approval and role changes for existing Administrators.
-- The first article discussion uses two-level threads, one like per eligible member, top-level pins for Publishers/Administrators, owner edit/delete and Administrator edit/delete. Deleted text becomes a thread-preserving tombstone.
+- Verified accounts without an invitation receive Commenter access and may keep one current editorial-role request. They may cancel and re-submit it, but deployed Firestore rules reserve approval and role changes for existing Administrators.
+- The first article discussion uses two-level threads, one like per eligible member, top-level pins for Publishers/Administrators, owner-only editing, owner deletion and Administrator deletion. Administrators cannot rewrite another person's comment. Deleted text becomes a thread-preserving tombstone.
 
 ## Target responsibility boundary
 

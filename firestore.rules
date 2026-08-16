@@ -106,10 +106,7 @@ service cloud.firestore {
     }
 
     function validOwnCommentEdit(slug, commentId) {
-      return (
-          get(commentOwnerPath(slug, commentId)).data.authorUid == request.auth.uid
-          || isAdministrator()
-        )
+      return get(commentOwnerPath(slug, commentId)).data.authorUid == request.auth.uid
         && resource.data.deleted == false
         && request.resource.data.deleted == false
         && request.resource.data.deletedAt == null
@@ -281,7 +278,7 @@ service cloud.firestore {
         && get(accessPath()).data.role in ['commenter', 'viewer']
         && request.resource.data.keys().hasOnly([
           'uid', 'email', 'currentRole', 'requestedRole', 'status',
-          'createdAt', 'reviewedAt', 'reviewedBy'
+          'createdAt', 'reviewedAt', 'reviewedBy', 'lastCancelledAt'
         ])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
@@ -290,20 +287,41 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt is string
         && request.resource.data.reviewedAt == ''
-        && request.resource.data.reviewedBy == '';
+        && request.resource.data.reviewedBy == ''
+        && request.resource.data.lastCancelledAt == '';
       allow update: if (
           request.auth.uid == uid
-          && resource.data.status == 'denied'
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.currentRole == resource.data.currentRole
+          && hasStudioAccess()
+          && get(accessPath()).data.role in ['commenter', 'viewer']
+          && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'lastCancelledAt'
+          ])
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.lastCancelledAt is string
+          && request.resource.data.lastCancelledAt != ''
+        ) || (
+          request.auth.uid == uid
+          && hasStudioAccess()
+          && get(accessPath()).data.role in ['commenter', 'viewer']
+          && resource.data.status in ['denied', 'cancelled']
+          && request.resource.data.keys().hasOnly([
+            'uid', 'email', 'currentRole', 'requestedRole', 'status',
+            'createdAt', 'reviewedAt', 'reviewedBy', 'lastCancelledAt'
+          ])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.email == request.auth.token.email
+          && request.resource.data.currentRole == get(accessPath()).data.role
           && request.resource.data.requestedRole in ['author', 'publisher', 'administrator']
           && request.resource.data.status == 'pending'
           && request.resource.data.createdAt is string
           && request.resource.data.reviewedAt == ''
           && request.resource.data.reviewedBy == ''
+          && request.resource.data.lastCancelledAt is string
+          && request.resource.data.lastCancelledAt == resource.data.get('lastCancelledAt', '')
         ) || (
           isAdministrator()
+          && resource.data.status == 'pending'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'reviewedAt', 'reviewedBy'
           ])

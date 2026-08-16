@@ -18,6 +18,7 @@ import {
   getFirestore,
   query,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
@@ -31,10 +32,11 @@ export type RoleRequest = {
   email: string;
   currentRole: 'commenter' | 'viewer';
   requestedRole: EditorialRole;
-  status: 'pending' | 'approved' | 'denied';
+  status: 'pending' | 'approved' | 'denied' | 'cancelled';
   createdAt: string;
   reviewedAt: string;
   reviewedBy: string;
+  lastCancelledAt?: string;
 };
 
 type MemberProfileChoices = {
@@ -347,54 +349,103 @@ const showRoleRequestPanel = async (user: User, role: 'commenter' | 'viewer') =>
   const email = find<HTMLElement>('[data-role-request-email]');
   const select = find<HTMLSelectElement>('[data-role-request-select]');
   const submit = find<HTMLButtonElement>('[data-role-request-submit]');
+  const cancel = find<HTMLButtonElement>('[data-role-request-cancel]');
   const status = find<HTMLElement>('[data-role-request-status]');
-  if (!panel || !select || !submit || !status || !user.email) return;
+  if (!panel || !select || !submit || !cancel || !status || !user.email) return;
 
   panel.hidden = false;
   if (email) email.textContent = user.email;
   const requestRef = doc(db, 'roleRequests', user.uid);
-  const existing = await getDoc(requestRef);
-  if (existing.exists()) {
-    const request = existing.data() as RoleRequest;
-    if (request.status === 'pending') {
-      status.textContent = `${request.requestedRole} access requested. An administrator must approve it.`;
-      select.value = request.requestedRole;
-      select.disabled = true;
-      submit.disabled = true;
-      submit.textContent = 'Request pending';
-      return;
-    }
-    if (request.status === 'approved') {
-      status.textContent = 'Your request was approved. Reload Studio to continue.';
-      submit.textContent = 'Reload Studio';
-      submit.addEventListener('click', () => window.location.reload(), { once: true });
-      return;
-    }
-    status.textContent = 'Your previous request was not approved. You may submit a different request.';
-  }
+  let lastCancelledAt = '';
+  let requestApproved = false;
+
+  const showReadyState = (message: string) => {
+    select.disabled = false;
+    submit.hidden = false;
+    submit.disabled = false;
+    submit.textContent = 'Send request';
+    cancel.hidden = true;
+    cancel.disabled = false;
+    status.textContent = message;
+  };
+
+  const showPendingState = (requestedRole: EditorialRole) => {
+    select.value = requestedRole;
+    select.disabled = true;
+    submit.hidden = true;
+    submit.disabled = true;
+    cancel.hidden = false;
+    cancel.disabled = false;
+    status.textContent = `${requestedRole} access requested. An administrator must approve it.`;
+  };
 
   submit.addEventListener('click', async () => {
+    if (requestApproved) {
+      window.location.reload();
+      return;
+    }
     submit.disabled = true;
     status.textContent = 'Sending request…';
     try {
+      const requestedRole = select.value as EditorialRole;
       await setDoc(requestRef, {
         uid: user.uid,
         email: user.email,
         currentRole: role,
-        requestedRole: select.value as EditorialRole,
+        requestedRole,
         status: 'pending',
         createdAt: new Date().toISOString(),
         reviewedAt: '',
         reviewedBy: '',
+        lastCancelledAt,
       });
-      select.disabled = true;
-      submit.textContent = 'Request pending';
-      status.textContent = `${select.value} access requested. An administrator must approve it.`;
+      showPendingState(requestedRole);
     } catch (error) {
       submit.disabled = false;
       status.textContent = error instanceof Error ? error.message : 'The request could not be sent.';
     }
   });
+
+  cancel.addEventListener('click', async () => {
+    cancel.disabled = true;
+    status.textContent = 'Cancelling request…';
+    try {
+      lastCancelledAt = new Date().toISOString();
+      await updateDoc(requestRef, {
+        status: 'cancelled',
+        lastCancelledAt,
+      });
+      showReadyState('Request cancelled. Choose a role whenever you are ready.');
+    } catch (error) {
+      cancel.disabled = false;
+      status.textContent = error instanceof Error ? error.message : 'The request could not be cancelled.';
+    }
+  });
+
+  const existing = await getDoc(requestRef);
+  if (existing.exists()) {
+    const request = existing.data() as RoleRequest;
+    lastCancelledAt = request.lastCancelledAt ?? '';
+    if (request.status === 'pending') {
+      showPendingState(request.requestedRole);
+      return;
+    }
+    if (request.status === 'approved') {
+      requestApproved = true;
+      status.textContent = 'Your request was approved. Reload Studio to continue.';
+      select.disabled = true;
+      cancel.hidden = true;
+      submit.textContent = 'Reload Studio';
+      return;
+    }
+    showReadyState(
+      request.status === 'cancelled'
+        ? 'Request cancelled. Choose a role whenever you are ready.'
+        : 'Your previous request was not approved. You may submit a different request.',
+    );
+    return;
+  }
+  showReadyState('Only an existing administrator can approve this request.');
 };
 
 export const initializeStudioBackend = async (): Promise<StudioBackend> => {
