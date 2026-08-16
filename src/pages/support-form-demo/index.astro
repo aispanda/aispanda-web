@@ -1,0 +1,165 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const intakeEndpoint = import.meta.env.PUBLIC_SUPPORTZERO_INTAKE_URL ?? '';
+const endpointConfigured = Boolean(intakeEndpoint);
+---
+
+<BaseLayout
+  title="Support form demo"
+  description="Try AI Spanda's fictional Support Zero web-to-case workflow and receive a real case-number confirmation."
+>
+  <header class="page-hero shell support-demo-hero">
+    <p class="eyebrow">Working proof</p>
+    <h1>Submit a demo support request.</h1>
+    <p class="lede">
+      See Support Zero turn a request into a traceable Case.
+    </p>
+  </header>
+
+  <section class="section support-demo-section">
+    <div class="shell support-demo-grid">
+      <aside class="support-demo-aside" aria-labelledby="demo-expectations-title">
+        <p class="eyebrow">What to expect</p>
+        <h2 id="demo-expectations-title">Web to case, kept deliberately small.</h2>
+        <ol class="support-demo-steps">
+          <li><strong>Submit</strong><span>Required fields are checked in your browser and again by the service.</span></li>
+          <li><strong>Confirm</strong><span>You land on a confirmation page showing the case number returned by Support Zero.</span></li>
+          <li><strong>Reply</strong><span>An automated acknowledgement is sent by email. Reply to it to add a communication to the same case.</span></li>
+        </ol>
+        <p class="support-demo-note"><strong>Live demo:</strong> The workspace combines three curated Cases with the three most recent live submissions. New submissions replace the oldest. Only case number, channel, status and received time are public; submitted details remain private.</p>
+        <p>To try email-to-case instead, write a fictional request to <a href="mailto:aispandasupportdemo@gmail.com">aispandasupportdemo@gmail.com</a>.</p>
+        <p>Have a real question? Email <a href="mailto:rajeevkasat.ai@gmail.com">rajeevkasat.ai@gmail.com</a> instead of using this demo.</p>
+      </aside>
+
+      <div class="support-form-card">
+        <div id="form-error" class="support-form-error" role="alert" tabindex="-1" hidden>
+          <h2>We could not submit the request.</h2>
+          <p id="form-error-detail">Check the fields and try again.</p>
+        </div>
+
+        <form
+          id="support-demo-form"
+          class="support-form"
+          data-endpoint={intakeEndpoint}
+          aria-describedby="support-form-intro support-form-status"
+        >
+          <div class="support-form-heading">
+            <p class="eyebrow">Demo request</p>
+            <h2>How can Support Zero help?</h2>
+            <p id="support-form-intro">Fields marked required must be completed. Organisation is optional.</p>
+          </div>
+
+          <div class="support-form-field">
+            <label for="support-name">Full name <span aria-hidden="true">*</span></label>
+            <input id="support-name" name="name" type="text" autocomplete="name" maxlength="255" required />
+          </div>
+
+          <div class="support-form-field">
+            <label for="support-email">Email address <span aria-hidden="true">*</span></label>
+            <input id="support-email" name="email" type="email" autocomplete="email" maxlength="320" required />
+            <p class="support-form-hint">The automated acknowledgement and case number will be sent here.</p>
+          </div>
+
+          <div class="support-form-field">
+            <label for="support-organization">Organisation <span class="support-form-optional">(optional)</span></label>
+            <input id="support-organization" name="organization" type="text" autocomplete="organization" maxlength="255" />
+          </div>
+
+          <div class="support-form-field">
+            <label for="support-subject">Subject <span aria-hidden="true">*</span></label>
+            <input id="support-subject" name="subject" type="text" maxlength="255" required />
+          </div>
+
+          <div class="support-form-field">
+            <label for="support-message">Support request <span aria-hidden="true">*</span></label>
+            <textarea id="support-message" name="message" rows="8" maxlength="4000" required></textarea>
+            <p class="support-form-hint">Use fictional, non-confidential information only. Maximum 4,000 characters.</p>
+          </div>
+
+          <div class="demo-honeypot" aria-hidden="true">
+            <label for="support-website">Website</label>
+            <input id="support-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+
+          <label class="support-form-confirm" for="support-confirm">
+            <input id="support-confirm" name="confirm_non_confidential" type="checkbox" required />
+            <span>I confirm this is fictional demo content and contains no confidential or sensitive information. <a href="/privacy">Read the privacy information.</a></span>
+          </label>
+
+          <button class="button support-form-submit" type="submit" disabled={!endpointConfigured}>
+            Submit support request
+          </button>
+          <p id="support-form-status" class="support-form-status" aria-live="polite">
+            {endpointConfigured ? 'Your request is not sent until you select Submit.' : 'The public demo service is not connected yet.'}
+          </p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const form = document.querySelector('#support-demo-form');
+    const submit = form?.querySelector('button[type="submit"]');
+    const status = document.querySelector('#support-form-status');
+    const error = document.querySelector('#form-error');
+    const errorDetail = document.querySelector('#form-error-detail');
+
+    if (form instanceof HTMLFormElement && submit instanceof HTMLButtonElement && status instanceof HTMLElement) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+
+        const endpoint = form.dataset.endpoint;
+        if (!endpoint) return;
+        const values = new FormData(form);
+        const organisation = String(values.get('organization') ?? '').trim();
+        const payload = {
+          name: String(values.get('name') ?? ''),
+          organization: organisation || null,
+          email: String(values.get('email') ?? ''),
+          subject: String(values.get('subject') ?? ''),
+          message: String(values.get('message') ?? ''),
+          confirm_non_confidential: values.get('confirm_non_confidential') === 'on',
+          website: String(values.get('website') ?? ''),
+        };
+
+        submit.disabled = true;
+        submit.setAttribute('aria-disabled', 'true');
+        status.textContent = 'Submitting your fictional request...';
+        if (error instanceof HTMLElement) error.hidden = true;
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const detail = typeof body.detail === 'string' ? body.detail : 'The demo service could not accept the request. Please try again.';
+            throw new Error(detail);
+          }
+          if (typeof body.case_number !== 'string' || !body.case_number) {
+            throw new Error('The demo service did not return a case number. Please try again.');
+          }
+          sessionStorage.setItem('supportzero-demo-case-number', body.case_number);
+          sessionStorage.setItem('supportzero-demo-subject', payload.subject);
+          window.location.assign('/support-form-demo/confirmation');
+        } catch (caught) {
+          const message = caught instanceof Error ? caught.message : 'The demo service could not accept the request. Please try again.';
+          if (errorDetail instanceof HTMLElement) errorDetail.textContent = message;
+          if (error instanceof HTMLElement) {
+            error.hidden = false;
+            error.focus();
+          }
+          status.textContent = 'The request was not submitted.';
+          submit.disabled = false;
+          submit.removeAttribute('aria-disabled');
+        }
+      });
+    }
+  </script>
+</BaseLayout>

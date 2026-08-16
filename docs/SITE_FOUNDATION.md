@@ -56,10 +56,12 @@ New identity for a **personal AI thought-leadership blog** (not a firm; nothing 
 | D03 | Launch with light insights, principles, assets and live ERD proof | Demonstrates thinking and implementation before adding résumé or community scope. |
 | D04 | Astro static-first | Content-led launch gets fast HTML, low runtime complexity and future interactive islands. |
 | D05 | Cloud Run with scale-to-zero policy | Reuses existing Google deployment experience while avoiding an always-on compute floor. |
+| D06 | Keep the eight-asset catalogue grouped and ordered without search | Scanning remains faster at this size. Add search or filters at 15 assets, or earlier if a group exceeds eight items or user evidence shows discovery friction. |
+| D07 | Add a bounded Support Zero web-to-case demo | The public form proves durable intake and acknowledgement. The workspace combines three curated fictional Cases with privacy-safe metadata for the three most recent live submissions; newer live Cases replace the oldest live Case. Submitted identity/content and provider identifiers remain private. |
 
 ## Current boundaries
 
-No comments, accounts, uploads, payments, analytics, custom forms, newsletter, database or application AI calls in the first release. Contact uses ordinary email with a warning not to send confidential information.
+No comments, accounts, uploads, payments, analytics, newsletter or application AI calls are active. The approved support-form demo is the only custom form: it accepts fictional non-confidential data, persists it to a separate private operational database, returns the case number, and may expose only case number, channel, status and received time for the three most recent live Cases. Names, email addresses, subjects, messages, provider identifiers and operational relationships remain private. Contact otherwise uses ordinary email with a warning not to send confidential information.
 
 Public source and generated output must not contain prohibited source-project or third-party names, or copied identity/content. The production build enforces this boundary automatically without storing those names in readable repository text.
 

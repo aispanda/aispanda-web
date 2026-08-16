@@ -58,6 +58,7 @@ const toc = headings.filter((heading) => heading.depth === 2);
         <header class="insight-hero">
           <div class="insight-hero-meta">
             <p class="eyebrow">{insight.eyebrow} · {insight.readTime}</p>
+            <a class="insight-edit" href="/studio" data-local-edit hidden>Edit article</a>
             <a class="insight-back" href="/insights">← All insights</a>
           </div>
           <h1>{insight.title}</h1>
@@ -77,7 +78,40 @@ const toc = headings.filter((heading) => heading.depth === 2);
 <script>
   import { enhanceInsightTables } from '@/scripts/enhance-insight-tables';
   enhanceInsightTables();
+
+  const sessionKey = 'aispanda-studio-authorized-session-v1';
+  const editLink = document.querySelector<HTMLElement>('[data-local-edit]');
+  const refreshEditAccess = () => {
+    let authorized = false;
+    try {
+      const session = JSON.parse(window.localStorage.getItem(sessionKey) ?? '{}') as { role?: string; expiresAt?: number };
+      authorized = ['administrator', 'publisher', 'author'].includes(session.role ?? '')
+        && Number(session.expiresAt) > Date.now();
+    } catch {
+      authorized = false;
+    }
+    if (editLink) editLink.hidden = !authorized;
+  };
+  refreshEditAccess();
+  window.addEventListener('storage', (event) => {
+    if (event.key === sessionKey) refreshEditAccess();
+  });
 </script>
+
+<style>
+  .insight-edit {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--blue);
+    font-size: .85rem;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .insight-edit:hover { text-decoration: underline; text-underline-offset: .18em; }
+  .insight-edit + .insight-back { margin-left: .9rem; }
+</style>
 
 {
   toc.length > 0 && (

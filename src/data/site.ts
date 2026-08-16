@@ -15,7 +15,32 @@ export const footerNavigation = [
 const reusableAssetSource = (folder: string) =>
   `https://github.com/aispanda/reusable-ai-assets/tree/main/${encodeURIComponent(folder)}`;
 
-export const assets = [
+export type AssetStatus = 'Live proof' | 'Pilot-ready' | 'Reusable' | 'Draft';
+
+export interface CatalogueAsset {
+  id: string;
+  name: string;
+  type: string;
+  status: AssetStatus;
+  summary: string;
+  outcome: string;
+  href: string;
+  tags: string[];
+  proof: {
+    lastVerified: string;
+    note: string;
+    links: { label: string; href: string }[];
+  };
+}
+
+const maturityOrder: Record<AssetStatus, number> = {
+  'Live proof': 0,
+  Reusable: 1,
+  'Pilot-ready': 2,
+  Draft: 3,
+};
+
+const catalogueAssets: CatalogueAsset[] = [
   {
     id: 'data-model-explorer',
     name: 'Data Model Exploration Suite',
@@ -25,6 +50,14 @@ export const assets = [
     outcome: 'Shows how a governed model can remain understandable to product leaders and precise enough for engineers.',
     href: '/labs/data-model-explorer/index.html',
     tags: ['Data', 'Architecture', 'UI/UX'],
+    proof: {
+      lastVerified: '2026-08-06',
+      note: 'Live demo available; test results are not stated in the asset record.',
+      links: [
+        { label: 'Live demo', href: '/labs/data-model-explorer/index.html' },
+        { label: 'GitHub', href: reusableAssetSource('Data Model Exploration Suite') },
+      ],
+    },
   },
   {
     id: 'supportzero-workspace',
@@ -45,6 +78,11 @@ export const assets = [
     outcome: 'Speeds discovery while keeping decisions, owners and quality gates explicit.',
     href: '/assets/rapid-solution-delivery',
     tags: ['Strategy', 'Delivery', 'Governance'],
+    proof: {
+      lastVerified: '2026-08-08',
+      note: 'Automated checks are defined; independent three-project evaluation remains pending.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('AI-Native Rapid Solution Delivery Kit') }],
+    },
   },
   {
     id: 'model-routing',
@@ -55,6 +93,11 @@ export const assets = [
     outcome: 'Avoids one-model-for-everything thinking and makes provider changes manageable.',
     href: '/assets/model-routing',
     tags: ['AI', 'Models', 'Operations'],
+    proof: {
+      lastVerified: '2026-08-09',
+      note: 'Mapped from a live Gujarati-to-English bake-off; broader evaluation remains pending.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('Model-Routing Template') }],
+    },
   },
   {
     id: 'deployment-automation',
@@ -65,6 +108,11 @@ export const assets = [
     outcome: 'Makes repeat deployments safer, more consistent and easier to audit across projects.',
     href: '/assets/deployment-automation',
     tags: ['Cloud', 'Automation', 'Quality'],
+    proof: {
+      lastVerified: '2026-08-07',
+      note: 'Verification commands are documented; test results are not stated in the asset record.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('Deployment Automation') }],
+    },
   },
   {
     id: 'create-reusable-asset',
@@ -75,6 +123,11 @@ export const assets = [
     outcome: 'Lets teams reuse proven work while loading only the documentation needed for the current task.',
     href: '/assets/create-reusable-asset',
     tags: ['AI', 'Reuse', 'Governance'],
+    proof: {
+      lastVerified: '2026-08-09',
+      note: 'The RA-004 process/template case completed; broader evaluations remain pending.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('Asset-creation-skill') }],
+    },
   },
   {
     id: 'website-delivery-system',
@@ -85,16 +138,26 @@ export const assets = [
     outcome: 'Combines fast AI-assisted delivery with responsive design, accessibility, discoverability and release controls.',
     href: '/assets/website-delivery-system',
     tags: ['Web', 'UI/UX', 'Delivery'],
+    proof: {
+      lastVerified: '2026-08-09',
+      note: 'Verification gates are defined; independent three-case evaluation remains pending.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('AI-Native Website Delivery System') }],
+    },
   },
   {
     id: 'indic-language-engine',
     name: 'Indic Translation & Summarization Engine',
     type: 'Language AI workflow',
-    status: 'Draft',
+    status: 'Reusable',
     summary: 'Route Indic-language translation and summarization through selectable models with an evaluator feedback loop.',
     outcome: 'Explores cost-aware multilingual processing while making model review and limitations visible.',
     href: '/assets/indic-language-engine',
     tags: ['Language', 'AI', 'Evaluation'],
+    proof: {
+      lastVerified: '2026-08-09',
+      note: 'Asset structure verified; the Bhashini path was smoke-tested with a DoH pin.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('Indic-language-tools') }],
+    },
   },
   {
     id: 'multi-agent-orchestration',
@@ -105,8 +168,17 @@ export const assets = [
     outcome: 'Gives architects a common starting vocabulary before committing to an orchestration implementation.',
     href: '/assets/multi-agent-orchestration',
     tags: ['Agents', 'Architecture', 'Safety'],
+    proof: {
+      lastVerified: '2026-08-09',
+      note: 'Structure validated; executable implementation proof is unverified.',
+      links: [{ label: 'GitHub', href: reusableAssetSource('Multi-Agent-Orchestration') }],
+    },
   },
 ];
+
+export const assets = catalogueAssets.toSorted(
+  (a, b) => maturityOrder[a.status] - maturityOrder[b.status] || b.proof.lastVerified.localeCompare(a.proof.lastVerified),
+);
 
 export const assetDetails = [
   {
@@ -208,13 +280,13 @@ export const assetDetails = [
     githubUrl: reusableAssetSource('Indic-language-tools'),
     name: 'Indic Translation & Summarization Engine',
     type: 'Language AI workflow',
-    status: 'Draft',
-    summary: 'A draft workflow for routing Indic-language translation and summarization through selectable generator and evaluator models.',
+    status: 'Reusable',
+    summary: 'Route Indic-language translation and summarization through selectable generator and evaluator models.',
     useWhen: 'Exploring multilingual summarization where provider choice, cost and independent output review matter.',
     delivers: ['Provider-neutral model routing.', 'Translation and summarization execution.', 'An evaluator loop that can request corrections.'],
     steps: ['Provide an Indic-language transcript.', 'Choose generator and evaluator models.', 'Generate the English summary.', 'Review and revise against evaluator feedback.'],
     cost: 'Local models can be free; hosted model costs vary by provider and usage.',
-    boundaries: ['Draft and not yet verified for production use.', 'It does not acquire source transcripts, and weak model combinations may fail to converge.'],
+    boundaries: ['It does not acquire source transcripts.', 'Provider availability is an operational gate, and weak model combinations may fail to converge.'],
     tags: ['Language', 'AI', 'Evaluation'],
   },
   {

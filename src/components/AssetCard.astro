@@ -1,25 +1,31 @@
 ---
+import type { CatalogueAsset } from '@/data/site';
+
 interface Props {
-  asset: {
-    id: string;
-    name: string;
-    type: string;
-    status: string;
-    summary: string;
-    outcome: string;
-    href: string;
-    tags: string[];
-  };
+  asset: CatalogueAsset;
   featured?: boolean;
 }
 const { asset, featured = false } = Astro.props;
 ---
 
-<article class:list={['asset-card', { featured }]} id={asset.id}>
-  <div class="asset-meta"><span>{asset.type}</span><span class="status-dot">{asset.status}</span></div>
+<article class:list={['asset-card', { featured, 'is-draft': asset.status === 'Draft' }]} id={asset.id}>
+  <div class="asset-meta">
+    <span>{asset.type}</span>
+    <span class="status-badge" data-status={asset.status} aria-label={`Maturity: ${asset.status}`}>
+      <span class="status-marker" aria-hidden="true"></span>{asset.status}
+    </span>
+  </div>
   <h3>{asset.name}</h3>
   <p>{asset.summary}</p>
   <p class="asset-outcome"><strong>Why it matters:</strong> {asset.outcome}</p>
-  <div class="tag-list">{asset.tags.map((tag) => <span>{tag}</span>)}</div>
+  <section class="asset-proof" aria-labelledby={`${asset.id}-proof-heading`}>
+    <h4 class="asset-proof-label" id={`${asset.id}-proof-heading`}>Proof</h4>
+    <p>{asset.proof.note}</p>
+    <p class="asset-verified">Last verified: <time datetime={asset.proof.lastVerified}>{asset.proof.lastVerified}</time></p>
+    <div class="asset-proof-links">
+      {asset.proof.links.map((link) => <a href={link.href} aria-label={`${link.label}: ${asset.name}`}>{link.label}</a>)}
+    </div>
+  </section>
+  <div class="tag-list" aria-label="Asset topics">{asset.tags.map((tag) => <span>{tag}</span>)}</div>
   <a class="text-link" href={asset.href}>Explore asset <span aria-hidden="true">→</span></a>
 </article>

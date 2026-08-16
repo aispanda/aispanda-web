@@ -1,0 +1,55 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+const workspaceUrl = import.meta.env.PUBLIC_SUPPORTZERO_WORKSPACE_URL ?? '/support-workspace';
+---
+
+<BaseLayout title="Support request received" description="Confirmation for the AI Spanda Support Zero web-to-case demo.">
+  <section class="section support-confirmation-section">
+    <div class="shell support-confirmation-card" aria-labelledby="confirmation-title">
+      <p class="eyebrow">Request received</p>
+      <h1 id="confirmation-title" tabindex="-1">Thank you for submitting the support form.</h1>
+      <p id="confirmation-case-line" class="support-confirmation-number" hidden>
+        Your case number is <strong id="confirmation-case-number"></strong>.
+      </p>
+      <p id="confirmation-subject-line" hidden>
+        Your submitted subject is <strong id="confirmation-subject"></strong>.
+      </p>
+      <p id="confirmation-missing" hidden>Open this page by submitting the <a href="/support-form-demo">support form demo</a>.</p>
+      <p>An automated acknowledgement is queued for the email address you supplied. Reply without changing its subject for the clearest demo experience. The three most recent live Cases are retained, so a newer submission may replace an older live Case.</p>
+      <div class="hero-actions">
+        <a id="confirmation-case-link" class="button" href={workspaceUrl} data-workspace-url={workspaceUrl}>View this Case</a>
+        <a class="button" href="/support-form-demo">Submit another demo request</a>
+        <a class="button button-secondary" href="/">Return home</a>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const caseNumber = sessionStorage.getItem('supportzero-demo-case-number');
+    const submittedSubject = sessionStorage.getItem('supportzero-demo-subject');
+    const title = document.querySelector('#confirmation-title');
+    const line = document.querySelector('#confirmation-case-line');
+    const value = document.querySelector('#confirmation-case-number');
+    const missing = document.querySelector('#confirmation-missing');
+    const caseLink = document.querySelector('#confirmation-case-link');
+    const subjectLine = document.querySelector('#confirmation-subject-line');
+    const subjectValue = document.querySelector('#confirmation-subject');
+    if (caseNumber && value instanceof HTMLElement && line instanceof HTMLElement) {
+      value.textContent = caseNumber;
+      line.hidden = false;
+      if (caseLink instanceof HTMLAnchorElement) {
+        const baseUrl = caseLink.dataset.workspaceUrl || '/support-workspace';
+        const separator = baseUrl.includes('?') ? '&' : '?';
+        caseLink.href = `${baseUrl}${separator}view=case&case=${encodeURIComponent(caseNumber)}`;
+      }
+    } else if (missing instanceof HTMLElement) {
+      missing.hidden = false;
+    }
+    if (submittedSubject && subjectLine instanceof HTMLElement && subjectValue instanceof HTMLElement) {
+      subjectValue.textContent = submittedSubject;
+      subjectLine.hidden = false;
+    }
+    if (title instanceof HTMLElement) title.focus();
+  </script>
+</BaseLayout>

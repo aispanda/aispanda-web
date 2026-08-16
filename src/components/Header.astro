@@ -16,6 +16,8 @@ const currentPath = Astro.url.pathname;
       {navigation.map((item) => (
         <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
       ))}
+      <a href="/studio" data-staff-signin>Sign in</a>
+      <a href="/studio" data-studio-entry hidden>Content Studio</a>
       <a class="button button-small" href="/contact">Write</a>
     </nav>
   </div>
@@ -28,5 +30,25 @@ const currentPath = Astro.url.pathname;
     const open = button.getAttribute('aria-expanded') === 'true';
     button.setAttribute('aria-expanded', String(!open));
     nav?.toggleAttribute('data-open', !open);
+  });
+
+  const sessionKey = 'aispanda-studio-authorized-session-v1';
+  const staffSignIn = document.querySelector<HTMLElement>('[data-staff-signin]');
+  const studioEntry = document.querySelector<HTMLElement>('[data-studio-entry]');
+  const refreshStudioNavigation = () => {
+    let authorized = false;
+    try {
+      const session = JSON.parse(window.localStorage.getItem(sessionKey) ?? '{}') as { role?: string; expiresAt?: number };
+      authorized = ['administrator', 'publisher', 'author'].includes(session.role ?? '')
+        && Number(session.expiresAt) > Date.now();
+    } catch {
+      authorized = false;
+    }
+    if (staffSignIn) staffSignIn.hidden = authorized;
+    if (studioEntry) studioEntry.hidden = !authorized;
+  };
+  refreshStudioNavigation();
+  window.addEventListener('storage', (event) => {
+    if (event.key === sessionKey) refreshStudioNavigation();
   });
 </script>

@@ -5,7 +5,18 @@ export default defineConfig({
   site: 'https://aispanda.com',
   output: 'static',
   trailingSlash: 'never',
-  integrations: [sitemap()],
+  integrations: [sitemap({ filter: (page) => !page.includes('/studio') })],
+  vite: {
+    server: {
+      proxy: {
+        '/__/auth': {
+          target: 'https://aispanda.firebaseapp.com',
+          changeOrigin: true,
+          secure: true,
+        },
+      },
+    },
+  },
   redirects: {
     '/insights/open-the-ai': '/open-the-ai',
     '/insights/public-ai-switchboard': '/open-the-ai',

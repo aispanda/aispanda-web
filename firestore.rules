@@ -1,0 +1,184 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function accessPath() {
+      return /databases/$(database)/documents/studioAccess/$(request.auth.uid);
+    }
+
+    function invitePath() {
+      return /databases/$(database)/documents/studioInvites/$(request.auth.token.email);
+    }
+
+    function hasStudioAccess() {
+      return signedIn()
+        && exists(accessPath())
+        && get(accessPath()).data.active == true;
+    }
+
+    function isAdministrator() {
+      return hasStudioAccess() && get(accessPath()).data.role == 'administrator';
+    }
+
+    function isAuthor() {
+      return hasStudioAccess() && get(accessPath()).data.role == 'author';
+    }
+
+    function isPublisher() {
+      return hasStudioAccess() && get(accessPath()).data.role == 'publisher';
+    }
+
+    function validDraft() {
+      return request.resource.data.keys().hasOnly([
+          'title', 'body', 'excerpt', 'slug', 'tags', 'publicationStatus',
+          'updatedAt', 'revisions', 'ownerUid', 'ownerEmail'
+        ])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 300
+        && request.resource.data.body is string
+        && request.resource.data.body.size() <= 500000
+        && request.resource.data.excerpt is string
+        && request.resource.data.excerpt.size() <= 2000
+        && request.resource.data.slug is string
+        && request.resource.data.slug.size() <= 90
+        && request.resource.data.tags is string
+        && request.resource.data.tags.size() <= 1000
+        && request.resource.data.publicationStatus in [
+          'draft', 'published', 'published-with-changes', 'unpublished'
+        ]
+        && request.resource.data.updatedAt is string
+        && request.resource.data.revisions is list
+        && request.resource.data.revisions.size() <= 20
+        && request.resource.data.ownerUid is string
+        && request.resource.data.ownerEmail is string;
+    }
+
+    function validProfile(uid) {
+      return request.resource.data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'photoURL', 'providerIds',
+          'firstSeenAt', 'lastSeenAt', 'privacyNoticeVersion'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 200
+        && request.resource.data.photoURL is string
+        && request.resource.data.photoURL.size() <= 2000
+        && request.resource.data.providerIds is list
+        && request.resource.data.providerIds.size() <= 10
+        && request.resource.data.firstSeenAt is string
+        && request.resource.data.lastSeenAt is string
+        && request.resource.data.privacyNoticeVersion is string;
+    }
+
+    match /studioAccess/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['active', 'role', 'email', 'claimedAt'])
+        && request.resource.data.active == true
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role in [
+          'administrator', 'publisher', 'author', 'commenter', 'viewer'
+        ]
+        && (
+          request.resource.data.role == 'commenter'
+          || (
+            exists(invitePath())
+            && get(invitePath()).data.active == true
+            && request.resource.data.role == get(invitePath()).data.role
+          )
+        );
+      allow update: if isAdministrator()
+        && request.resource.data.keys().hasOnly([
+          'active', 'role', 'email', 'claimedAt', 'approvedAt', 'approvedBy'
+        ])
+        && request.resource.data.active is bool
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.claimedAt == resource.data.claimedAt
+        && request.resource.data.role in [
+          'administrator', 'publisher', 'author', 'commenter', 'viewer'
+        ];
+      allow delete: if false;
+    }
+
+    match /studioInvites/{email} {
+      allow read: if signedIn() && request.auth.token.email == email;
+      allow write: if false;
+    }
+
+    match /userProfiles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdministrator());
+      allow create: if signedIn() && validProfile(uid);
+      allow update: if signedIn()
+        && validProfile(uid)
+        && request.resource.data.firstSeenAt == resource.data.firstSeenAt;
+      allow delete: if false;
+    }
+
+    match /roleRequests/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdministrator());
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && hasStudioAccess()
+        && get(accessPath()).data.role in ['commenter', 'viewer']
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'currentRole', 'requestedRole', 'status',
+          'createdAt', 'reviewedAt', 'reviewedBy'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.currentRole == get(accessPath()).data.role
+        && request.resource.data.requestedRole in ['author', 'publisher', 'administrator']
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is string
+        && request.resource.data.reviewedAt == ''
+        && request.resource.data.reviewedBy == '';
+      allow update: if (
+          request.auth.uid == uid
+          && resource.data.status == 'denied'
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.currentRole == resource.data.currentRole
+          && request.resource.data.requestedRole in ['author', 'publisher', 'administrator']
+          && request.resource.data.status == 'pending'
+          && request.resource.data.createdAt is string
+          && request.resource.data.reviewedAt == ''
+          && request.resource.data.reviewedBy == ''
+        ) || (
+          isAdministrator()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'reviewedAt', 'reviewedBy'
+          ])
+          && request.resource.data.status in ['approved', 'denied']
+          && request.resource.data.reviewedAt is string
+          && request.resource.data.reviewedBy == request.auth.uid
+        );
+      allow delete: if false;
+    }
+
+    match /contentDrafts/{draftId} {
+      allow read: if isAdministrator() || isPublisher()
+        || (isAuthor() && resource.data.ownerUid == request.auth.uid);
+      allow create: if validDraft()
+        && (isAdministrator() || isPublisher()
+          || (isAuthor() && request.resource.data.ownerUid == request.auth.uid));
+      allow update: if validDraft()
+        && (isAdministrator() || isPublisher()
+          || (isAuthor()
+            && resource.data.ownerUid == request.auth.uid
+            && request.resource.data.ownerUid == request.auth.uid));
+      allow delete: if isAdministrator() || isPublisher()
+        || (isAuthor() && resource.data.ownerUid == request.auth.uid);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

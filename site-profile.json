@@ -12,7 +12,7 @@
     {"id": "builders", "need": "Reuse practical patterns, code, tools, prompts, and working demonstrations."}
   ],
   "stages": {
-    "launch": ["insights", "engineering-principles", "asset-catalogue", "live-data-model-explorer", "about", "contact"],
+    "launch": ["insights", "engineering-principles", "asset-catalogue", "live-data-model-explorer", "support-form-demo", "about", "contact"],
     "next": ["resume", "skills", "case-studies", "expanded-search"],
     "later": ["comments", "contributions", "member-portal", "groups-and-chat"]
   },
