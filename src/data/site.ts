@@ -68,6 +68,11 @@ const catalogueAssets: CatalogueAsset[] = [
     outcome: 'Shows how plain language requirements can become a polished, reviewed business experience without live customer data.',
     href: '/support-workspace',
     tags: ['Support', 'UI/UX', 'Agentic AI'],
+    proof: {
+      lastVerified: '2026-08-16',
+      note: 'Live public workspace using fictional data with transparent demonstration boundaries.',
+      links: [{ label: 'Live demo', href: '/support-workspace' }],
+    },
   },
   {
     id: 'rapid-solution-delivery',
