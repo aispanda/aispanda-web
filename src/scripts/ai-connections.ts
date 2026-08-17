@@ -864,11 +864,16 @@ export const createHuggingFaceConnector = (options: HuggingFaceConnectorOptions 
 
       const code = url.searchParams.get('code');
       const returnedState = url.searchParams.get('state');
-      const callbackLocation = `${url.origin}${url.pathname}`;
+      const redirectLocation = new URL(pending.redirectUri);
+      const normalizePath = (pathname: string) => pathname.replace(/\/+$/, '') || '/';
+      const callbackPath = normalizePath(url.pathname);
+      const redirectPath = normalizePath(redirectLocation.pathname);
+      const isAllowedCallbackLocation = url.origin === redirectLocation.origin
+        && (callbackPath === redirectPath || callbackPath === '/ai');
       if (
         !code
         || returnedState !== pending.state
-        || callbackLocation !== pending.redirectUri
+        || !isAllowedCallbackLocation
         || Date.now() - pending.createdAt > CONNECTION_MAX_AGE_MS
       ) {
         return {

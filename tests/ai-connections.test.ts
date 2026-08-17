@@ -277,7 +277,7 @@ test('completes PKCE and keeps the returned key only for the browser-tab session
   assert.match(JSON.stringify(requestBodies), /one-time-code/);
 });
 
-test('completes Hugging Face OAuth and validates Inference Providers access', async () => {
+test('completes Hugging Face OAuth after the account-to-AI callback handoff', async () => {
   const sessionStore = createMemoryStore();
   let authorizationUrl = '';
   const requests: Array<{ url: string; body?: string }> = [];
@@ -298,9 +298,10 @@ test('completes Hugging Face OAuth and validates Inference Providers access', as
     navigate: (url) => { authorizationUrl = url; },
   });
 
-  await connector.beginConnection('http://localhost:4321/account?section=ai');
+  await connector.beginConnection('http://localhost:4321/ai?section=ai');
   const authorization = new URL(authorizationUrl);
-  const callback = new URL('http://localhost:4321/account');
+  assert.equal(authorization.searchParams.get('redirect_uri'), 'http://localhost:4321/account');
+  const callback = new URL('http://localhost:4321/ai');
   callback.searchParams.set('code', 'one-time-hf-code');
   callback.searchParams.set('state', authorization.searchParams.get('state') ?? '');
   const result = await connector.completeConnectionCallback(callback.toString());
