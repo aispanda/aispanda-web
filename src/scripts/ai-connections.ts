@@ -93,6 +93,29 @@ export interface AiConnectionCallbackResult {
   error?: string;
 }
 
+export interface AiPersistentConnectionPayload {
+  secret: {
+    accessToken: string;
+    refreshToken?: string;
+  };
+  configuration?: Readonly<Record<string, string>>;
+  status: AiConnectionStatus;
+}
+
+export interface AiVaultSnapshot {
+  activeProvider: string | null;
+  connections: Array<{ provider: string; status: AiConnectionStatus }>;
+}
+
+interface AiVaultBridge {
+  list(): Promise<AiVaultSnapshot>;
+  save(provider: string, payload: AiPersistentConnectionPayload): Promise<AiConnectionStatus>;
+  setActive(provider: string | null): Promise<void>;
+  refresh(provider: string): Promise<AiConnectionStatus>;
+  generate(provider: string, request: AiGenerationRequest): Promise<AiGenerationResult>;
+  disconnect(provider: string): Promise<void>;
+}
+
 export interface AiRouterConnector {
   readonly descriptor: AiRouterDescriptor;
   readonly status: AiConnectionStatus;
@@ -102,7 +125,11 @@ export interface AiRouterConnector {
   completeConnectionCallback(callbackUrl: string): Promise<AiConnectionCallbackResult>;
   refreshStatus(): Promise<AiConnectionStatus>;
   generate(request: AiGenerationRequest): Promise<AiGenerationResult>;
-  disconnect(): void;
+  disconnect(): void | Promise<void>;
+  exportPersistentConnection?(): AiPersistentConnectionPayload | null;
+  persistForAccount?(): Promise<AiConnectionStatus>;
+  restorePersistedConnection?(status: AiConnectionStatus): void;
+  clearBrowserSession?(): void;
 }
 
 export class AiConnectorRegistry {
@@ -139,10 +166,16 @@ export const ACTIVE_AI_ROUTER_KEY = 'aispanda-ai-active-router-v1';
 export class AiActiveConnectionManager {
   readonly #registry: AiConnectorRegistry;
   readonly #sessionStore: SessionStore;
+  readonly #onActiveChange?: (id: string | null) => void | Promise<void>;
 
-  constructor(registry: AiConnectorRegistry, sessionStore: SessionStore = sessionStorage) {
+  constructor(
+    registry: AiConnectorRegistry,
+    sessionStore: SessionStore = sessionStorage,
+    onActiveChange?: (id: string | null) => void | Promise<void>,
+  ) {
     this.#registry = registry;
     this.#sessionStore = sessionStore;
+    this.#onActiveChange = onActiveChange;
     const requested = sessionStore.getItem(ACTIVE_AI_ROUTER_KEY);
     if (!requested) return;
     try {
@@ -174,21 +207,97 @@ export class AiActiveConnectionManager {
     const selected = this.#registry.get(id);
     if (!selected.status.connected) throw new Error(`${selected.descriptor.label} must be connected before it can be active.`);
     this.#sessionStore.setItem(ACTIVE_AI_ROUTER_KEY, id);
+    void Promise.resolve(this.#onActiveChange?.(id)).catch(() => undefined);
     return selected;
   }
 
-  disconnect(id: string) {
-    this.#registry.get(id).disconnect();
+  async disconnect(id: string) {
+    await this.#registry.get(id).disconnect();
     if (this.#sessionStore.getItem(ACTIVE_AI_ROUTER_KEY) === id) {
       this.#sessionStore.removeItem(ACTIVE_AI_ROUTER_KEY);
+      await this.#onActiveChange?.(null);
     }
   }
 
-  disconnectAll() {
-    for (const connector of this.#registry.list()) connector.disconnect();
+  async disconnectAll() {
+    await Promise.all(this.#registry.list().map((connector) => connector.disconnect()));
+    this.#sessionStore.removeItem(ACTIVE_AI_ROUTER_KEY);
+    await this.#onActiveChange?.(null);
+  }
+
+  clearBrowserSession() {
+    for (const connector of this.#registry.list()) connector.clearBrowserSession?.();
     this.#sessionStore.removeItem(ACTIVE_AI_ROUTER_KEY);
   }
+
+  restoreActive(id: string | null) {
+    if (!id) {
+      this.#sessionStore.removeItem(ACTIVE_AI_ROUTER_KEY);
+      return;
+    }
+    const selected = this.#registry.get(id);
+    if (selected.status.connected) this.#sessionStore.setItem(ACTIVE_AI_ROUTER_KEY, id);
+  }
 }
+
+const withAccountPersistence = (connector: AiRouterConnector, vault: AiVaultBridge): AiRouterConnector => {
+  let persistedStatus: AiConnectionStatus | null = null;
+  const localStatus = () => connector.status;
+  const clearLocal = () => connector.clearBrowserSession?.();
+
+  return {
+    descriptor: Object.freeze({
+      ...connector.descriptor,
+      transports: Object.freeze([...new Set([...connector.descriptor.transports, 'server-relay' as const])]),
+    }),
+    get status() { return localStatus().connected ? localStatus() : persistedStatus ?? localStatus(); },
+    beginConnection: (returnUrl) => connector.beginConnection(returnUrl),
+    connectWithApiKey: connector.connectWithApiKey
+      ? (apiKey) => connector.connectWithApiKey!(apiKey)
+      : undefined,
+    connectWithConfiguration: connector.connectWithConfiguration
+      ? (configuration) => connector.connectWithConfiguration!(configuration)
+      : undefined,
+    completeConnectionCallback: (callbackUrl) => connector.completeConnectionCallback(callbackUrl),
+    exportPersistentConnection: () => connector.exportPersistentConnection?.() ?? null,
+    async persistForAccount() {
+      const payload = connector.exportPersistentConnection?.();
+      if (!payload) {
+        if (persistedStatus?.connected) return persistedStatus;
+        throw new Error(`${connector.descriptor.label} has no verified connection to save.`);
+      }
+      const savedStatus = await vault.save(connector.descriptor.id, payload);
+      clearLocal();
+      persistedStatus = { ...savedStatus, connected: true };
+      return persistedStatus;
+    },
+    restorePersistedConnection(status) {
+      clearLocal();
+      persistedStatus = { ...status, connected: true };
+    },
+    clearBrowserSession() {
+      clearLocal();
+      persistedStatus = null;
+    },
+    async refreshStatus() {
+      if (localStatus().connected) return connector.refreshStatus();
+      if (!persistedStatus?.connected) return localStatus();
+      persistedStatus = await vault.refresh(connector.descriptor.id);
+      return persistedStatus;
+    },
+    async generate(request) {
+      if (localStatus().connected) return connector.generate(request);
+      if (!persistedStatus?.connected) return connector.generate(request);
+      return vault.generate(connector.descriptor.id, request);
+    },
+    async disconnect() {
+      if (persistedStatus?.connected) await vault.disconnect(connector.descriptor.id);
+      else await connector.disconnect();
+      clearLocal();
+      persistedStatus = null;
+    },
+  };
+};
 
 interface OpenRouterConnectorOptions {
   fetchImpl?: typeof fetch;
@@ -520,6 +629,13 @@ export const createOpenRouterConnector = (options: OpenRouterConnectorOptions = 
     sessionStore.removeItem(OPENROUTER_SESSION_KEY);
   };
 
+  const clearBrowserSession = () => {
+    apiKey = '';
+    status = { connected: false };
+    sessionStore.removeItem(OPENROUTER_SESSION_KEY);
+    sessionStore.removeItem(OPENROUTER_PENDING_KEY);
+  };
+
   const rememberConnection = () => {
     if (!apiKey || !status.connected) return;
     sessionStore.setItem(OPENROUTER_SESSION_KEY, JSON.stringify({ apiKey, status } satisfies OpenRouterSessionConnection));
@@ -683,6 +799,13 @@ export const createOpenRouterConnector = (options: OpenRouterConnectorOptions = 
       });
     },
 
+    exportPersistentConnection() {
+      if (!apiKey || !status.connected) return null;
+      return { secret: { accessToken: apiKey }, status };
+    },
+
+    clearBrowserSession,
+
     disconnect() {
       forgetConnection();
       sessionStore.removeItem(OPENROUTER_PENDING_KEY);
@@ -710,6 +833,7 @@ interface HuggingFacePendingConnection {
 
 interface HuggingFaceSessionConnection {
   apiKey: string;
+  refreshToken?: string;
   status: AiConnectionStatus;
 }
 
@@ -770,11 +894,13 @@ export const createHuggingFaceConnector = (options: HuggingFaceConnectorOptions 
     restored = undefined;
   }
   let apiKey = restored?.apiKey ?? '';
+  let refreshToken = restored?.refreshToken ?? '';
   let status: AiConnectionStatus = restored?.status ?? { connected: false };
   let model = status.label?.split(' · ')[1] ?? HUGGING_FACE_DEFAULT_MODEL;
 
   const forgetConnection = () => {
     apiKey = '';
+    refreshToken = '';
     status = { connected: false };
     sessionStore.removeItem(HUGGING_FACE_SESSION_KEY);
   };
@@ -795,7 +921,7 @@ export const createHuggingFaceConnector = (options: HuggingFaceConnectorOptions 
     const payload = await response.json() as { data?: Array<{ id?: string }> };
     model = selectHuggingFacePlaygroundModel(payload.data?.flatMap((entry) => entry.id ? [entry.id] : []) ?? [model]);
     status = { ...status, connected: true, label: `Zero-markup routing · ${model}` };
-    sessionStore.setItem(HUGGING_FACE_SESSION_KEY, JSON.stringify({ apiKey, status } satisfies HuggingFaceSessionConnection));
+    sessionStore.setItem(HUGGING_FACE_SESSION_KEY, JSON.stringify({ apiKey, refreshToken: refreshToken || undefined, status } satisfies HuggingFaceSessionConnection));
     return status;
   };
 
@@ -908,7 +1034,7 @@ export const createHuggingFaceConnector = (options: HuggingFaceConnectorOptions 
       if (!response.ok) {
         return { handled: true, connected: false, cleanUrl: cleanUrl.toString(), error: await responseError(response, 'Hugging Face') };
       }
-      const payload = await response.json() as { access_token?: string; expires_in?: number; scope?: string };
+      const payload = await response.json() as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
       if (!payload.access_token?.startsWith('hf_') || (payload.scope && !payload.scope.split(' ').includes('inference-api'))) {
         return {
           handled: true,
@@ -918,6 +1044,7 @@ export const createHuggingFaceConnector = (options: HuggingFaceConnectorOptions 
         };
       }
       apiKey = payload.access_token;
+      refreshToken = payload.refresh_token ?? '';
       status = {
         connected: true,
         expiresAt: payload.expires_in ? new Date(Date.now() + payload.expires_in * 1_000).toISOString() : undefined,
@@ -951,6 +1078,21 @@ export const createHuggingFaceConnector = (options: HuggingFaceConnectorOptions 
         extraBody: /gpt-oss/i.test(model) ? { reasoning_effort: 'low' } : {},
       });
     },
+    exportPersistentConnection() {
+      if (!apiKey || !status.connected) return null;
+      return {
+        secret: { accessToken: apiKey, refreshToken: refreshToken || undefined },
+        configuration: { clientId },
+        status,
+      };
+    },
+    clearBrowserSession() {
+      apiKey = '';
+      refreshToken = '';
+      status = { connected: false };
+      sessionStore.removeItem(HUGGING_FACE_SESSION_KEY);
+      sessionStore.removeItem(HUGGING_FACE_PENDING_KEY);
+    },
     disconnect() {
       forgetConnection();
       sessionStore.removeItem(HUGGING_FACE_PENDING_KEY);
@@ -981,7 +1123,14 @@ const CLOUDFLARE_CLIENT_ID = '29693e35e11d3865e28facf20adfcb38';
 const CLOUDFLARE_AUTH_URL = 'https://dash.cloudflare.com/oauth2/auth';
 const CLOUDFLARE_TOKEN_URL = 'https://dash.cloudflare.com/oauth2/token';
 const CLOUDFLARE_REVOKE_URL = 'https://dash.cloudflare.com/oauth2/revoke';
-const CLOUDFLARE_OAUTH_SCOPE = 'account.ai_gateway_run';
+// Scope IDs come from GET https://api.cloudflare.com/client/v4/oauth/scopes and are
+// abbreviated, so they cannot be inferred from the permission names shown in the dashboard:
+// "AI Gateway Run" is aig.run and "Workers AI Read" is ai.read. Both permissions are needed,
+// and both must also be selected on the OAuth client in Cloudflare:
+// - ai.read: the chat completion call targets /accounts/{id}/ai/*, which Cloudflare documents
+//   as requiring Workers AI rather than AI Gateway.
+// - aig.run: the call is routed through a gateway via the cf-aig-gateway-id header.
+const CLOUDFLARE_OAUTH_SCOPES = ['aig.run', 'ai.read'] as const;
 
 export const buildCloudflareAuthorizationUrl = ({
   clientId,
@@ -999,7 +1148,7 @@ export const buildCloudflareAuthorizationUrl = ({
   authorizationUrl.searchParams.set('redirect_uri', redirectUri);
   authorizationUrl.searchParams.set('response_type', 'code');
   authorizationUrl.searchParams.set('state', state);
-  authorizationUrl.searchParams.set('scope', CLOUDFLARE_OAUTH_SCOPE);
+  authorizationUrl.searchParams.set('scope', CLOUDFLARE_OAUTH_SCOPES.join(' '));
   authorizationUrl.searchParams.set('code_challenge', challenge);
   authorizationUrl.searchParams.set('code_challenge_method', 'S256');
   return authorizationUrl.toString();
@@ -1018,6 +1167,7 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
     };
   });
   let accessToken = '';
+  let refreshToken = '';
   let configuration: CloudflareConnectionConfiguration | undefined;
   let pending: CloudflarePendingConnection | undefined;
   let status: AiConnectionStatus = { connected: false };
@@ -1025,6 +1175,7 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
   const forgetConnection = () => {
     const tokenToRevoke = accessToken;
     accessToken = '';
+    refreshToken = '';
     configuration = undefined;
     pending?.popup?.close();
     pending = undefined;
@@ -1119,7 +1270,7 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
           return {
             handled: true,
             connected: false,
-            error: 'Cloudflare OAuth is not configured with the AI Gateway Run permission. Add that permission to the OAuth client in Cloudflare, then try again.',
+            error: 'Cloudflare OAuth rejected the requested permissions. Select both AI Gateway → Run and Workers AI → Read on the OAuth client in Cloudflare, then try again.',
           };
         }
         return { handled: true, connected: false, error: 'Cloudflare authorization was cancelled or denied.' };
@@ -1143,11 +1294,12 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
       if (!tokenResponse.ok) {
         return { handled: true, connected: false, error: await responseError(tokenResponse, 'Cloudflare OAuth') };
       }
-      const tokenPayload = await tokenResponse.json() as { access_token?: string; expires_in?: number };
+      const tokenPayload = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number };
       if (!tokenPayload.access_token) {
         return { handled: true, connected: false, error: 'Cloudflare did not return an access token. Start the connection again.' };
       }
       accessToken = tokenPayload.access_token;
+      refreshToken = tokenPayload.refresh_token ?? '';
       status = {
         connected: true,
         expiresAt: typeof tokenPayload.expires_in === 'number'
@@ -1181,6 +1333,22 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
         requestedRoute: `dynamic/${configuration.route}`,
         fallbackStatus: 'Controlled by the dynamic route; whether fallback was used was not reported',
       });
+    },
+    exportPersistentConnection() {
+      if (!accessToken || !configuration || !status.connected) return null;
+      return {
+        secret: { accessToken, refreshToken: refreshToken || undefined },
+        configuration: { ...configuration, clientId },
+        status,
+      };
+    },
+    clearBrowserSession() {
+      accessToken = '';
+      refreshToken = '';
+      configuration = undefined;
+      pending?.popup?.close();
+      pending = undefined;
+      status = { connected: false };
     },
     disconnect: forgetConnection,
   };
@@ -1293,6 +1461,15 @@ export const createMergeGatewayConnector = (options: BrowserTokenConnectorOption
         errorFormatter: mergeGatewayResponseError,
       });
     },
+    exportPersistentConnection() {
+      if (!apiKey || !status.connected) return null;
+      return { secret: { accessToken: apiKey }, status };
+    },
+    clearBrowserSession() {
+      apiKey = '';
+      status = { connected: false };
+      sessionStore.removeItem(MERGE_GATEWAY_SESSION_KEY);
+    },
     disconnect: forgetConnection,
   };
 };
@@ -1302,20 +1479,55 @@ export const AI_CONNECTIONS_CHANGED_EVENT = 'aispanda:ai-connections-changed';
 let browserAiConnectionContext: {
   registry: AiConnectorRegistry;
   manager: AiActiveConnectionManager;
+  vault: AiVaultBridge;
 } | undefined;
+
+const createBrowserVaultBridge = (): AiVaultBridge => ({
+  list: async () => (await import('./ai-vault-client')).loadAiVaultConnections(),
+  save: async (provider, payload) => (await import('./ai-vault-client')).saveAiVaultConnection(provider, payload),
+  setActive: async (provider) => (await import('./ai-vault-client')).setActiveAiVaultConnection(provider),
+  refresh: async (provider) => (await import('./ai-vault-client')).refreshAiVaultConnection(provider),
+  generate: async (provider, request) => (await import('./ai-vault-client')).generateWithAiVault(provider, request),
+  disconnect: async (provider) => (await import('./ai-vault-client')).disconnectAiVaultConnection(provider),
+});
 
 export const getBrowserAiConnectionContext = () => {
   if (!browserAiConnectionContext) {
+    const vault = createBrowserVaultBridge();
     const registry = new AiConnectorRegistry([
-      createOpenRouterConnector({ appName: 'AI Spanda', siteUrl: window.location.origin }),
-      createHuggingFaceConnector(),
-      createCloudflareAiGatewayConnector(),
-      createMergeGatewayConnector(),
+      withAccountPersistence(createOpenRouterConnector({ appName: 'AI Spanda', siteUrl: window.location.origin }), vault),
+      withAccountPersistence(createHuggingFaceConnector(), vault),
+      withAccountPersistence(createCloudflareAiGatewayConnector(), vault),
+      withAccountPersistence(createMergeGatewayConnector(), vault),
     ]);
     browserAiConnectionContext = {
       registry,
-      manager: new AiActiveConnectionManager(registry),
+      manager: new AiActiveConnectionManager(registry, sessionStorage, (id) => vault.setActive(id)),
+      vault,
     };
   }
   return browserAiConnectionContext;
+};
+
+export const persistBrowserAiConnections = async () => {
+  const { registry } = getBrowserAiConnectionContext();
+  for (const connector of registry.list()) {
+    if (!connector.status.connected || !connector.exportPersistentConnection?.()) continue;
+    await connector.persistForAccount?.();
+  }
+};
+
+export const restoreBrowserAiConnections = async () => {
+  const { registry, manager, vault } = getBrowserAiConnectionContext();
+  const snapshot = await vault.list();
+  for (const connection of snapshot.connections) {
+    try {
+      registry.get(connection.provider).restorePersistedConnection?.(connection.status);
+    } catch {
+      // Ignore records for a provider that this browser build does not support.
+    }
+  }
+  manager.restoreActive(snapshot.activeProvider);
+  window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
+  return snapshot;
 };

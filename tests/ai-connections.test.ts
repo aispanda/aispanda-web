@@ -349,6 +349,31 @@ test('activating a router preserves other connected routers', async () => {
   assert.match(sessionStore.getItem('aispanda-ai-openrouter-session-v1') ?? '', /sk-or-v1-test-key/);
 });
 
+test('sign-out clears browser connection state without disconnecting the account vault', () => {
+  const sessionStore = createMemoryStore();
+  let browserClears = 0;
+  let disconnects = 0;
+  const connector: AiRouterConnector = {
+    descriptor: {
+      id: 'saved', label: 'Saved router', authentication: ['managed'], transports: ['server-relay'],
+      capabilities: new Set(['text-generation']),
+    },
+    status: { connected: true },
+    async beginConnection() {},
+    async completeConnectionCallback() { return { handled: false, connected: true }; },
+    async refreshStatus() { return this.status; },
+    async generate() { return { text: 'ok', model: 'saved' }; },
+    disconnect() { disconnects += 1; },
+    clearBrowserSession() { browserClears += 1; },
+  };
+  const manager = new AiActiveConnectionManager(new AiConnectorRegistry([connector]), sessionStore);
+  manager.activate('saved');
+  manager.clearBrowserSession();
+  assert.equal(browserClears, 1);
+  assert.equal(disconnects, 0);
+  assert.equal(manager.activeId, null);
+});
+
 test('connects Cloudflare with PKCE, keeps OAuth access in memory, and revokes it on disconnect', async () => {
   const sessionStore = createMemoryStore();
   let authorizationUrl = '';
@@ -400,7 +425,14 @@ test('connects Cloudflare with PKCE, keeps OAuth access in memory, and revokes i
   const authorization = new URL(authorizationUrl);
   assert.equal(authorization.origin + authorization.pathname, 'https://dash.cloudflare.com/oauth2/auth');
   assert.equal(authorization.searchParams.get('response_type'), 'code');
-  assert.equal(authorization.searchParams.get('scope'), 'account.ai_gateway_run');
+  // Both permissions must be requested: ai.read (Workers AI) covers the /accounts/{id}/ai/*
+  // completion call and aig.run covers routing it through the gateway. These abbreviated IDs
+  // come from GET /client/v4/oauth/scopes; a mocked request cannot prove Cloudflare still
+  // publishes them, so only a live authorization attempt confirms they are accepted.
+  assert.deepEqual(
+    (authorization.searchParams.get('scope') ?? '').split(' ').sort(),
+    ['ai.read', 'aig.run'],
+  );
   assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
   assert.ok(authorization.searchParams.get('code_challenge'));
   const callback = new URL('http://localhost:4321/auth/cloudflare/callback');

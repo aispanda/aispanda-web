@@ -2,6 +2,11 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Provider credentials are encrypted and accessed only through the Cloud Run
+    // service identity. Browser SDK clients must never read or write this vault.
+    match /aiCredentialVault/{userId}/{document=**} {
+      allow read, write: if false;
+    }
     function signedIn() {
       return request.auth != null && request.auth.token.email_verified == true;
     }

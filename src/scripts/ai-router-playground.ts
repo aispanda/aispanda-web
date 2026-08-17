@@ -3,6 +3,7 @@ import {
   AI_CONNECTIONS_CHANGED_EVENT,
   PLAYGROUND_MAX_PROMPT_CHARACTERS,
   getBrowserAiConnectionContext,
+  restoreBrowserAiConnections,
   runRouterComparison,
   type RouterComparisonResult,
 } from './ai-connections';
@@ -519,12 +520,18 @@ export const initializeAiRouterPlayground = () => {
   compare?.addEventListener('click', () => void execute(selectedConnectors()));
 
   const auth = getAuth(getFirebaseClientApp());
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (loading) loading.hidden = true;
     if (signedOut) signedOut.hidden = Boolean(user);
     if (content) content.hidden = !user;
     if (!user) return;
     setStatus('Checking your connected routers…');
+    try {
+      await restoreBrowserAiConnections();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Saved AI connections could not be loaded.', 'error');
+      return;
+    }
     void Promise.allSettled(
       registry.list().filter((connector) => connector.status.connected).map((connector) => connector.refreshStatus()),
     ).then(() => {

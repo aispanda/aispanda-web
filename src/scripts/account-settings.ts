@@ -19,6 +19,8 @@ import {
 import {
   AI_CONNECTIONS_CHANGED_EVENT,
   getBrowserAiConnectionContext,
+  persistBrowserAiConnections,
+  restoreBrowserAiConnections,
 } from './ai-connections';
 import { getFirebaseClientApp, isFirebaseConfigured } from './firebase-client';
 
@@ -99,6 +101,11 @@ export const initializeAccountSettings = async () => {
 
   if (country) populateCountryOptions(country);
 
+  const app = getFirebaseClientApp();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  await setPersistence(auth, browserLocalPersistence);
+
   const { registry: connectors, manager: connectionManager } = getBrowserAiConnectionContext();
   const needsAttention = new Set<string>();
   const defaultCopy = new Map(providerCards.map((card) => [card.dataset.aiProviderCard ?? '', {
@@ -178,9 +185,10 @@ export const initializeAccountSettings = async () => {
     window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
   };
 
-  const finishConnection = (id: string, card: HTMLElement) => {
+  const finishConnection = async (id: string, card: HTMLElement) => {
     needsAttention.delete(id);
     const connector = connectors.get(id);
+    if (auth.currentUser) await connector.persistForAccount?.();
     if (!connectionManager.activeId) {
       activateConnectedRouter(id, card);
       return;
@@ -228,7 +236,7 @@ export const initializeAccountSettings = async () => {
       showConnectionResult(card, 'Checking this connection…');
       try {
         await connector.connectWithApiKey?.(candidate);
-        finishConnection(id, card);
+        await finishConnection(id, card);
         window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
       } catch (error) {
         needsAttention.add(id);
@@ -255,7 +263,7 @@ export const initializeAccountSettings = async () => {
           showConnectionResult(card, 'Continue in the Cloudflare window to approve AI Gateway access.');
           await connector.beginConnection(`${window.location.origin}/auth/cloudflare/callback`);
         } else {
-          finishConnection(id, card);
+          await finishConnection(id, card);
           window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
         }
       } catch (error) {
@@ -267,12 +275,17 @@ export const initializeAccountSettings = async () => {
       }
     });
 
-    card.querySelector<HTMLButtonElement>('[data-ai-disconnect]')?.addEventListener('click', () => {
-      connectionManager.disconnect(id);
-      needsAttention.delete(id);
-      showConnectionResult(card, `${connector.descriptor.label} disconnected from this browser tab.`);
+    card.querySelector<HTMLButtonElement>('[data-ai-disconnect]')?.addEventListener('click', async () => {
+      try {
+        await connectionManager.disconnect(id);
+        needsAttention.delete(id);
+        showConnectionResult(card, `${connector.descriptor.label} disconnected from your account.`);
+        window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
+      } catch (error) {
+        needsAttention.add(id);
+        showConnectionResult(card, error instanceof Error ? error.message : `${connector.descriptor.label} could not be disconnected.`);
+      }
       renderConnections();
-      window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
     });
   }
 
@@ -288,7 +301,7 @@ export const initializeAccountSettings = async () => {
       const callback = await connector.completeConnectionCallback(message.callbackUrl);
       if (!callback.handled) throw new Error('This Cloudflare response did not match the connection request. Start again.');
       if (callback.connected) {
-        finishConnection('cloudflare', card);
+        await finishConnection('cloudflare', card);
         window.dispatchEvent(new Event(AI_CONNECTIONS_CHANGED_EVENT));
       } else {
         needsAttention.add('cloudflare');
@@ -320,7 +333,7 @@ export const initializeAccountSettings = async () => {
     const callback = await connector.completeConnectionCallback(callbackUrl);
     if (!callback.handled) continue;
     if (callback.cleanUrl) window.history.replaceState({}, '', callback.cleanUrl);
-    if (callback.connected && card) finishConnection(connector.descriptor.id, card);
+    if (callback.connected && card) await finishConnection(connector.descriptor.id, card);
     else if (card) {
       needsAttention.add(connector.descriptor.id);
       showConnectionResult(card, callback.error ?? `${connector.descriptor.label} did not connect.`);
@@ -340,10 +353,6 @@ export const initializeAccountSettings = async () => {
   renderConnections();
   window.addEventListener(AI_CONNECTIONS_CHANGED_EVENT, renderConnections);
 
-  const app = getFirebaseClientApp();
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  await setPersistence(auth, browserLocalPersistence);
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -359,7 +368,7 @@ export const initializeAccountSettings = async () => {
   });
 
   signOutButton?.addEventListener('click', async () => {
-    connectionManager.disconnectAll();
+    connectionManager.clearBrowserSession();
     clearMemberSessions();
     await signOut(auth);
     window.location.reload();
@@ -416,6 +425,14 @@ export const initializeAccountSettings = async () => {
     }
 
     try {
+      try {
+        await persistBrowserAiConnections();
+        await restoreBrowserAiConnections();
+      } catch (connectionError) {
+        if (status) status.textContent = connectionError instanceof Error
+          ? `Your account loaded, but saved AI connections need attention: ${connectionError.message}`
+          : 'Your account loaded, but saved AI connections need attention.';
+      }
       const accessRef = doc(db, 'studioAccess', user.uid);
       let access = await getDoc(accessRef);
       if (!access.exists()) {

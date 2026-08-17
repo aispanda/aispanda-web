@@ -26,6 +26,8 @@ steps:
       - --memory=256Mi
       - --concurrency=80
       - --timeout=60
+      - --set-secrets=AI_VAULT_KEY_B64=aispanda-ai-vault-key:2
+      - --service-account=aispanda-web-runtime@aispanda.iam.gserviceaccount.com
 images:
   - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
 options:
