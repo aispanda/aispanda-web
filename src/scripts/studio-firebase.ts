@@ -1,4 +1,3 @@
-import { initializeApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
@@ -22,7 +21,14 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { countryCodes } from '../data/countries';
+import {
+  countryCodeValues,
+  populateCountryOptions,
+  primaryInterestValues,
+  professionalRoleValues,
+  type MemberProfileChoices,
+} from '../data/member-profile';
+import { getFirebaseClientApp, googleClientId, isFirebaseConfigured } from './firebase-client';
 
 export type StudioDraftRecord = Record<string, unknown> & { updatedAt?: string };
 export type StudioRole = 'administrator' | 'publisher' | 'author' | 'commenter' | 'viewer';
@@ -39,13 +45,6 @@ export type RoleRequest = {
   lastCancelledAt?: string;
 };
 
-type MemberProfileChoices = {
-  professionalRole: string;
-  primaryInterest: string;
-  countryCode: string;
-  profileCompletedAt: string;
-};
-
 export type StudioBackend = {
   mode: 'local' | 'cloud';
   role: StudioRole;
@@ -59,19 +58,7 @@ export type StudioBackend = {
 
 const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
-const firebaseConfig = {
-  apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
-  authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
-};
-
-const googleClientId = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
-const isConfigured = Object.values(firebaseConfig).every((value) => typeof value === 'string' && value.length > 0)
-  && typeof googleClientId === 'string'
-  && googleClientId.length > 0;
+const isConfigured = isFirebaseConfigured;
 
 const localBackend: StudioBackend = {
   mode: 'local',
@@ -165,51 +152,6 @@ const rememberAuthorizedSession = (user: User, role: EditorialRole) => {
     role,
     expiresAt: Date.now() + 60 * 60 * 1000,
   }));
-};
-
-const professionalRoleValues = new Set([
-  'prefer-not-to-say',
-  'student',
-  'educator-researcher',
-  'technology-ai-practitioner',
-  'business-operations-leader',
-  'public-sector-policy',
-  'writer-creator',
-  'independent-learner',
-  'other',
-]);
-
-const primaryInterestValues = new Set([
-  'prefer-not-to-say',
-  'practical-ai',
-  'ai-strategy',
-  'open-reusable-ai',
-  'ai-policy-social-impact',
-  'education-training',
-  'community-discussion',
-  'other',
-]);
-
-const countryCodeValues = new Set<string>(countryCodes);
-
-const populateCountryOptions = (select: HTMLSelectElement) => {
-  if (select.options.length > 1) return;
-  let displayNames: Intl.DisplayNames | undefined;
-  try {
-    displayNames = new Intl.DisplayNames(navigator.languages, { type: 'region' });
-  } catch {
-    displayNames = undefined;
-  }
-  const collator = new Intl.Collator(navigator.languages, { sensitivity: 'base' });
-  const options = countryCodes
-    .map((code) => ({ code, label: displayNames?.of(code) ?? code }))
-    .sort((left, right) => collator.compare(left.label, right.label));
-  for (const { code, label } of options) {
-    const option = document.createElement('option');
-    option.value = code;
-    option.textContent = label;
-    select.append(option);
-  }
 };
 
 const requestProfileChoices = (user: User): Promise<MemberProfileChoices> => {
@@ -460,7 +402,7 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
     return waitForLocalAccess();
   }
 
-  const app = initializeApp(firebaseConfig);
+  const app = getFirebaseClientApp();
   const auth = getAuth(app);
   await setPersistence(auth, browserLocalPersistence);
   const db = getFirestore(app);

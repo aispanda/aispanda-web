@@ -11,6 +11,7 @@
     "dev": "astro dev",
     "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-content-boundary.mjs dist",
     "preview": "astro preview",
+    "test:ai": "node --test tests/ai-connections.test.ts",
     "validate:profile": "node scripts/validate-site-profile.mjs",
     "validate:content": "node scripts/validate-content-boundary.mjs"
   },

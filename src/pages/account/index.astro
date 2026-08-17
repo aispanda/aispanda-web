@@ -1,0 +1,171 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { primaryInterestOptions, professionalRoleOptions } from '@/data/member-profile';
+---
+
+<BaseLayout
+  title="My account"
+  description="Manage your AI Spanda personal information and open your AI tools."
+  noindex
+>
+  <section class="account-shell">
+    <div class="account-loading account-panel" data-account-loading>
+      <p class="eyebrow">My account</p>
+      <h1>Loading your account…</h1>
+      <p>Confirming your signed-in account and settings.</p>
+    </div>
+
+    <div class="account-signed-out account-panel" data-account-signed-out hidden>
+      <p class="eyebrow">My account</p>
+      <h1>Sign in to continue</h1>
+      <p data-account-status>Your personal information and AI connections are available after Google sign-in.</p>
+      <button class="button" type="button" data-account-signin>Continue with Google</button>
+      <a href="/">Back to AI Spanda</a>
+    </div>
+
+    <div class="account-content" data-account-content hidden>
+      <header class="account-heading">
+        <div>
+          <p class="eyebrow">Account settings</p>
+          <h1>My account</h1>
+          <p>Keep your personal details current and open the tools available to your account.</p>
+        </div>
+        <div class="account-heading-actions">
+          <a class="button button-secondary" href="/studio" data-account-studio-link hidden>Open Content Studio</a>
+          <button class="account-text-button" type="button" data-account-signout>Sign out</button>
+        </div>
+      </header>
+
+      <section class="account-section" aria-labelledby="personal-information-title">
+        <div class="account-section-heading">
+          <div>
+            <p class="eyebrow">Personal information</p>
+            <h2 id="personal-information-title">About you</h2>
+          </div>
+          <span class="account-role" data-account-role></span>
+        </div>
+        <p class="account-section-intro">Only the minimum information needed for your account and community experience.</p>
+        <form class="account-form" data-account-profile-form>
+          <label>
+            <span>Name from Google</span>
+            <input type="text" data-account-name readonly />
+          </label>
+          <label>
+            <span>Email</span>
+            <input type="email" data-account-email readonly />
+          </label>
+          <label>
+            <span>Professional role</span>
+            <select data-account-professional-role>
+              {professionalRoleOptions.map(([value, label]) => <option value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Primary interest</span>
+            <select data-account-primary-interest>
+              {primaryInterestOptions.map(([value, label]) => <option value={value}>{label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>Country or area</span>
+            <select data-account-country>
+              <option value="">Prefer not to say</option>
+            </select>
+          </label>
+          <div class="account-form-action">
+            <button class="button" type="submit" data-account-profile-submit>Save changes</button>
+            <span role="status" aria-live="polite" data-account-profile-status></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="account-section account-ai-entry" aria-labelledby="account-ai-tools-title">
+        <div>
+          <p class="eyebrow">AI Tools</p>
+          <h2 id="account-ai-tools-title">Connect and compare your AI</h2>
+          <p>Manage router connections, compare the same prompt, and choose which router stays active.</p>
+        </div>
+        <a class="button button-secondary" href="/ai">Open AI Tools</a>
+      </section>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import { initializeAccountSettings } from '@/scripts/account-settings';
+  const callback = new URL(window.location.href);
+  if (callback.searchParams.get('section') === 'ai' || callback.searchParams.has('code') || callback.searchParams.has('error')) {
+    callback.searchParams.delete('section');
+    const query = callback.searchParams.toString();
+    window.location.replace(`/ai${query ? `?${query}` : ''}`);
+  } else {
+    void initializeAccountSettings();
+  }
+</script>
+
+<style>
+  .account-shell { width: min(1080px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(3rem, 7vw, 6rem) 0; }
+  .account-panel { width: min(520px, 100%); margin: 5vh auto; padding: clamp(1.5rem, 4vw, 2.5rem); border: 1px solid var(--line); border-radius: 1.25rem; background: white; box-shadow: 0 1.5rem 4rem rgb(14 18 26 / 9%); }
+  .account-panel h1, .account-heading h1 { margin: .3rem 0 .7rem; }
+  .account-panel p { color: var(--muted); }
+  .account-signed-out { display: grid; gap: 1rem; }
+  .account-signed-out[hidden], .account-content[hidden], .account-loading[hidden] { display: none; }
+  .account-signed-out .button { justify-self: start; }
+  .account-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 2rem; }
+  .account-heading p { max-width: 42rem; margin: 0; color: var(--muted); }
+  .account-heading-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 1rem; }
+  .account-text-button { padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
+  .account-text-button:hover { color: var(--ink); text-decoration: underline; }
+  .account-section { margin-top: 1.25rem; padding: clamp(1.35rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.1rem; background: white; }
+  .account-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .account-section h2 { margin: .25rem 0 0; }
+  .account-section-intro { max-width: 50rem; margin: .65rem 0 1.25rem; color: var(--muted); }
+  .account-ai-entry { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; }
+  .account-ai-entry h2 { margin: .2rem 0 .45rem; }
+  .account-ai-entry p:last-child { max-width: 42rem; margin: 0; color: var(--muted); }
+  .account-role, .connection-state { display: inline-flex; padding: .35rem .65rem; border-radius: 999px; background: #f6e7b8; color: #71510a; font-size: .78rem; font-weight: 750; }
+  .connection-state[data-connected] { background: #e9edf2; color: #465466; }
+  .connection-state[data-active-state], .connection-active-indicator { background: #dff2e6; color: #21603a; }
+  .connection-state[data-needs-attention] { background: #f8e1d6; color: #8a341f; }
+  .account-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .account-form label, .connection-advanced label { display: grid; gap: .4rem; color: var(--ink); font-weight: 700; }
+  .account-form input, .account-form select, .connection-advanced input { width: 100%; min-height: 3rem; box-sizing: border-box; border: 1px solid #cfd2d8; border-radius: .7rem; background: white; color: var(--ink); font: inherit; padding: .65rem .8rem; }
+  .account-form input[readonly] { background: #f5f3ed; color: var(--muted); }
+  .account-form-action { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; padding-top: .35rem; }
+  .account-form-action span { color: var(--muted); }
+  .active-router-note { margin-bottom: 1rem; padding: .7rem .85rem; border-radius: .7rem; background: #f1f5fc; color: #334b73; font-weight: 700; }
+  .connection-test-note { margin: -0.25rem 0 1rem; color: var(--muted); font-size: .9rem; }
+  .playground-link.is-disabled { opacity: .48; pointer-events: none; }
+  .connection-list { display: grid; gap: 1rem; }
+  .connection-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.25rem; padding: 1.25rem; border: 1px solid #d7d9de; border-radius: .9rem; background: #faf9f5; transition: border-color .2s ease, box-shadow .2s ease; }
+  .connection-card[data-active] { border-color: #2f6fe4; box-shadow: 0 0 0 2px rgb(47 111 228 / 10%); }
+  .connection-main { display: flex; align-items: start; gap: 1rem; }
+  .connection-logo { display: grid; flex: 0 0 3rem; width: 3rem; height: 3rem; place-items: center; border-radius: .75rem; background: var(--ink); color: white; font-weight: 800; }
+  .connection-logo-hf { background: #f1b928; color: #171717; }
+  .connection-logo-cf { background: #f48120; }
+  .connection-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
+  .connection-title-line h3 { margin: 0; }
+  .connection-main p { margin: .35rem 0 0; color: var(--muted); }
+  .connection-main .connection-usage { color: #425476; font-size: .9rem; }
+  .connection-actions { display: flex; align-items: flex-end; flex-direction: column; gap: .7rem; }
+  .connection-actions [hidden] { display: none; }
+  .connection-active-indicator { display: inline-flex; align-items: center; gap: .35rem; padding: .55rem .8rem; border-radius: .7rem; font-weight: 800; }
+  .connection-actions a { color: var(--clarity); font-weight: 700; }
+  .connection-advanced, .connection-learning { grid-column: 1 / -1; padding-top: 1rem; border-top: 1px solid var(--line); }
+  .connection-advanced summary, .connection-learning summary { color: var(--clarity); font-weight: 750; cursor: pointer; }
+  .connection-advanced form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: .75rem; margin-top: 1rem; }
+  .connection-advanced p, .connection-learning p, .connection-message { margin: .65rem 0 0; color: var(--muted); font-size: .9rem; }
+  .connection-learning a { display: inline-block; margin-top: .65rem; color: var(--clarity); font-weight: 700; }
+  .connection-learning-links { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .connection-message:empty { display: none; }
+  .connection-facts { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem; }
+  .connection-facts span { padding: .4rem .65rem; border-radius: 999px; background: #f1f5fc; color: #334b73; font-size: .78rem; font-weight: 700; }
+  @media (max-width: 740px) {
+    .account-heading, .account-section-heading, .account-ai-entry { align-items: flex-start; flex-direction: column; }
+    .account-heading-actions { justify-content: flex-start; }
+    .account-form, .connection-card { grid-template-columns: 1fr; }
+    .connection-actions { align-items: stretch; }
+    .connection-advanced, .connection-learning { grid-column: 1; }
+    .connection-advanced form { grid-template-columns: 1fr; }
+  }
+</style>

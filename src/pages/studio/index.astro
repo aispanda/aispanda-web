@@ -147,6 +147,7 @@ const { Content } = await render(entry);
           <span>Signed in as</span>
           <strong data-studio-account-email></strong>
           <span class="studio-account-role" data-studio-account-role></span>
+          <a href="/account">Account settings</a>
           <button type="button" data-manage-access hidden>Access requests</button>
           <button type="button" data-studio-signout>Sign out</button>
         </div>
@@ -319,13 +320,35 @@ const { Content } = await render(entry);
     <dialog class="studio-dialog studio-ai-dialog" data-ai-dialog aria-labelledby="studio-ai-title">
       <div class="studio-dialog-header">
         <div>
-          <p class="studio-kicker">Zero-cost writing assistance</p>
-          <h2 id="studio-ai-title">Prepare a request for Gemini</h2>
+          <p class="studio-kicker">Writing assistance</p>
+          <h2 id="studio-ai-title">AI assist</h2>
         </div>
         <button class="studio-icon-button" type="button" data-close-ai aria-label="Close AI assistance">×</button>
       </div>
       <div class="studio-ai-content">
-        <p class="studio-ai-privacy"><strong>Nothing is sent automatically.</strong> Review the exact request below before copying it to your clipboard.</p>
+        <p class="studio-ai-privacy"><strong>You stay in control.</strong> Review exactly what will be shared. Nothing is sent until you explicitly continue.</p>
+
+        <section class="studio-ai-connection" aria-labelledby="studio-ai-connection-title">
+          <div class="studio-ai-connection-heading">
+            <div>
+              <strong id="studio-ai-connection-title">AI connection</strong>
+              <span data-ai-connection-state>OpenRouter is not connected</span>
+            </div>
+            <div class="studio-ai-connection-actions">
+              <a class="studio-button studio-button-secondary" href="/ai">Manage AI connections</a>
+            </div>
+          </div>
+          <p data-ai-connection-detail>Connect OpenRouter from your Account page, then return here to use AI assistance.</p>
+          <div class="studio-ai-connection-facts" aria-label="How the connection works">
+            <span>Your OpenRouter account pays</span>
+            <span>Connection lasts this browser tab</span>
+            <span>Nothing is sent until you ask</span>
+          </div>
+          <p class="studio-ai-connection-help">
+            You may need OpenRouter credits or eligible free models. Review its limits before generating.
+            <a href="https://openrouter.ai/docs/guides/overview/auth/oauth" target="_blank" rel="noopener noreferrer">How the secure connection works ↗</a>
+          </p>
+        </section>
 
         <fieldset class="studio-ai-scope">
           <legend>What should be shared?</legend>
@@ -334,7 +357,7 @@ const { Content } = await render(entry);
         </fieldset>
 
         <label class="studio-ai-field">
-          <span>What should Gemini do?</span>
+          <span>What should the AI do?</span>
           <textarea rows="4" data-ai-instruction>Act as a careful copyeditor. Improve clarity, flow and concision while preserving the author's meaning, factual claims, structure and voice. Do not introduce new facts. Return only the revised content.</textarea>
         </label>
 
@@ -376,8 +399,25 @@ const { Content } = await render(entry);
 
     <script>
       import { initializeStudioBackend, type RoleRequest, type StudioDraftRecord } from '@/scripts/studio-firebase';
+      import {
+        AiActiveConnectionManager,
+        AiConnectorRegistry,
+        createCloudflareAiGatewayConnector,
+        createHuggingFaceConnector,
+        createOpenRouterConnector,
+      } from '@/scripts/ai-connections';
 
       const studioBackend = await initializeStudioBackend();
+      const aiConnectors = new AiConnectorRegistry([
+        createOpenRouterConnector({
+          appName: 'AI Spanda Content Studio',
+          siteUrl: window.location.origin,
+        }),
+        createHuggingFaceConnector(),
+        createCloudflareAiGatewayConnector(),
+      ]);
+      const aiConnectionManager = new AiActiveConnectionManager(aiConnectors);
+      const openRouterConnector = aiConnectors.get('openrouter');
       const canPublish = studioBackend.role === 'administrator' || studioBackend.role === 'publisher';
       const draftId = new URLSearchParams(window.location.search).get('draft') ?? 'open-the-ai';
       const isNewDraft = draftId !== 'open-the-ai';
@@ -427,8 +467,10 @@ const { Content } = await render(entry);
       const aiFallback = document.querySelector<HTMLElement>('[data-ai-fallback]');
       const aiCopyOpen = document.querySelector<HTMLButtonElement>('[data-ai-copy-open]');
       const aiManualCopy = document.querySelector<HTMLButtonElement>('[data-ai-manual-copy]');
+      const aiConnectionState = document.querySelector<HTMLElement>('[data-ai-connection-state]');
+      const aiConnectionDetail = document.querySelector<HTMLElement>('[data-ai-connection-detail]');
 
-      if (!studio || !title || !editor || !excerpt || !slug || !tags || !saveState || !wordCount || !readTime || !slugPreview || !documentList || !listHeading || !allCount || !draftCount || !publishedCount || !unpublishedCount || !editorWorkspace || !contentLibrary || !libraryList || !libraryTitle || !librarySummary || !topbarKicker || !editorActions || !revisionsList || !saveMenu || !previewDialog || !publishDialog || !previewFrame || !toast || !openAi || !aiDialog || !aiInstruction || !aiPreview || !aiSelectionScope || !aiFallback || !aiCopyOpen || !aiManualCopy) {
+      if (!studio || !title || !editor || !excerpt || !slug || !tags || !saveState || !wordCount || !readTime || !slugPreview || !documentList || !listHeading || !allCount || !draftCount || !publishedCount || !unpublishedCount || !editorWorkspace || !contentLibrary || !libraryList || !libraryTitle || !librarySummary || !topbarKicker || !editorActions || !revisionsList || !saveMenu || !previewDialog || !publishDialog || !previewFrame || !toast || !openAi || !aiDialog || !aiInstruction || !aiPreview || !aiSelectionScope || !aiFallback || !aiCopyOpen || !aiManualCopy || !aiConnectionState || !aiConnectionDetail) {
         throw new Error('Content Studio prototype failed to initialize');
       }
 
@@ -503,6 +545,54 @@ const { Content } = await render(entry);
         ].join('\n');
       };
 
+      const formatUsd = (value: number) => new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 2,
+      }).format(value);
+
+      const renderAiConnection = () => {
+        const connector = aiConnectionManager.active;
+        if (!connector) {
+          aiConnectionState.textContent = 'No AI router is connected';
+          aiConnectionDetail.textContent = 'Choose a router from your Account page, then return here to use AI assistance.';
+          return;
+        }
+
+        const connection = connector.status;
+        aiConnectionState.textContent = `${connector.descriptor.label} connected`;
+        const allowance = typeof connection.limitRemaining === 'number'
+          ? ` ${formatUsd(connection.limitRemaining)} remains on this connection's spending limit.`
+          : '';
+        const label = connection.label ? ` (${connection.label})` : '';
+        aiConnectionDetail.textContent = `Connected${label} for this browser tab.${allowance}`;
+      };
+
+      const completeAiConnection = async () => {
+        try {
+          const result = await openRouterConnector.completeConnectionCallback(window.location.href);
+          if (!result.handled) return;
+          if (result.cleanUrl) window.history.replaceState(null, '', result.cleanUrl);
+          if (result.connected) aiConnectionManager.activate('openrouter');
+          renderAiConnection();
+          if (result.connected) {
+            aiDialog.showModal();
+            showToast('OpenRouter connected for this browser tab.');
+            return;
+          }
+          aiConnectionState.textContent = 'OpenRouter connection failed';
+          aiConnectionDetail.textContent = result.error ?? 'Reconnect and try again.';
+          aiDialog.showModal();
+          showToast('OpenRouter could not be connected.');
+        } catch (error) {
+          renderAiConnection();
+          aiConnectionState.textContent = 'OpenRouter connection failed';
+          aiConnectionDetail.textContent = error instanceof Error ? error.message : 'Reconnect and try again.';
+          aiDialog.showModal();
+          showToast('OpenRouter could not be connected.');
+        }
+      };
+
       const openAiDialog = () => {
         rememberEditorSelection();
         aiSelectionScope.disabled = !lastEditorSelection;
@@ -511,6 +601,7 @@ const { Content } = await render(entry);
         else if (articleScope) articleScope.checked = true;
         aiFallback.hidden = true;
         renderAiRequest();
+        renderAiConnection();
         aiDialog.showModal();
       };
 
@@ -1280,6 +1371,8 @@ const { Content } = await render(entry);
         showToast('Published locally — the live site was not changed');
       });
 
+      renderAiConnection();
+      await completeAiConnection();
       updateMetrics();
       renderRevisions();
       renderStatus();
@@ -1350,8 +1443,8 @@ const { Content } = await render(entry);
   .studio-account { display: grid; gap: .3rem; padding-top: .8rem; border-top: 1px solid #353a43; color: #a9afb8; font-size: .72rem; }
   .studio-account strong { overflow: hidden; color: white; text-overflow: ellipsis; }
   .studio-account-role { justify-self: start; padding: .2rem .45rem; border-radius: 999px; background: #2b3038; color: #f3b536; text-transform: capitalize; }
-  .studio-account button { justify-self: start; padding: 0; border: 0; background: transparent; color: #8eb4ff; cursor: pointer; }
-  .studio-account button:hover { color: white; text-decoration: underline; }
+  .studio-account a, .studio-account button { justify-self: start; padding: 0; border: 0; background: transparent; color: #8eb4ff; cursor: pointer; font: inherit; text-decoration: none; }
+  .studio-account a:hover, .studio-account button:hover { color: white; text-decoration: underline; }
   .studio-workspace { min-width: 0; height: 100vh; overflow: hidden; }
   .studio-topbar { position: relative; z-index: 20; display: flex; align-items: center; justify-content: space-between; min-height: 74px; padding: 0 1.35rem; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.94); backdrop-filter: blur(14px); }
   .studio-save-state { margin: .15rem 0 0; color: var(--muted); font-size: .84rem; }
@@ -1451,11 +1544,25 @@ const { Content } = await render(entry);
   .studio-ai-dialog { width: min(760px, calc(100vw - 2rem)); }
   .studio-ai-content { display: grid; gap: 1rem; max-height: min(66vh, 680px); overflow: auto; padding: 1.2rem; }
   .studio-ai-privacy { margin: 0; padding: .85rem 1rem; border: 1px solid #b8d4c0; border-radius: .7rem; background: #edf7f0; color: #31543a; font-size: .88rem; }
+  .studio-ai-connection { display: grid; gap: .8rem; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: white; }
+  .studio-ai-connection p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+  .studio-ai-connection-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+  .studio-ai-connection-heading > div:first-child { display: grid; gap: .2rem; }
+  .studio-ai-connection-heading span { color: var(--muted); font-size: .82rem; }
+  .studio-ai-connection-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; }
+  .studio-ai-connection-facts { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .studio-ai-connection-facts span { padding: .35rem .55rem; border-radius: 999px; background: #f1f5fc; color: #334b73; font-size: .72rem; font-weight: 700; }
+  .studio-ai-connection-help a { color: var(--clarity); font-weight: 750; }
+  .studio-ai-key-option { padding-top: .2rem; border-top: 1px solid var(--line); }
+  .studio-ai-key-option summary { padding-top: .7rem; color: var(--clarity); cursor: pointer; font-size: .8rem; font-weight: 750; }
+  .studio-ai-key-option > div { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: .65rem; padding-top: .75rem; }
+  .studio-ai-key-option small { display: block; padding-top: .55rem; color: var(--muted); font-size: .74rem; line-height: 1.45; }
   .studio-ai-scope { display: flex; flex-wrap: wrap; gap: .65rem 1.25rem; margin: 0; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .7rem; background: white; }
   .studio-ai-scope legend { padding: 0 .25rem; font-size: .8rem; font-weight: 800; }
   .studio-ai-scope label { display: flex; align-items: center; gap: .4rem; color: var(--muted); font-size: .86rem; cursor: pointer; }
   .studio-ai-field { display: grid; gap: .45rem; font-size: .82rem; font-weight: 800; }
-  .studio-ai-field textarea { width: 100%; resize: vertical; padding: .8rem; border: 1px solid var(--line); border-radius: .65rem; background: white; color: var(--ink); font-family: inherit; font-size: .85rem; font-weight: 400; line-height: 1.5; }
+  .studio-ai-field textarea, .studio-ai-field select, .studio-ai-field input { width: 100%; box-sizing: border-box; padding: .8rem; border: 1px solid var(--line); border-radius: .65rem; background: white; color: var(--ink); font-family: inherit; font-size: .85rem; font-weight: 400; line-height: 1.5; }
+  .studio-ai-field textarea { resize: vertical; }
   .studio-ai-field textarea[readonly] { background: #faf9f5; }
   .studio-ai-chrome-note, .studio-ai-fallback { display: grid; gap: .25rem; padding: .85rem 1rem; border-radius: .7rem; font-size: .82rem; }
   .studio-ai-chrome-note { border: 1px solid #cbd7ee; background: #f1f5fc; color: #334b73; }
@@ -1511,5 +1618,7 @@ const { Content } = await render(entry);
     .studio-preview-frame { padding: 1.25rem; }
     .studio-publish-actions { flex-direction: column-reverse; }
     .studio-ai-actions { flex-direction: column-reverse; }
+    .studio-ai-connection-heading, .studio-ai-connection-actions { align-items: stretch; flex-direction: column; }
+    .studio-ai-key-option > div { grid-template-columns: 1fr; }
   }
 </style>

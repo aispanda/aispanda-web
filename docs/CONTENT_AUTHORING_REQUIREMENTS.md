@@ -164,7 +164,7 @@ Use three plain author-facing states:
 - Stable serialization: editor JSON to Markdown and Markdown back to editor JSON must preserve supported content.
 - Unicode support, including Indic scripts, smart punctuation and mixed-script text.
 
-### Zero-cost AI assistance MVP
+### AI assistance and user-funded connection
 
 - Offer a clearly labelled `Copy AI request & open Gemini` action; never imply that AI runs inside AIspanda.
 - Let the author choose selected text or the entire article and edit the instruction before continuing.
@@ -173,7 +173,25 @@ Use three plain author-facing states:
 - If browser clipboard access fails, expose a manual copy control and select the request for keyboard copying.
 - Returning revised text remains a deliberate manual paste in the first release; the Studio must not overwrite content automatically.
 - Keep the page structure and labels understandable to Gemini in Chrome when a user explicitly shares the tab.
-- Do not add provider API keys, usage billing or background data transfer until observed demand justifies an integrated version and its privacy controls.
+- Add a router-neutral connection layer that permits several managed routers to remain connected in the browser tab while exactly zero or one is active for AI actions. A newly connected first router may become active; connecting an additional router must not silently switch or remove the active one. Connected alternatives show `Make active`; the selected card shows a non-interactive Active indicator. Initial options are OpenRouter, Hugging Face Inference Providers and Cloudflare AI Gateway; LiteLLM is excluded from the member-facing MVP because it transfers operating and support responsibility to AIspanda or the member.
+- Prefer one-click OpenRouter OAuth with S256 PKCE. Let expert users connect an existing OpenRouter key through a password field.
+- Prefer one-click Hugging Face OAuth using AIspanda's public no-secret OAuth application and S256 PKCE. Request only `inference-api`; keep a fine-grained token field under `Use an API token instead` as the fallback.
+- Validate the key directly with OpenRouter and show connection and per-key limit status without exposing the key. Label OpenRouter as the source of truth; the UI must not imply AIspanda guarantees the remaining balance, reset or billing outcome.
+- Keep light personal information on `/account`. Put router connections and the comparison Playground together on one dedicated signed-in `/ai` page because comparison informs which connected router the member makes active. Every router card must make Not connected, Connected, Active and Needs attention states immediately understandable, with Connect, Make active and Disconnect actions as appropriate. Keep `/account/ai-playground` as a compatibility redirect to `/ai#playground`.
+- During the MVP, keep an API key only in same-tab `sessionStorage` so the connection survives navigation between Account and Studio and page refresh. Never place it in Firestore, drafts, `localStorage`, logs, analytics or documentation. Clear it on disconnect, sign-out or tab close. Move to an encrypted server-side account vault before offering cross-device persistence.
+- Connecting must not send article content. Every later AI request must show the exact content and instruction before transmission.
+- Do not activate a specific integrated AI use case until the owner approves its user value, eligible roles, shared context, output limit and review/application behavior.
+- Treat the user's router account as the payer; AIspanda must not silently fall back to a site-funded provider or retry through another router.
+- The first approved AI action is a signed-in AI Router Playground. Accept a user-written prompt of at most 300 characters and offer one explicit beginner-friendly example prompt; allow a run through the active router or a concurrent comparison of explicitly selected connected routers using the identical prompt; request no more than 80 output tokens per router and display at most 500 response characters. Present routers as columns and aspects as rows in a horizontally scrollable comparison matrix. Show each of these fields once: routing method, model ownership, usage type, fallback, infrastructure provider, time to first response, output speed, reasoning tokens, reported cost and token use. Every comparable metric must state whether lower or higher is better; color the best comparable value green and the weakest red. Keep ownership, routing, provider and token rows neutral where lower/higher does not imply quality. Reported cost may identify a winner only when every successful router reports a directly comparable unit. Do not put answer quality in the metric table or ask routers to score one another; the member makes a temporary preference choice after reading the answers. Keep per-result trace details limited to non-duplicate evidence. Missing metrics must say `Not reported`; do not calculate unreported cost, create a combined score, persist prompts/results/preferences or retry through another router. A member may explicitly make a successful result's connected router active after comparison. State clearly that each run may consume the member's provider credit and AIspanda adds no AI usage charge. Link router/model identities to their source pages and keep a short, grouped set of benchmark and model-catalog learning links rather than a comprehensive directory.
+
+Candidate use cases awaiting owner approval, in proposed order:
+
+1. Studio authoring for Authors, Publishers and Administrators: improve selected text, simplify, correct grammar, adjust tone, and suggest title, excerpt or tags.
+2. Deterministic connection help for everyone: account, credits, limits, privacy and common recovery steps; this must work even when AI is disconnected.
+3. Published-reading help for every role: explain, define or show why selected text matters, using only the selection and a bounded context window.
+4. Later: research planning, one's own comment/reply assistance, Discussion catch-up, Event/Learning drafting, and Administrator-only moderation summaries.
+
+Every generated result remains a proposal. AI may never post, publish, delete, moderate, change roles or apply content without an explicit human review action.
 
 ## Typography and branding
 
@@ -236,6 +254,125 @@ Book capabilities should be staged after the article workflow is stable:
 - Book metadata, cover management and table of contents.
 - Export to EPUB and print-ready PDF; DOCX backup is desirable.
 - Shared editor blocks and revision machinery with articles.
+
+## Community, Group, Discussion and Post requirements
+
+The first community release should optimize for thoughtful, durable conversation rather than imitate a fast-moving chat stream. It reuses the existing identity, five-role authorization model, ownership rules, notifications and Firestore boundary.
+
+### Plain product structure
+
+```text
+Community
+  -> Group (stable topic or member space)
+      -> Discussion (titled conversation; internally this may be a thread)
+          -> Post (opening message or reply, with optional reply-to context)
+```
+
+- Use `Group`, `Discussion`, `Post` and `Reply` in the interface. Use `thread` only as an internal data or engineering term.
+- The main creation action is `Start a discussion`; `New post` is reserved for contributing inside an existing Discussion.
+- Article comments and community Posts share identity, ownership and moderation rules, but retain interfaces suited to their context.
+
+### Authority and membership
+
+- Administrators and Publishers may create Groups. Publishers may manage Groups they created; deleting a Group or changing its access boundary requires an Administrator.
+- V1 supports `Open to members` and `Invite only` Groups. Secret, paid and real-time chat Groups remain later options.
+- Every signed-in role except View Only may join or leave a permitted Group, start a Discussion, post, reply, like and remove their own like.
+- Members may edit or delete only Posts they authored. Administrators may delete any Post for moderation but may never edit another person's words.
+- Administrators and Publishers may pin or unpin Discussions and important Posts. Only Administrators may close or reopen a Group; Administrators and Publishers may close or reopen a Discussion.
+- A question Discussion may be marked `Answered` by its creator, a Publisher responsible for the Group or an Administrator.
+
+### Group and Discussion experience
+
+- A Group landing page shows its purpose, access, member count, controlled topics and a compact Discussion list. It should not resemble a crowded administration dashboard.
+- Each Discussion row prioritizes title, creator, topics, last activity, reply count, unread state and pin/answered/closed state. Hide views and participant decoration until proven useful.
+- Put pinned Discussions first, then default to `Recent activity`. Let members choose `Newest` or `Most discussed`, and remember their last choice. Do not use numbered rankings.
+- A title opens the Discussion from the beginning; an unread indicator resumes at the first unread Post; the activity timestamp opens the latest Post. Accessible labels must make these destinations explicit.
+- Inside a Discussion, show the opening Post followed by oldest-first replies so the conversation reads coherently. Offer `Newest first` as a member preference.
+- Show `Replying to [name]` and a short quoted context instead of deeply indenting every reply. A deleted Post becomes a tombstone when later replies depend on it.
+- Keep states small: `Open`, `Answered` for question Discussions and `Closed`. Closing stops new Posts without hiding prior conversation.
+- Draft Discussions autosave privately. Starting a Discussion requires a clear title, one Group, an opening Post and optional controlled topics.
+- On narrow screens, use one column and preserve title, state, replies, unread position and activity. Remove secondary excerpts and decoration before compressing primary information.
+
+### Post composer and media
+
+- Keep the composer structured and brand-safe: bold, italic, semantic headings, lists, quote, code, links, mentions and emoji. Do not expose arbitrary fonts, sizes, colors, custom HTML or pasted foreign styling.
+- Support pasted or uploaded images with alt text, links to internal Discussions, and safe previews for trusted video URLs such as YouTube. V1 does not host uploaded video.
+- Show a live preview or reliable rich-text rendering before posting. Save unfinished Posts and Discussions as private drafts.
+- An edited Post shows `Edited` and retains revision/audit data. A short edit reason may be offered but is not mandatory for ordinary member edits.
+- Polls, GIF catalogues, voice/video recording, broad embed catalogues and complex tables remain optional later enhancements.
+
+### Topics, filtering, sorting and search
+
+- Administrators and Publishers manage a small controlled topic list. Eligible members select relevant topics when starting or editing a Discussion.
+- Groups are stable destinations; topics are lightweight labels that work across Groups. Avoid deep Group hierarchies and uncontrolled member-created tags in V1.
+- A Group provides `All` plus topic filters. Add `Unanswered`, `Following` and `Unread` when content volume justifies them.
+- Site search spans Group names, Discussion titles, opening Posts and replies. Results are grouped into `Discussions` and `Posts`; every Post result shows and opens within its parent Discussion.
+- Search supports optional Group and topic filters. Add author and date filters after content volume makes them valuable.
+- Members may bookmark a Discussion or Post and later find saved items from their account area.
+
+### Engagement, notifications and moderation
+
+- One member may like each Discussion or Post once and remove their own like. View Only cannot like.
+- Members may follow or unfollow a Group or Discussion. Posting follows that Discussion by default with a clear opt-out.
+- Notification levels are simple: `All activity`, `Replies and mentions`, and `Muted`. The default is replies and mentions.
+- Use one notification inbox with unread state and `Mark all read`. Notify direct replies, mentions, followed activity, role-request outcomes and pinned announcements.
+- Every Post provides `Report`. Reports enter an Administrator queue with reporter, reason, target, status and audit history.
+- Moderation actions are explicit and logged: pin/unpin, close/reopen, remove with reason, restore when supported and resolve/reject report.
+- Read and write queries are paginated and bounded. Define retention, rate limits, abuse controls and cost alerts before public launch.
+
+### Community acceptance criteria
+
+- View Only can read permitted Groups and Discussions but sees no enabled join, create, reply, like or moderation controls; server rules reject equivalent direct writes.
+- Administrator or Publisher can create a Group; Author or Commenter cannot, even through a direct request.
+- An eligible member can join a Group, draft and start a Discussion, reply with visible context, and edit or delete only their own Posts.
+- Administrator can remove any Post with an audit reason but cannot rewrite it as though the original member made the change.
+- The same Discussion list can open its beginning, first unread Post and latest activity as three predictable destinations.
+- A Discussion creator can mark their question Answered; authorized Group managers can pin, close, reopen or correct that state.
+- Search returns matching Discussions and Posts with Group, topic and parent context; no result opens a reply without its Discussion.
+- Report resolution and restoration leave audit records; repeated actions do not create duplicate moderation items.
+- Core journeys remain usable without horizontal scrolling at a narrow mobile width.
+
+## Optional Events and Learn modules
+
+Events and Learning paths reuse the same account, role, Group, notification and Discussion contracts. They are staged after core community capability and do not create a second member system.
+
+### Events baseline
+
+- Administrators and Publishers may create, edit, publish, cancel and archive events. Authors may prepare event drafts but cannot publish them.
+- V1 fields are title, concise description, start/end time with explicit timezone, location type (`Online link`, `In person` or `To be announced`), optional related Group/topic, capacity and access.
+- Eligible members may RSVP, cancel an RSVP and see a clear confirmed/waitlisted/cancelled state. Event cancellation notifies registered members.
+- Event discovery separates `Upcoming` and `Past`, defaults to a compact list, and keeps a calendar view optional. Each row prioritizes date, local time, title, location type and the member's RSVP state; the event page carries its discussion thread.
+- Recurrence, payments, native live rooms, streaming, recordings and advanced host controls are deferred.
+
+### Learn and Learning paths baseline
+
+```text
+Learn
+  -> Learning path (published guided content)
+      -> Section
+          -> Lesson
+
+My learning plan = a member's enrolled paths, next lessons and progress
+```
+
+- Start with self-paced Learning paths. A Learning path has a title, summary, learning outcomes, level, estimated effort, controlled topics, access, ordered Sections and Lessons, publication state and learner progress.
+- `Learn` is a distinct destination, not a Group category. A Learning path may link to one relevant Group or Discussion while retaining its ordered educational structure.
+- Authors may create and edit Learning paths they own. Publishers and Administrators may publish, unpublish and archive them. Published content can retain a separate unpublished draft until republished.
+- Lessons reuse semantic authoring blocks and support text, headings, images with alt text, files, links and trusted video previews. Arbitrary fonts, custom HTML and direct video hosting remain excluded.
+- A member may add or remove a Learning path from `My learning plan`, resume the next incomplete Lesson and mark Lessons complete. Progress is private to the member unless they explicitly share it.
+- Learning path discovery supports topic, level and estimated-effort filters plus `Newest`. `My learning plan` prioritizes `Continue learning`, progress and completed paths rather than discovery filters.
+- Each Learning path may have one overall Discussion. Lesson-level Discussions are added only when there is a teaching need, avoiding an empty Discussion for every Lesson.
+- A path has `Draft`, `Published`, `Published with draft changes`, `Unpublished` and `Archived` states consistent with article publishing behavior.
+- Scheduled cohorts, drip release, certificates, assessments, payments, prerequisites, live teaching and instructor analytics remain deferred.
+
+### Learning acceptance criteria
+
+- Author can draft and reorder Sections and Lessons in a Learning path they own but cannot publish it; Publisher or Administrator can publish after preview.
+- A published Learning path remains readable while authorized staff prepare unpublished changes; members see only the latest published version.
+- Eligible member can add a path to `My learning plan`, resume at the next incomplete Lesson, mark completion and remove the path without deleting the published content.
+- View Only may read an openly accessible path but cannot enroll, record progress or post in linked Discussions.
+- Reordering content never loses Lesson content or member completion records; progress remains tied to stable Lesson identifiers.
+- Mobile members can find, continue and complete a Lesson without navigating the authoring hierarchy or encountering horizontal scrolling.
 
 ## Validation and quality gates
 
@@ -331,4 +468,4 @@ These are planning ranges, not commitments. The largest uncertainty is lossless 
 
 The first production release is complete when the authorized owner can sign in with Google, open the existing article, edit it in structured rich text, see `Saved`, preview the exact desktop/mobile public rendering, save a revision as draft, publish through final review, receive a live URL after successful deployment and recover the unchanged draft after a simulated publish failure.
 
-Books, collaboration, comments, community groups/chat, newsletters, paid membership, arbitrary HTML, site-wide theme editing and instant database-backed publication are explicitly outside that first cut.
+Books, collaboration, comments, Community Groups and Discussions, Events, Learning paths, newsletters, paid membership, arbitrary HTML, site-wide theme editing and instant database-backed publication are explicitly outside that first cut.

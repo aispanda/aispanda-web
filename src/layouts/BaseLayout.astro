@@ -7,9 +7,10 @@ interface Props {
   title: string;
   description: string;
   image?: string;
+  noindex?: boolean;
 }
 
-const { title, description, image = '/social/og.png' } = Astro.props;
+const { title, description, image = '/social/og.png', noindex = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const isHome = title === 'AI Spanda' || title === 'AIspanda';
 const documentTitle = isHome ? 'AI Spanda' : `${title} · AI Spanda`;
@@ -24,6 +25,7 @@ const shareAlt = 'Abstract radiant source with colourful vibration — AI Spanda
     <meta name="generator" content={Astro.generator} />
     <title>{documentTitle}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/png" href="/brand/favicon.png" />
     <link rel="apple-touch-icon" href="/brand/favicon.png" />

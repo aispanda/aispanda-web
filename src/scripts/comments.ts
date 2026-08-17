@@ -1,4 +1,3 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
@@ -26,7 +25,13 @@ import {
   writeBatch,
   type Timestamp,
 } from 'firebase/firestore';
-import { countryCodes } from '../data/countries';
+import {
+  countryCodeValues,
+  populateCountryOptions,
+  primaryInterestValues,
+  professionalRoleValues,
+} from '../data/member-profile';
+import { getFirebaseClientApp, isFirebaseConfigured } from './firebase-client';
 
 type MemberRole = 'administrator' | 'publisher' | 'author' | 'commenter' | 'viewer';
 
@@ -53,43 +58,9 @@ type ProfileChoices = {
   profileCompletedAt: string;
 };
 
-const firebaseConfig = {
-  apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
-  authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
-};
-
-const isConfigured = Object.values(firebaseConfig).every(
-  (value) => typeof value === 'string' && value.length > 0,
-);
+const isConfigured = isFirebaseConfigured;
 
 const roles = new Set<MemberRole>(['administrator', 'publisher', 'author', 'commenter', 'viewer']);
-const professionalRoleValues = new Set([
-  'prefer-not-to-say',
-  'student',
-  'educator-researcher',
-  'technology-ai-practitioner',
-  'business-operations-leader',
-  'public-sector-policy',
-  'writer-creator',
-  'independent-learner',
-  'other',
-]);
-const primaryInterestValues = new Set([
-  'prefer-not-to-say',
-  'practical-ai',
-  'ai-strategy',
-  'open-reusable-ai',
-  'ai-policy-social-impact',
-  'education-training',
-  'community-discussion',
-  'other',
-]);
-const countryCodeValues = new Set<string>(countryCodes);
-
 const memberSessionKey = 'aispanda-member-session-v1';
 const editorialSessionKey = 'aispanda-studio-authorized-session-v1';
 
@@ -120,26 +91,6 @@ const clearMemberSessions = () => {
   window.localStorage.removeItem(memberSessionKey);
   window.localStorage.removeItem(editorialSessionKey);
   window.dispatchEvent(new StorageEvent('storage', { key: memberSessionKey }));
-};
-
-const populateCountryOptions = (select: HTMLSelectElement) => {
-  if (select.options.length > 1) return;
-  let displayNames: Intl.DisplayNames | undefined;
-  try {
-    displayNames = new Intl.DisplayNames(navigator.languages, { type: 'region' });
-  } catch {
-    displayNames = undefined;
-  }
-  const collator = new Intl.Collator(navigator.languages, { sensitivity: 'base' });
-  const options = countryCodes
-    .map((code) => ({ code, label: displayNames?.of(code) ?? code }))
-    .sort((left, right) => collator.compare(left.label, right.label));
-  for (const { code, label } of options) {
-    const option = document.createElement('option');
-    option.value = code;
-    option.textContent = label;
-    select.append(option);
-  }
 };
 
 export const initializeComments = () => {
@@ -190,7 +141,7 @@ export const initializeComments = () => {
     return;
   }
 
-  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  const app = getFirebaseClientApp();
   const auth = getAuth(app);
   const db = getFirestore(app);
   const commentsRef = collection(db, 'publishedContent', articleSlug, 'comments');

@@ -15,8 +15,12 @@ Detailed acceptance criteria remain in the owning requirement or implementation 
 | EP-08 Multi-user editorial roles | Administrators and authors collaborate within explicit permissions. | Planned | `CONTENT_AUTHORING_REQUIREMENTS.md` | Role matrix and enforcement tests remain. |
 | EP-09 Books | Ordered parts and chapters use the shared authoring platform. | Planned | `CONTENT_AUTHORING_REQUIREMENTS.md` | Book-ready model is required; working book UI and export remain. |
 | EP-10 Comments and moderation | All signed-in roles except View Only can comment, reply and like; Publishers/Administrators can pin; editing is owner-only and Administrators may delete any comment. | In progress | `CONTENT_AUTHORING_REQUIREMENTS.md` | Native bounded threads, likes, pins, private ownership records, tombstone deletion and rules are implemented; deployed cross-account ownership tests, abuse reporting and server-side rate controls remain. |
-| EP-11 Community groups and chat | Members communicate in moderated, cost-bounded groups. | Planned | Future community requirements | Privacy, moderation, notification, retention and load requirements must be elaborated. |
+| EP-11 Community Groups and Discussions | Members create and find durable conversations in moderated, cost-bounded Groups. | Planned | `CONTENT_AUTHORING_REQUIREMENTS.md` | Product baseline covers Group authority, membership, Discussion/Post structure, ownership, topics, search, sorting, notifications and moderation; implementation and representative role/load proof remain. |
 | EP-12 Reusable platform extraction | A generic package launches brand-specific content communities safely. | Deferred | RA-003 promotion process | Requires verified AIspanda implementation and independent portability evidence. |
+| EP-13 Events | Members discover and join simple scheduled activities. | Planned | `CONTENT_AUTHORING_REQUIREMENTS.md` | RSVP event baseline is defined; implementation and timezone, capacity, cancellation and role proof remain. |
+| EP-14 Learn and Learning paths | Members learn through self-paced Learning paths and track progress in `My learning plan`. | Planned | `CONTENT_AUTHORING_REQUIREMENTS.md` | Learning path structure, Lessons, progress, linked Discussion, publication and role rules are defined; implementation and proof remain. |
+| EP-15 User-funded AI router connection | Members connect their preferred managed router and compare bounded results without AIspanda paying model charges. | In progress | `CONTENT_AUTHORING_REQUIREMENTS.md` | Dedicated `/ai` connect-compare-activate UI, one-active-router contract, OpenRouter and Hugging Face live OAuth proof, token fallbacks, Cloudflare adapter, same-tab continuity and the approved comparison matrix exist. Local live multi-router comparison is verified; Cloudflare's credentialed journey and production deployment proof remain. |
+| EP-16 AI assistance experiences | Approved roles receive bounded, transparent AI help for specific authoring, reading and community needs. | Planned | `CONTENT_AUTHORING_REQUIREMENTS.md` | Owner approval of prioritized use cases, shared context, outputs and review behavior is required before implementation. |
 
 ## Cross-epic rules already accepted
 
@@ -25,4 +29,7 @@ Detailed acceptance criteria remain in the owning requirement or implementation 
 - Publishing remains deliberate and cannot occur directly from a list-row action.
 - Privileged permissions are enforced outside the browser.
 - New accounts cannot self-escalate beyond Commenter; only an existing Administrator can approve editorial access.
+- Administrators and Publishers may create Groups; every signed-in role except View Only may participate in permitted Groups and start Discussions.
+- No role may edit another member's Post. Administrators may delete another member's Post only as a recorded moderation action.
 - Brand, domain, credentials, user data and project evidence do not enter the reusable core.
+- AI connectors must not persist user API keys or silently switch to site-funded providers; integrated AI use cases require owner approval before implementation.

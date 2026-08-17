@@ -17,7 +17,8 @@ const currentPath = Astro.url.pathname;
         <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
       ))}
       <a href="/studio" data-staff-signin>Sign in</a>
-      <a href="/studio" data-member-entry hidden>My account</a>
+      <a href="/account" data-member-entry hidden>My account</a>
+      <a href="/ai" data-ai-tools-entry hidden>AI Tools</a>
       <a href="/studio" data-studio-entry hidden>Content Studio</a>
       <a class="button button-small" href="/contact">Write</a>
     </nav>
@@ -37,6 +38,7 @@ const currentPath = Astro.url.pathname;
   const memberSessionKey = 'aispanda-member-session-v1';
   const staffSignIn = document.querySelector<HTMLElement>('[data-staff-signin]');
   const memberEntry = document.querySelector<HTMLElement>('[data-member-entry]');
+  const aiToolsEntry = document.querySelector<HTMLElement>('[data-ai-tools-entry]');
   const studioEntry = document.querySelector<HTMLElement>('[data-studio-entry]');
   const refreshStudioNavigation = () => {
     let authorized = false;
@@ -53,7 +55,8 @@ const currentPath = Astro.url.pathname;
       signedIn = false;
     }
     if (staffSignIn) staffSignIn.hidden = authorized || signedIn;
-    if (memberEntry) memberEntry.hidden = authorized || !signedIn;
+    if (memberEntry) memberEntry.hidden = !signedIn;
+    if (aiToolsEntry) aiToolsEntry.hidden = !signedIn;
     if (studioEntry) studioEntry.hidden = !authorized;
   };
   refreshStudioNavigation();

@@ -1,0 +1,26 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="AI Router Playground"
+  description="Connect, compare and choose the AI router that works best for you."
+  noindex
+>
+  <main class="legacy-ai-route">
+    <p class="eyebrow">AI Tools</p>
+    <h1>Opening the AI Router Playground…</h1>
+    <p>The Playground now lives with your AI connections.</p>
+    <a class="button" href="/ai#playground">Continue to AI Tools</a>
+  </main>
+</BaseLayout>
+
+<script is:inline>
+  window.location.replace('/ai#playground');
+</script>
+
+<style>
+  .legacy-ai-route { width: min(720px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(4rem, 10vw, 8rem) 0; }
+  .legacy-ai-route h1 { margin: .3rem 0 .7rem; }
+  .legacy-ai-route p:not(.eyebrow) { margin-bottom: 1.25rem; color: var(--muted); }
+</style>

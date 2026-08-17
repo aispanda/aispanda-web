@@ -1,0 +1,567 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Connect and compare AI routers"
+  description="Connect your own AI router accounts, compare them with the same prompt, and choose which router powers your AI actions."
+  noindex
+>
+  <main class="playground-shell">
+    <section class="playground-panel" data-playground-loading data-account-loading>
+      <p class="eyebrow">AI routers</p>
+      <h1>Loading your AI connections…</h1>
+      <p>Checking your signed-in account and the connections in this browser tab.</p>
+    </section>
+
+    <section class="playground-panel" data-playground-signed-out data-account-signed-out hidden>
+      <p class="eyebrow">AI routers</p>
+      <h1>Sign in to continue</h1>
+      <p data-playground-signed-out-message data-account-status>Connect and compare your own AI router accounts after Google sign-in.</p>
+      <div class="playground-panel-actions">
+        <button class="button" type="button" data-account-signin>Continue with Google</button>
+        <a href="/">Back to AI Spanda</a>
+      </div>
+    </section>
+
+    <div data-playground-content data-account-content hidden>
+      <header class="playground-heading">
+        <div>
+          <p class="eyebrow">Your accounts, your choice</p>
+          <h1>Connect and compare AI routers</h1>
+          <p>Connect your own AI router accounts, test them with the same prompt, and choose which router powers your AI actions.</p>
+        </div>
+        <div class="ai-tools-heading-actions">
+          <a class="button button-secondary" href="/account">Your profile</a>
+          <button class="account-text-button" type="button" data-account-signout>Sign out</button>
+        </div>
+      </header>
+
+      <nav class="ai-tools-nav" aria-label="AI router sections">
+        <a href="#connections"><span>1</span> Connect &amp; activate</a>
+        <a href="#playground"><span>2</span> Compare &amp; choose</a>
+      </nav>
+
+      <section class="account-section" id="connections" aria-labelledby="ai-connections-title">
+        <div class="account-section-heading">
+          <div>
+            <p class="eyebrow">Step 1 · AI connections</p>
+            <h2 id="ai-connections-title">Connect &amp; activate</h2>
+          </div>
+          <a
+            class="button button-secondary playground-link is-disabled"
+            href="#playground"
+            aria-disabled="true"
+            tabindex="-1"
+            data-ai-playground-link
+          >Compare connected routers</a>
+        </div>
+        <p class="account-section-intro">Connect any routers you use in this browser tab. One router is active for AI actions, while every connected router remains available for comparison or switching.</p>
+        <div class="active-router-note" role="status" aria-live="polite" data-active-router-note>No AI router is active.</div>
+        <p class="connection-test-note">Your AI accounts pay any provider charge. AI Spanda does not add an AI usage fee.</p>
+
+        <div class="connection-list">
+          <article class="connection-card" data-ai-provider-card="openrouter">
+            <div class="connection-main">
+              <div class="connection-logo" aria-hidden="true">OR</div>
+              <div>
+                <div class="connection-title-line">
+                  <h3>OpenRouter</h3>
+                  <span class="connection-state" data-ai-state>Not connected</span>
+                </div>
+                <p data-ai-detail>Best simple starting point for broad model choice and managed routing.</p>
+                <p class="connection-usage" data-ai-usage>Your OpenRouter account pays. AI Spanda adds no model charge.</p>
+              </div>
+            </div>
+            <div class="connection-actions">
+              <button class="button" type="button" data-ai-oauth-connect>Connect</button>
+              <button class="button" type="button" data-ai-activate hidden>Make active</button>
+              <span class="connection-active-indicator" data-ai-active-indicator hidden><span aria-hidden="true">✓</span> Active</span>
+              <button class="button button-secondary" type="button" data-ai-disconnect hidden>Disconnect</button>
+              <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noreferrer">Manage at OpenRouter ↗</a>
+            </div>
+            <details class="connection-advanced">
+              <summary>Already have an OpenRouter API key?</summary>
+              <form data-ai-key-form>
+                <label>
+                  <span>API key</span>
+                  <input type="password" autocomplete="off" placeholder="sk-or-v1-…" data-ai-key />
+                </label>
+                <button class="button button-secondary" type="submit" data-ai-key-submit>Connect existing key</button>
+              </form>
+              <p>The field is cleared immediately. The connection stays only in this browser tab and is never saved to your AI Spanda profile.</p>
+            </details>
+            <details class="connection-learning">
+              <summary>When should I use this?</summary>
+              <p>Choose OpenRouter for the easiest access to many model providers, simple spending limits, and minimal setup. It is a hosted marketplace, not an open-source gateway you operate.</p>
+              <div class="connection-learning-links">
+                <a href="https://www.youtube.com/watch?v=_K69Axdo_vc" target="_blank" rel="noreferrer">Watch manual key setup ↗</a>
+                <a href="https://openrouter.ai/docs/quickstart" target="_blank" rel="noreferrer">Read the official quickstart ↗</a>
+              </div>
+            </details>
+            <p class="connection-message" role="status" aria-live="polite" data-ai-message></p>
+          </article>
+
+          <article class="connection-card" data-ai-provider-card="huggingface">
+            <div class="connection-main">
+              <div class="connection-logo connection-logo-hf" aria-hidden="true">HF</div>
+              <div>
+                <div class="connection-title-line">
+                  <h3>Hugging Face Router</h3>
+                  <span class="connection-state" data-ai-state>Not connected</span>
+                </div>
+                <p data-ai-detail>Zero-markup hosted routing across inference providers for a model you choose.</p>
+                <p class="connection-usage" data-ai-usage>Provider inference is billed to your Hugging Face account.</p>
+              </div>
+            </div>
+            <div class="connection-actions">
+              <button class="button" type="button" data-ai-oauth-connect>Connect</button>
+              <button class="button" type="button" data-ai-activate hidden>Make active</button>
+              <span class="connection-active-indicator" data-ai-active-indicator hidden><span aria-hidden="true">✓</span> Active</span>
+              <button class="button button-secondary" type="button" data-ai-disconnect hidden>Disconnect</button>
+              <a href="https://huggingface.co/settings/inference-providers" target="_blank" rel="noreferrer">Manage at Hugging Face ↗</a>
+            </div>
+            <details class="connection-advanced" data-ai-setup>
+              <summary>Use an API token instead</summary>
+              <form data-ai-key-form>
+                <label>
+                  <span>Token with Inference Providers permission</span>
+                  <input type="password" autocomplete="off" placeholder="hf_…" data-ai-key />
+                </label>
+                <button class="button button-secondary" type="submit" data-ai-key-submit>Check and connect</button>
+              </form>
+              <p>The token remains only in this browser tab and is cleared when you disconnect or close it.</p>
+              <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer">Create or manage token ↗</a>
+            </details>
+            <details class="connection-learning">
+              <summary>When should I use this?</summary>
+              <p>Choose it for open models and hosted provider routing with no Hugging Face markup. Its automatic routing mainly chooses who serves your selected model; it does not choose the best model for each task.</p>
+              <div class="connection-learning-links">
+                <a href="https://www.youtube.com/watch?v=oxwsizy1Spw" target="_blank" rel="noreferrer">Watch the official walkthrough ↗</a>
+                <a href="https://huggingface.co/docs/inference-providers/en/index" target="_blank" rel="noreferrer">Read the official guide ↗</a>
+              </div>
+            </details>
+            <p class="connection-message" role="status" aria-live="polite" data-ai-message></p>
+          </article>
+
+          <article class="connection-card" data-ai-provider-card="cloudflare">
+            <div class="connection-main">
+              <div class="connection-logo connection-logo-cf" aria-hidden="true">CF</div>
+              <div>
+                <div class="connection-title-line">
+                  <h3>Cloudflare AI Gateway</h3>
+                  <span class="connection-state" data-ai-state>Not connected</span>
+                </div>
+                <p data-ai-detail>Advanced hosted choice for conditional routes, quotas, fallbacks and budget controls.</p>
+                <p class="connection-usage" data-ai-usage>Core gateway features are currently free; model use and optional paid services remain yours.</p>
+              </div>
+            </div>
+            <div class="connection-actions">
+              <button class="button" type="button" data-ai-open-setup>Connect</button>
+              <button class="button" type="button" data-ai-activate hidden>Make active</button>
+              <span class="connection-active-indicator" data-ai-active-indicator hidden><span aria-hidden="true">✓</span> Active</span>
+              <button class="button button-secondary" type="button" data-ai-disconnect hidden>Disconnect</button>
+              <a href="https://dash.cloudflare.com/" target="_blank" rel="noreferrer">Open Cloudflare dashboard ↗</a>
+            </div>
+            <details class="connection-advanced" data-ai-setup>
+              <summary>Connect your Cloudflare route</summary>
+              <ol>
+                <li>Create an AI Gateway and deploy a dynamic route in Cloudflare.</li>
+                <li>Enter the three non-secret identifiers below.</li>
+                <li>Continue to Cloudflare and approve access. No API token is pasted into AI Spanda.</li>
+              </ol>
+              <form data-ai-config-form>
+                <label>
+                  <span>Account ID</span>
+                  <input type="text" autocomplete="off" placeholder="32-character account ID" data-ai-config="accountId" />
+                </label>
+                <label>
+                  <span>Gateway ID</span>
+                  <input type="text" autocomplete="off" placeholder="default" value="default" data-ai-config="gatewayId" />
+                </label>
+                <label>
+                  <span>Dynamic route name</span>
+                  <input type="text" autocomplete="off" placeholder="editorial" data-ai-config="route" />
+                </label>
+                <button class="button button-secondary" type="submit" data-ai-config-submit>Continue with Cloudflare</button>
+              </form>
+              <aside class="connection-safety-note" aria-label="Cloudflare authorization information">
+                <strong>Know what you are approving</strong>
+                <ul>
+                  <li>Cloudflare’s AI Gateway Run permission currently covers every AI Gateway in the selected Cloudflare account, not only the route entered here.</li>
+                  <li>The temporary OAuth access stays only in this open page; AI Spanda does not save it to its database, browser storage or logs.</li>
+                  <li>Disconnect when finished. AI Spanda will revoke the temporary access with Cloudflare.</li>
+                </ul>
+              </aside>
+              <p>Connection testing sends a one-token request through the route. Your Cloudflare limits, provider charges and logging settings still apply.</p>
+            </details>
+            <details class="connection-learning">
+              <summary>When should I use this?</summary>
+              <p>Choose Cloudflare when you need visual or JSON-based task rules, quotas, retries and fallbacks without operating a gateway server. Review logging, caching and token permissions for sensitive content.</p>
+              <div class="connection-learning-links">
+                <a href="https://www.youtube.com/watch?v=GgZ1coyrmi4" target="_blank" rel="noreferrer">Watch the visual overview ↗</a>
+                <a href="https://developers.cloudflare.com/ai-gateway/features/dynamic-routing/" target="_blank" rel="noreferrer">Dynamic routing guide ↗</a>
+              </div>
+            </details>
+            <p class="connection-message" role="status" aria-live="polite" data-ai-message></p>
+          </article>
+
+          <article class="connection-card" data-ai-provider-card="merge">
+            <div class="connection-main">
+              <div class="connection-logo connection-logo-merge" aria-hidden="true">MG</div>
+              <div>
+                <div class="connection-title-line">
+                  <h3>Merge Gateway</h3>
+                  <span class="connection-state" data-ai-state>Not connected</span>
+                </div>
+                <p data-ai-detail>User-funded routing controlled by the policy and hard budget in your Merge project.</p>
+                <p class="connection-usage" data-ai-usage>Your Merge account pays. AI Spanda never uses its own key or funded fallback.</p>
+              </div>
+            </div>
+            <div class="connection-actions">
+              <button class="button" type="button" data-ai-open-setup>Connect</button>
+              <button class="button" type="button" data-ai-activate hidden>Make active</button>
+              <span class="connection-active-indicator" data-ai-active-indicator hidden><span aria-hidden="true">✓</span> Active</span>
+              <button class="button button-secondary" type="button" data-ai-disconnect hidden>Disconnect</button>
+              <a href="https://gateway.merge.dev/api-keys" target="_blank" rel="noreferrer">Manage Merge keys ↗</a>
+            </div>
+            <details class="connection-advanced" data-ai-setup>
+              <summary>Connect with a Project API Key</summary>
+              <ol>
+                <li>Create a dedicated Merge project for AI Spanda.</li>
+                <li>Configure its routing policy and set a low hard monthly budget.</li>
+                <li>Create a Project API Key for that project, then paste it below.</li>
+              </ol>
+              <aside class="connection-safety-note" aria-label="Merge Gateway key safety">
+                <strong>Keep your key safe</strong>
+                <ul>
+                  <li>Use a dedicated Project API Key—never a management or reusable master key.</li>
+                  <li>AI Spanda does not save it to its database or logs. It stays only in this browser-tab session.</li>
+                  <li>Avoid shared devices. Disconnect here and revoke the key in Merge immediately if you suspect exposure.</li>
+                </ul>
+              </aside>
+              <form data-ai-key-form>
+                <label>
+                  <span>Merge Gateway API Key</span>
+                  <input type="password" autocomplete="off" placeholder="Project API Key" data-ai-key />
+                </label>
+                <button class="button button-secondary" type="submit" data-ai-key-submit>Save &amp; test connection</button>
+              </form>
+              <p>Tip: start with the smallest practical budget. You can raise it later after confirming your routing policy behaves as expected.</p>
+              <div class="connection-learning-links">
+                <a href="https://gateway.merge.dev/get-started" target="_blank" rel="noreferrer">Merge Gateway setup ↗</a>
+                <a href="https://gateway.merge.dev/api-keys" target="_blank" rel="noreferrer">Create a Project API Key ↗</a>
+              </div>
+            </details>
+            <details class="connection-learning">
+              <summary>When should I use this?</summary>
+              <p>Choose Merge when you want its project routing policy to select the model while a hard project budget limits your spending. You own the account, policy, provider access and charges.</p>
+              <a href="https://gateway.merge.dev/get-started" target="_blank" rel="noreferrer">Read the Merge Gateway guide ↗</a>
+            </details>
+            <p class="connection-message" role="status" aria-live="polite" data-ai-message></p>
+          </article>
+        </div>
+
+        <div class="connection-facts" aria-label="AI connection facts">
+          <span>One active router at a time</span>
+          <span>Credentials close with this browser tab</span>
+          <span>Nothing is sent until you use an AI action</span>
+        </div>
+      </section>
+
+      <section class="playground-section-heading" id="playground" aria-labelledby="playground-heading-title">
+        <p class="eyebrow">Step 2 · Learn by trying</p>
+        <h2 id="playground-heading-title">Compare &amp; choose</h2>
+        <p>Send one short prompt through your active router, or compare connected routers using exactly the same request.</p>
+      </section>
+
+      <section class="playground-workspace" aria-labelledby="playground-prompt-title">
+        <div class="playground-cost-note">
+          <strong>Your accounts, your limits.</strong>
+          <span>Each run may use a small amount of your provider credit. AI Spanda adds no AI usage charge.</span>
+        </div>
+
+        <div class="playground-prompt-block">
+          <div class="playground-label-line">
+            <label id="playground-prompt-title" for="playground-prompt">What would you like to ask?</label>
+            <span data-playground-character-count>0/300</span>
+          </div>
+          <textarea
+            id="playground-prompt"
+            rows="4"
+            maxlength="300"
+            placeholder="Type a short question, or use the suggested prompt below."
+            data-playground-prompt
+          ></textarea>
+          <div class="playground-example">
+            <div>
+              <strong>Suggested prompt</strong>
+              <p>In exactly two short sentences, explain the difference between an AI model and an AI router to a curious beginner. Use one simple analogy and no jargon.</p>
+            </div>
+            <button class="playground-example-button" type="button" data-playground-use-example>Use this prompt</button>
+          </div>
+          <p class="playground-help">The same prompt and response limit are sent to every selected router.</p>
+        </div>
+
+        <fieldset class="playground-router-picker">
+          <legend>Choose routers to compare</legend>
+          <div class="playground-router-grid">
+            <label data-playground-router-row>
+              <input type="checkbox" value="openrouter" data-playground-router />
+              <span><strong>OpenRouter</strong><small data-playground-router-state>Not connected</small></span>
+            </label>
+            <label data-playground-router-row>
+              <input type="checkbox" value="huggingface" data-playground-router />
+              <span><strong>Hugging Face Router</strong><small data-playground-router-state>Not connected</small></span>
+            </label>
+            <label data-playground-router-row>
+              <input type="checkbox" value="cloudflare" data-playground-router />
+              <span><strong>Cloudflare AI Gateway</strong><small data-playground-router-state>Not connected</small></span>
+            </label>
+            <label data-playground-router-row>
+              <input type="checkbox" value="merge" data-playground-router />
+              <span><strong>Merge Gateway</strong><small data-playground-router-state>Not connected</small></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="playground-actions">
+          <button class="button" type="button" data-playground-compare disabled>Run selected router</button>
+        </div>
+        <p class="playground-status" role="status" aria-live="polite" data-playground-status></p>
+      </section>
+
+      <section class="playground-summary" data-playground-summary hidden></section>
+      <section class="playground-results" aria-label="Router results" data-playground-results></section>
+
+      <section class="playground-resources" aria-labelledby="playground-resources-title">
+        <div class="playground-resources-heading">
+          <div>
+            <p class="eyebrow">Keep learning</p>
+            <h2 id="playground-resources-title">Explore benchmarks and current models</h2>
+          </div>
+          <p>Use several sources: every leaderboard measures something different.</p>
+        </div>
+        <div class="playground-resource-groups">
+          <div>
+            <h3>Compare performance</h3>
+            <div class="playground-resource-links">
+              <a href="https://artificialanalysis.ai/leaderboards/models/" target="_blank" rel="noopener noreferrer"><span class="playground-resource-mark">AA</span><span><strong>Artificial Analysis</strong><small>Quality, speed and cost</small></span></a>
+              <a href="https://arena.ai/leaderboard" target="_blank" rel="noopener noreferrer"><span class="playground-resource-mark">A</span><span><strong>Arena</strong><small>Human preference rankings</small></span></a>
+              <a href="https://crfm.stanford.edu/helm/" target="_blank" rel="noopener noreferrer"><span class="playground-resource-mark">H</span><span><strong>Stanford HELM</strong><small>Transparent task evaluations</small></span></a>
+            </div>
+          </div>
+          <div>
+            <h3>Browse current models</h3>
+            <div class="playground-resource-links">
+              <a href="https://openrouter.ai/models" target="_blank" rel="noopener noreferrer"><span class="playground-resource-mark">OR</span><span><strong>OpenRouter Models</strong><small>Catalog, pricing and routes</small></span></a>
+              <a href="https://huggingface.co/models" target="_blank" rel="noopener noreferrer"><span class="playground-resource-mark">HF</span><span><strong>Hugging Face Models</strong><small>Open model hub</small></span></a>
+            </div>
+          </div>
+        </div>
+        <details class="playground-official-models">
+          <summary>Official model pages</summary>
+          <div>
+            <a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener noreferrer"><span>OA</span>OpenAI</a>
+            <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer"><span>G</span>Google Gemini</a>
+            <a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener noreferrer"><span>AN</span>Anthropic</a>
+            <a href="https://ai.meta.com/resources/models-and-libraries/" target="_blank" rel="noopener noreferrer"><span>M</span>Meta AI</a>
+          </div>
+        </details>
+      </section>
+
+      <aside class="playground-learning">
+        <p class="eyebrow">One useful distinction</p>
+        <h2>A router is not the same as a model</h2>
+        <p>A router decides where a request goes. The model produces the answer. This first comparison lets each router make its own choice, so compare the complete result—not only the model name.</p>
+      </aside>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  import { initializeAccountSettings } from '@/scripts/account-settings';
+  import { initializeAiRouterPlayground } from '@/scripts/ai-router-playground';
+  void initializeAccountSettings();
+  initializeAiRouterPlayground();
+</script>
+
+<style is:global>
+  .playground-shell { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: clamp(3rem, 7vw, 6rem) 0; }
+  .playground-panel { width: min(560px, 100%); margin: 5vh auto; padding: clamp(1.5rem, 4vw, 2.5rem); border: 1px solid var(--line); border-radius: 1.25rem; background: white; box-shadow: 0 1.5rem 4rem rgb(14 18 26 / 9%); }
+  .playground-panel[hidden], [data-playground-content][hidden] { display: none; }
+  .playground-panel h1 { margin: .3rem 0 .7rem; }
+  .playground-panel p { color: var(--muted); }
+  .playground-panel-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+  .playground-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 2rem; }
+  .playground-heading h1 { margin: .25rem 0 .65rem; }
+  .playground-heading p { max-width: 48rem; margin: 0; color: var(--muted); font-size: 1.08rem; }
+  .ai-tools-heading-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 1rem; }
+  .account-text-button { padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
+  .account-text-button:hover { color: var(--ink); text-decoration: underline; }
+  .ai-tools-nav { display: flex; flex-wrap: wrap; gap: .65rem; margin: 0 0 1.25rem; }
+  .ai-tools-nav a { display: inline-flex; align-items: center; gap: .45rem; padding: .6rem .8rem; border: 1px solid #d7d9de; border-radius: 999px; color: var(--ink); text-decoration: none; font-weight: 800; }
+  .ai-tools-nav a:hover { border-color: #8aa8df; background: #f7f9fd; }
+  .ai-tools-nav span { display: inline-grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 999px; background: #eaf0fb; color: #285aa8; font-size: .72rem; }
+  .account-section { margin-top: 1.25rem; padding: clamp(1.35rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.1rem; background: white; scroll-margin-top: 1rem; }
+  .account-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .account-section h2 { margin: .25rem 0 0; }
+  .account-section-intro { max-width: 54rem; margin: .65rem 0 1.25rem; color: var(--muted); }
+  .active-router-note { margin-bottom: 1rem; padding: .7rem .85rem; border-radius: .7rem; background: #f1f5fc; color: #334b73; font-weight: 700; }
+  .connection-test-note { margin: -.25rem 0 1rem; color: var(--muted); font-size: .9rem; }
+  .playground-link.is-disabled { opacity: .48; pointer-events: none; }
+  .connection-list { display: grid; gap: 1rem; }
+  .connection-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.25rem; padding: 1.25rem; border: 1px solid #d7d9de; border-radius: .9rem; background: #faf9f5; transition: border-color .2s ease, box-shadow .2s ease; }
+  .connection-card[data-active] { border-color: #2f6fe4; box-shadow: 0 0 0 2px rgb(47 111 228 / 10%); }
+  .connection-main { display: flex; align-items: start; gap: 1rem; }
+  .connection-logo { display: grid; flex: 0 0 3rem; width: 3rem; height: 3rem; place-items: center; border-radius: .75rem; background: var(--ink); color: white; font-weight: 800; }
+  .connection-logo-hf { background: #f1b928; color: #171717; }
+  .connection-logo-cf { background: #f48120; }
+  .connection-logo-merge { background: #6d4aff; }
+  .connection-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; }
+  .connection-title-line h3 { margin: 0; }
+  .connection-main p { margin: .35rem 0 0; color: var(--muted); }
+  .connection-main .connection-usage { color: #425476; font-size: .9rem; }
+  .connection-state { display: inline-flex; padding: .35rem .65rem; border-radius: 999px; background: #f6e7b8; color: #71510a; font-size: .78rem; font-weight: 750; }
+  .connection-state[data-connected] { background: #e9edf2; color: #465466; }
+  .connection-state[data-active-state], .connection-active-indicator { background: #dff2e6; color: #21603a; }
+  .connection-state[data-needs-attention] { background: #f8e1d6; color: #8a341f; }
+  .connection-actions { display: flex; align-items: flex-end; flex-direction: column; gap: .7rem; }
+  .connection-actions [hidden], .playground-result-activation [hidden] { display: none; }
+  .connection-active-indicator { display: inline-flex; align-items: center; gap: .35rem; padding: .55rem .8rem; border-radius: .7rem; font-weight: 800; }
+  .connection-actions a { color: var(--clarity); font-weight: 700; }
+  .connection-advanced, .connection-learning { grid-column: 1 / -1; padding-top: 1rem; border-top: 1px solid var(--line); }
+  .connection-advanced summary, .connection-learning summary { color: var(--clarity); font-weight: 750; cursor: pointer; }
+  .connection-advanced form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: .75rem; margin-top: 1rem; }
+  .connection-advanced label { display: grid; gap: .4rem; color: var(--ink); font-weight: 700; }
+  .connection-advanced input { width: 100%; min-height: 3rem; box-sizing: border-box; border: 1px solid #cfd2d8; border-radius: .7rem; background: white; color: var(--ink); font: inherit; padding: .65rem .8rem; }
+  .connection-advanced p, .connection-learning p, .connection-message { margin: .65rem 0 0; color: var(--muted); font-size: .9rem; }
+  .connection-safety-note { margin-top: 1rem; padding: .9rem 1rem; border: 1px solid #ead59a; border-radius: .75rem; background: #fff8e6; color: var(--ink); }
+  .connection-safety-note strong { display: block; margin-bottom: .35rem; }
+  .connection-safety-note ul { margin: 0; padding-left: 1.15rem; color: var(--muted); }
+  .connection-safety-note li + li { margin-top: .3rem; }
+  .connection-learning a { display: inline-block; margin-top: .65rem; color: var(--clarity); font-weight: 700; }
+  .connection-learning-links { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .connection-message:empty { display: none; }
+  .connection-facts { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1rem; }
+  .connection-facts span { padding: .4rem .65rem; border-radius: 999px; background: #f1f5fc; color: #334b73; font-size: .78rem; font-weight: 700; }
+  .playground-section-heading { padding: clamp(2.5rem, 6vw, 4.5rem) 0 1rem; scroll-margin-top: 1rem; }
+  .playground-section-heading h2 { margin: .2rem 0 .5rem; font-size: clamp(2rem, 5vw, 3.3rem); }
+  .playground-section-heading p:last-child { max-width: 54rem; margin: 0; color: var(--muted); }
+  .playground-workspace, .playground-summary, .playground-learning { padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.1rem; background: white; }
+  .playground-cost-note { display: flex; align-items: baseline; flex-wrap: wrap; gap: .45rem; margin-bottom: 1.3rem; padding: .8rem 1rem; border-radius: .8rem; background: #f1f5fc; color: #334b73; }
+  .playground-prompt-block { display: grid; gap: .55rem; }
+  .playground-label-line { display: flex; justify-content: space-between; gap: 1rem; font-weight: 800; }
+  .playground-label-line span { color: var(--muted); font-size: .88rem; font-weight: 700; }
+  .playground-prompt-block textarea { width: 100%; min-height: 8rem; box-sizing: border-box; resize: vertical; border: 1px solid #bfc4cd; border-radius: .85rem; background: white; color: var(--ink); font: inherit; font-size: 1.05rem; line-height: 1.55; padding: .9rem 1rem; }
+  .playground-prompt-block textarea:focus { outline: 3px solid rgb(47 111 228 / 18%); border-color: #2f6fe4; }
+  .playground-help { margin: 0; color: var(--muted); font-size: .9rem; }
+  .playground-example { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem .9rem; border: 1px solid #d8dfeb; border-radius: .75rem; background: #f7f9fd; }
+  .playground-example p { max-width: 48rem; margin: .2rem 0 0; color: #34435b; font-size: .9rem; line-height: 1.45; }
+  .playground-example-button { flex: 0 0 auto; padding: .55rem .75rem; border: 1px solid #2f6fe4; border-radius: .55rem; background: white; color: #1d57ba; font: inherit; font-size: .85rem; font-weight: 800; cursor: pointer; }
+  .playground-example-button:hover { background: #edf3ff; }
+  .playground-router-picker { margin: 1.5rem 0 0; padding: 0; border: 0; }
+  .playground-router-picker legend { margin-bottom: .7rem; font-weight: 800; }
+  .playground-router-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; }
+  .playground-router-grid label { display: flex; align-items: center; gap: .7rem; min-height: 4rem; padding: .7rem .8rem; border: 1px solid #d7d9de; border-radius: .8rem; background: #f8f7f3; cursor: not-allowed; opacity: .56; }
+  .playground-router-grid label[data-connected] { cursor: pointer; opacity: 1; }
+  .playground-router-grid label[data-active] { border-color: #2f6fe4; box-shadow: 0 0 0 2px rgb(47 111 228 / 10%); }
+  .playground-router-grid input { width: 1.05rem; height: 1.05rem; accent-color: #2f6fe4; }
+  .playground-router-grid span { display: grid; gap: .1rem; }
+  .playground-router-grid small { color: var(--muted); }
+  .playground-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+  .playground-actions .button:disabled { cursor: not-allowed; opacity: .48; }
+  .playground-status { min-height: 1.4rem; margin: .8rem 0 0; color: var(--muted); font-weight: 700; }
+  .playground-status[data-tone="error"] { color: #9b321f; }
+  .playground-status[data-tone="success"] { color: #21603a; }
+  .playground-summary { margin-top: 1rem; background: #f8fafc; overflow: hidden; }
+  .playground-summary[hidden] { display: none; }
+  .playground-summary-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+  .playground-summary-heading h2 { margin: 0; }
+  .playground-summary-heading p { max-width: 42rem; margin: 0; color: var(--muted); font-size: .9rem; }
+  .playground-summary-warning { display: flex; flex-wrap: wrap; gap: .25rem .45rem; margin: 0 0 1rem; padding: .9rem 1rem; border: 1px solid #e4b34c; border-left: .3rem solid #c98516; border-radius: .75rem; background: #fff8e8; color: #69480b; }
+  .playground-summary-warning strong { color: #4f3505; }
+  .playground-table-wrap { overflow-x: auto; border: 1px solid #d9dee7; border-radius: .8rem; background: white; }
+  .playground-comparison-table { width: 100%; min-width: 700px; border-collapse: collapse; text-align: left; }
+  .playground-comparison-table th, .playground-comparison-table td { padding: .85rem 1rem; border-bottom: 1px solid #e2e5ea; vertical-align: top; }
+  .playground-comparison-table thead th { background: #eef2f8; color: var(--ink); }
+  .playground-comparison-table tbody tr:last-child th, .playground-comparison-table tbody tr:last-child td { border-bottom: 0; }
+  .playground-comparison-table tbody th { width: 24%; background: #fafbfc; }
+  .playground-comparison-table tbody tr.playground-table-section th { width: auto; padding: .7rem 1rem; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; background: #e9eef7; color: var(--ink); }
+  .playground-section-label { display: block; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; }
+  .playground-section-help { display: block; margin-top: .2rem; color: var(--muted); font-size: .76rem; font-weight: 600; letter-spacing: normal; text-transform: none; }
+  .playground-metric-label { display: block; font-size: .92rem; }
+  .playground-metric-help { display: block; margin-top: .18rem; color: var(--muted); font-size: .72rem; font-weight: 600; line-height: 1.35; }
+  .playground-router-column { display: grid; gap: .2rem; min-width: 13rem; }
+  .playground-router-column small { color: var(--muted); font-weight: 600; overflow-wrap: anywhere; }
+  .playground-router-column a { color: inherit; text-decoration-color: #94a8cc; text-underline-offset: .16em; }
+  .playground-router-identity { display: flex; align-items: center; gap: .55rem; }
+  .playground-brand-mark { display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; flex: 0 0 auto; border-radius: .45rem; background: #141820; color: white; font-size: .65rem; font-weight: 900; letter-spacing: -.02em; }
+  .playground-table-value { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; font-weight: 750; overflow-wrap: anywhere; }
+  .playground-comparison-table td.is-winner { background: #f1faf4; box-shadow: inset 3px 0 #2f8f55; }
+  .playground-comparison-table td.is-loser { background: #fff7f5; box-shadow: inset 3px 0 #c75a43; }
+  .playground-marker { display: inline-flex; align-items: center; padding: .22rem .45rem; border-radius: 999px; font-size: .69rem; font-weight: 850; white-space: nowrap; }
+  .playground-marker.is-winner { background: #dff2e6; color: #21603a; }
+  .playground-marker.is-loser { background: #f7dfd9; color: #8a341f; }
+  .playground-unavailable { color: var(--muted); font-weight: 650; }
+  .playground-summary-note { margin: .85rem 0 0; color: var(--muted); font-size: .86rem; }
+  .playground-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+  .playground-result { min-width: 0; padding: 1.25rem; border: 1px solid #d7d9de; border-radius: 1rem; background: white; }
+  .playground-result.is-preferred { border-color: #2f8f55; box-shadow: 0 0 0 3px rgb(47 143 85 / 12%); }
+  .playground-result.is-error { border-color: #e1b5a8; background: #fffaf8; }
+  .playground-result-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+  .playground-result-heading h2 { margin: .15rem 0 0; overflow-wrap: anywhere; font-size: 1.3rem; }
+  .playground-result-model { margin: .25rem 0 0; color: var(--muted); font-size: .82rem; font-weight: 700; overflow-wrap: anywhere; }
+  .playground-result-state { flex: 0 0 auto; padding: .3rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 800; }
+  .playground-result-state.is-success { background: #dff2e6; color: #21603a; }
+  .playground-result-state.is-error { background: #f8e1d6; color: #8a341f; }
+  .playground-answer { min-height: 5rem; margin: 1rem 0; color: var(--ink); font-size: 1.02rem; line-height: 1.6; white-space: pre-wrap; }
+  .playground-result-error { margin: 1rem 0 .4rem; color: #8a341f; font-weight: 750; }
+  .playground-result-help { margin: .5rem 0; color: var(--muted); font-size: .85rem; }
+  .playground-detail { min-width: 0; padding: .65rem .7rem; border-radius: .65rem; background: #f5f3ed; }
+  .playground-detail dt { color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+  .playground-detail dd { margin: .22rem 0 0; overflow-wrap: anywhere; color: var(--ink); font-weight: 750; }
+  .playground-result-details { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+  .playground-result-details summary { color: var(--clarity); font-weight: 750; cursor: pointer; }
+  .playground-detail-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: .75rem 0 0; }
+  .playground-preference { display: flex; align-items: center; gap: .45rem; margin-top: .9rem; color: var(--clarity); font-weight: 800; cursor: pointer; }
+  .playground-preference input { accent-color: #2f6fe4; }
+  .playground-result-activation { display: flex; align-items: center; justify-content: flex-end; margin-top: .9rem; }
+  .playground-resources { margin-top: 1rem; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--line); border-radius: 1.1rem; background: white; }
+  .playground-resources-heading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
+  .playground-resources-heading h2 { margin: .2rem 0 0; }
+  .playground-resources-heading > p { max-width: 25rem; margin: 0; color: var(--muted); font-size: .9rem; }
+  .playground-resource-groups { display: grid; grid-template-columns: 1.25fr 1fr; gap: 2rem; margin-top: 1.35rem; }
+  .playground-resource-groups h3 { margin: 0 0 .65rem; font-size: .95rem; }
+  .playground-resource-links { display: grid; gap: .55rem; }
+  .playground-resource-links > a { display: flex; align-items: center; gap: .75rem; padding: .7rem .8rem; border: 1px solid #dfe3e9; border-radius: .7rem; color: var(--ink); text-decoration: none; }
+  .playground-resource-links > a:hover { border-color: #8aa8df; background: #f7f9fd; }
+  .playground-resource-links > a > span:last-child { display: grid; gap: .08rem; }
+  .playground-resource-links small { color: var(--muted); }
+  .playground-resource-mark { display: inline-grid; place-items: center; width: 2rem; height: 2rem; flex: 0 0 auto; border-radius: .55rem; background: #eaf0fb; color: #285aa8; font-size: .68rem; font-weight: 900; }
+  .playground-official-models { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+  .playground-official-models summary { color: var(--clarity); font-weight: 800; cursor: pointer; }
+  .playground-official-models > div { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .75rem; }
+  .playground-official-models a { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .6rem; border: 1px solid #dfe3e9; border-radius: 999px; color: var(--ink); text-decoration: none; font-size: .85rem; font-weight: 750; }
+  .playground-official-models a span { display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; padding: 0 .18rem; border-radius: 999px; background: #141820; color: white; font-size: .57rem; font-weight: 900; }
+  .playground-learning { margin-top: 1rem; background: #fff9e8; }
+  .playground-learning h2 { margin: .2rem 0 .45rem; }
+  .playground-learning p:last-child { max-width: 58rem; margin: 0; color: var(--muted); }
+  @media (max-width: 820px) {
+    .playground-heading, .account-section-heading { align-items: flex-start; flex-direction: column; }
+    .ai-tools-heading-actions { justify-content: flex-start; }
+    .connection-card { grid-template-columns: 1fr; }
+    .connection-actions { align-items: stretch; }
+    .connection-advanced, .connection-learning { grid-column: 1; }
+    .connection-advanced form { grid-template-columns: 1fr; }
+    .playground-router-grid { grid-template-columns: 1fr; }
+    .playground-results { grid-template-columns: 1fr; }
+    .playground-resource-groups { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .playground-example, .playground-summary-heading, .playground-resources-heading { align-items: flex-start; flex-direction: column; }
+    .playground-actions .button { width: 100%; }
+    .playground-example-button { width: 100%; }
+    .playground-detail-list { grid-template-columns: 1fr; }
+  }
+</style>
