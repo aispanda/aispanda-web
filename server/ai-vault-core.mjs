@@ -167,7 +167,20 @@ export const refreshProviderConnection = async (provider, rawConnection, fetchIm
       headers: { Authorization: `Bearer ${token}`, 'cf-aig-gateway-id': gatewayId, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: `dynamic/${route}`, messages: [{ role: 'user', content: 'Reply OK.' }], max_tokens: 1, temperature: 0, stream: false }),
     });
-    if (!response.ok) throw new Error(await responseMessage(response, 'Cloudflare AI Gateway'));
+    if (!response.ok) {
+      // Diagnostic only: Cloudflare's own status and error body, never the token. Cloudflare
+      // returns 401 code 10000 when the credential lacks Workers AI, which is otherwise
+      // indistinguishable from a bad gateway or route once the message is generalised.
+      const detail = await response.clone().text().catch(() => '');
+      console.error('Cloudflare verify failed', {
+        endpoint: `/accounts/${accountId}/ai/v1/chat/completions`,
+        gatewayId,
+        route,
+        status: response.status,
+        body: detail.slice(0, 600),
+      });
+      throw new Error(await responseMessage(response, 'Cloudflare AI Gateway'));
+    }
     connection.status = { ...connection.status, connected: true, label: `${gatewayId} · dynamic/${route}` };
   } else {
     response = await fetchImpl('https://api-gateway.merge.dev/v1/models', { headers: { Authorization: `Bearer ${token}` } });

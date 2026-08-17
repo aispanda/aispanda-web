@@ -188,6 +188,16 @@ export const initializeAccountSettings = async () => {
   const finishConnection = async (id: string, card: HTMLElement) => {
     needsAttention.delete(id);
     const connector = connectors.get(id);
+    // A provider with no browser-direct transport can only run through the server relay, so it is
+    // unusable without a signed-in account to store the credential against. Say so and drop the
+    // credential rather than reporting a connection that cannot generate.
+    if (!connector.descriptor.transports.includes('browser-direct') && !auth.currentUser) {
+      needsAttention.add(id);
+      connector.clearBrowserSession?.();
+      showConnectionResult(card, `${connector.descriptor.label} runs through the AI Spanda server, so it needs you signed in. Sign in, then connect again.`);
+      renderConnections();
+      return;
+    }
     if (auth.currentUser) await connector.persistForAccount?.();
     if (!connectionManager.activeId) {
       activateConnectedRouter(id, card);

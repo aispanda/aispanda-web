@@ -240,10 +240,16 @@ export class AiActiveConnectionManager {
   }
 }
 
-const withAccountPersistence = (connector: AiRouterConnector, vault: AiVaultBridge): AiRouterConnector => {
+// Exported for tests: transport selection here decides whether a provider credential is used in
+// the browser or only on the server, so it needs direct coverage.
+export const withAccountPersistence = (connector: AiRouterConnector, vault: AiVaultBridge): AiRouterConnector => {
   let persistedStatus: AiConnectionStatus | null = null;
   const localStatus = () => connector.status;
   const clearLocal = () => connector.clearBrowserSession?.();
+  // Read the wrapped connector's own declaration, never this wrapper's descriptor: the wrapper
+  // unions 'server-relay' into the advertised transports, so its own list would always still
+  // contain 'browser-direct' and the check would pass for providers that cannot use it.
+  const supportsBrowserDirect = connector.descriptor.transports.includes('browser-direct');
 
   return {
     descriptor: Object.freeze({
@@ -280,14 +286,16 @@ const withAccountPersistence = (connector: AiRouterConnector, vault: AiVaultBrid
       persistedStatus = null;
     },
     async refreshStatus() {
-      if (localStatus().connected) return connector.refreshStatus();
+      if (supportsBrowserDirect && localStatus().connected) return connector.refreshStatus();
       if (!persistedStatus?.connected) return localStatus();
       persistedStatus = await vault.refresh(connector.descriptor.id);
       return persistedStatus;
     },
     async generate(request) {
-      if (localStatus().connected) return connector.generate(request);
-      if (!persistedStatus?.connected) return connector.generate(request);
+      if (supportsBrowserDirect && localStatus().connected) return connector.generate(request);
+      // A relay-only provider must reach the vault even before a persisted status exists, because
+      // its provider API rejects browser origins outright.
+      if (!persistedStatus?.connected && supportsBrowserDirect) return connector.generate(request);
       return vault.generate(connector.descriptor.id, request);
     },
     async disconnect() {
@@ -1189,40 +1197,22 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
     }
   };
 
-  const refreshStatus = async () => {
-    if (!accessToken || !configuration) return status = { connected: false };
-    const response = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${configuration.accountId}/ai/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'cf-aig-gateway-id': configuration.gatewayId,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: `dynamic/${configuration.route}`,
-        messages: [{ role: 'user', content: 'Reply OK.' }],
-        max_tokens: 1,
-        temperature: 0,
-        stream: false,
-      }),
-    });
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        accessToken = '';
-        status = { connected: false };
-      }
-      throw new Error(await responseError(response, 'Cloudflare AI Gateway'));
-    }
-    status = { connected: true, label: `${configuration.gatewayId} · dynamic/${configuration.route}` };
-    return status;
-  };
+  // No browser-direct status check exists for Cloudflare. api.cloudflare.com refuses the CORS
+  // preflight, so the route can only be verified server-side, by the vault, when the connection is
+  // saved to the account. Returning the local status keeps the connector honest instead of issuing
+  // a request the browser is guaranteed to block.
+  const refreshStatus = async () => status;
 
   return {
     descriptor: Object.freeze({
       id: 'cloudflare',
       label: 'Cloudflare AI Gateway',
       authentication: Object.freeze(['oauth-pkce'] as const),
-      transports: Object.freeze(['browser-direct'] as const),
+      // Relay-only. api.cloudflare.com answers the CORS preflight for an Authorization-bearing
+      // request with 405 and no Access-Control-* headers, so the browser blocks every status and
+      // generation call. Only the server-side vault may talk to the provider API. OAuth itself
+      // stays in the browser because dash.cloudflare.com/oauth2/token does send CORS headers.
+      transports: Object.freeze(['server-relay'] as const),
       capabilities: new Set<AiRouterCapability>(['text-generation', 'model-routing', 'usage-metadata', 'streaming', 'structured-output', 'tool-calling']),
     }),
     get status() { return status; },
@@ -1306,33 +1296,15 @@ export const createCloudflareAiGatewayConnector = (options: CloudflareConnectorO
           ? new Date(Date.now() + tokenPayload.expires_in * 1_000).toISOString()
           : null,
       };
-      try {
-        await refreshStatus();
-        return { handled: true, connected: true };
-      } catch (error) {
-        accessToken = '';
-        status = { connected: false };
-        return {
-          handled: true,
-          connected: false,
-          error: error instanceof Error ? error.message : 'Cloudflare could not verify this gateway route.',
-        };
-      }
+      // Deliberately not verified here. Verifying in the browser would call api.cloudflare.com,
+      // which CORS blocks, and the old catch discarded a valid access token before the vault could
+      // store it. The token is handed to the server, which verifies the route and returns the
+      // authoritative status.
+      return { handled: true, connected: true };
     },
     refreshStatus,
-    async generate(request) {
-      if (!accessToken || !configuration) throw new Error('Connect Cloudflare AI Gateway before generating.');
-      return requestOpenAiCompatibleText({
-        endpoint: `https://api.cloudflare.com/client/v4/accounts/${configuration.accountId}/ai/v1/chat/completions`,
-        apiKey: accessToken,
-        model: `dynamic/${configuration.route}`,
-        request,
-        fetchImpl,
-        headers: { 'cf-aig-gateway-id': configuration.gatewayId },
-        providerLabel: 'Cloudflare AI Gateway',
-        requestedRoute: `dynamic/${configuration.route}`,
-        fallbackStatus: 'Controlled by the dynamic route; whether fallback was used was not reported',
-      });
+    async generate() {
+      throw new Error('Cloudflare AI Gateway runs through the AI Spanda server relay. Save the connection to your account, then generate.');
     },
     exportPersistentConnection() {
       if (!accessToken || !configuration || !status.connected) return null;

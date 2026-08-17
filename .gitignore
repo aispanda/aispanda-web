@@ -149,6 +149,7 @@ vite.config.ts.timestamp-*
 
 # Local deployment inputs and credentials
 .deployment.config
+.claude/
 *.pem
 *.key
 service-account*.json

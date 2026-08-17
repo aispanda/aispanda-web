@@ -188,12 +188,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
               <aside class="connection-safety-note" aria-label="Cloudflare authorization information">
                 <strong>Know what you are approving</strong>
                 <ul>
-                  <li>Cloudflare’s AI Gateway Run permission currently covers every AI Gateway in the selected Cloudflare account, not only the route entered here.</li>
-                  <li>The temporary OAuth access stays only in this open page; AI Spanda does not save it to its database, browser storage or logs.</li>
-                  <li>Disconnect when finished. AI Spanda will revoke the temporary access with Cloudflare.</li>
+                  <li>Cloudflare grants two account-level permissions: AI Gateway Run and Workers AI Read. AI Gateway Run covers every AI Gateway in the selected Cloudflare account, not only the route entered here.</li>
+                  <li>Cloudflare’s API cannot be called from a web page, so AI Spanda runs your Cloudflare requests through its own server. The OAuth access is encrypted and stored against your account so the connection survives signing out; it is never written to browser storage or logs.</li>
+                  <li>Disconnect when finished. AI Spanda deletes the stored access and revokes it with Cloudflare.</li>
                 </ul>
               </aside>
-              <p>Connection testing sends a one-token request through the route. Your Cloudflare limits, provider charges and logging settings still apply.</p>
+              <p>Connecting verifies the route on the AI Spanda server with a one-token request. Your Cloudflare limits, provider charges and logging settings still apply.</p>
             </details>
             <details class="connection-learning">
               <summary>When should I use this?</summary>

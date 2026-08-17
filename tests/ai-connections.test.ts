@@ -12,7 +12,10 @@ import {
   createOpenRouterConnector,
   runRouterComparison,
   selectHuggingFacePlaygroundModel,
+  withAccountPersistence,
+  type AiConnectionStatus,
   type AiRouterConnector,
+  type AiTransportMode,
 } from '../src/scripts/ai-connections.ts';
 
 const createMemoryStore = () => {
@@ -374,6 +377,77 @@ test('sign-out clears browser connection state without disconnecting the account
   assert.equal(manager.activeId, null);
 });
 
+const createTransportProbeConnector = (transports: readonly AiTransportMode[]) => {
+  const calls: string[] = [];
+  const status: AiConnectionStatus = { connected: true, label: 'local browser session' };
+  const connector = {
+    descriptor: {
+      id: 'cloudflare',
+      label: 'Probe Router',
+      authentication: Object.freeze(['oauth-pkce'] as const),
+      transports: Object.freeze([...transports]),
+      capabilities: new Set(['text-generation' as const]),
+    },
+    get status() { return status; },
+    beginConnection: async () => undefined,
+    completeConnectionCallback: async () => ({ handled: false, connected: true }),
+    refreshStatus: async () => { calls.push('connector.refreshStatus'); return status; },
+    generate: async () => { calls.push('connector.generate'); return { text: 'browser-direct', model: 'probe' }; },
+    disconnect: () => undefined,
+    exportPersistentConnection: () => ({ secret: { accessToken: 'probe-token' }, status }),
+    clearBrowserSession: () => undefined,
+  } as unknown as AiRouterConnector;
+  return { connector, calls };
+};
+
+const createProbeVault = (calls: string[]) => ({
+  list: async () => ({ activeProvider: null, connections: [] }),
+  save: async () => ({ connected: true }),
+  setActive: async () => undefined,
+  refresh: async () => { calls.push('vault.refresh'); return { connected: true }; },
+  generate: async () => { calls.push('vault.generate'); return { text: 'via relay', model: 'relay' }; },
+  disconnect: async () => undefined,
+});
+
+test('a relay-only provider never generates or refreshes through the browser, even with a live local session', async () => {
+  const { connector, calls } = createTransportProbeConnector(['server-relay']);
+  const wrapped = withAccountPersistence(connector, createProbeVault(calls));
+
+  // The local connector reports connected, which previously short-circuited straight to
+  // browser-direct calls. Cloudflare's provider API rejects browser origins, so the wrapper must
+  // choose by declared transport instead of by local session state.
+  assert.equal(connector.status.connected, true);
+
+  const generated = await wrapped.generate({ instruction: 'Be concise.', content: 'Probe.' });
+  assert.equal(generated.text, 'via relay');
+
+  // Before the connection is saved there is nothing in the vault to refresh, so the wrapper reports
+  // local status without calling out. It still must not issue a browser-direct provider request.
+  await wrapped.refreshStatus();
+  assert.deepEqual(calls, ['vault.generate']);
+
+  // Once saved, status refreshes must come from the server, even though the probe connector keeps
+  // reporting a live local session.
+  await wrapped.persistForAccount?.();
+  assert.equal(connector.status.connected, true);
+  await wrapped.refreshStatus();
+
+  assert.deepEqual(calls, ['vault.generate', 'vault.refresh']);
+  assert.equal(calls.includes('connector.generate'), false);
+  assert.equal(calls.includes('connector.refreshStatus'), false);
+});
+
+test('a browser-direct provider still uses its in-browser session when one is live', async () => {
+  const { connector, calls } = createTransportProbeConnector(['browser-direct']);
+  const wrapped = withAccountPersistence(connector, createProbeVault(calls));
+
+  const generated = await wrapped.generate({ instruction: 'Be concise.', content: 'Probe.' });
+  assert.equal(generated.text, 'browser-direct');
+  await wrapped.refreshStatus();
+
+  assert.deepEqual(calls, ['connector.generate', 'connector.refreshStatus']);
+});
+
 test('connects Cloudflare with PKCE, keeps OAuth access in memory, and revokes it on disconnect', async () => {
   const sessionStore = createMemoryStore();
   let authorizationUrl = '';
@@ -403,17 +477,11 @@ test('connects Cloudflare with PKCE, keeps OAuth access in memory, and revokes i
         revoked = true;
         return new Response(null, { status: 200 });
       }
-      assert.equal(url, 'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1/chat/completions');
-      const headers = new Headers(init?.headers);
-      assert.equal(headers.get('Authorization'), 'Bearer temporary-cloudflare-oauth-access');
-      assert.equal(headers.get('cf-aig-gateway-id'), 'aispanda');
-      const body = JSON.parse(String(init?.body)) as { model?: string; max_tokens?: number };
-      assert.equal(body.model, 'dynamic/editorial');
+      // Reaching here means the browser tried to call the provider API directly. api.cloudflare.com
+      // rejects the CORS preflight for an Authorization-bearing request, so any such call fails as
+      // "Failed to fetch" in a real browser. Count it and let the assertions below fail loudly.
       routeRequests += 1;
-      return Response.json({
-        model: 'provider/model-selected-by-route',
-        choices: [{ message: { content: routeRequests === 1 ? 'OK' : 'Cloudflare route works.' } }],
-      });
+      return Response.json({ model: 'unreachable-from-browser', choices: [{ message: { content: 'unreachable' } }] });
     },
   });
   await connector.connectWithConfiguration?.({
@@ -440,11 +508,26 @@ test('connects Cloudflare with PKCE, keeps OAuth access in memory, and revokes i
   callback.searchParams.set('state', authorization.searchParams.get('state') ?? '');
   const result = await connector.completeConnectionCallback(callback.toString());
   assert.equal(result.connected, true);
-  assert.equal(connector.status.label, 'aispanda · dynamic/editorial');
   assert.equal(sessionStore.getItem('aispanda-ai-cloudflare-session-v1'), null);
-  const generated = await connector.generate({ instruction: 'Be concise.', content: 'Test the route.' });
-  assert.equal(generated.text, 'Cloudflare route works.');
-  assert.equal(routeRequests, 2);
+
+  // Cloudflare is relay-only: the provider API is unreachable from a browser origin.
+  assert.deepEqual([...connector.descriptor.transports], ['server-relay']);
+
+  // The access token must survive the callback so the vault can store it. The previous
+  // implementation verified the route in the browser and discarded the token when CORS blocked
+  // that call, which left nothing to persist.
+  const exported = connector.exportPersistentConnection?.();
+  assert.equal(exported?.secret.accessToken, 'temporary-cloudflare-oauth-access');
+  assert.equal(exported?.configuration?.gatewayId, 'aispanda');
+
+  // Browser-direct generation must refuse rather than issue a request the browser would block.
+  await assert.rejects(
+    connector.generate({ instruction: 'Be concise.', content: 'Test the route.' }),
+    /server relay/i,
+  );
+
+  // Nothing in the connect-and-generate path may touch api.cloudflare.com from the browser.
+  assert.equal(routeRequests, 0);
   connector.disconnect();
   await Promise.resolve();
   assert.equal(connector.status.connected, false);
