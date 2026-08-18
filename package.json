@@ -20,7 +20,6 @@
     "astro": "7.2.0",
     "firebase": "^12.17.1",
     "firebase-admin": "^13.5.0",
-    "@better-stack/source-maps": "^0.7.0",
     "@sentry/astro": "^7.108.0"
   }
 }
