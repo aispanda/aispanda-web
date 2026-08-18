@@ -9,15 +9,9 @@ export default defineConfig({
   integrations: [
     sentry({
       dsn: process.env.SENTRY_DSN,
-      environment: 'staging' // Pilot: staging-only, never production,
+      environment: 'staging', // Pilot: staging-only, never production
       tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
       release: 'ai-48-observability-pilot',
-      enabled: process.env.ENABLE_OBSERVABILITY_PILOT === 'true',
-    }),
-    // Better Stack uptime monitoring (Phase 1 evidence)
-    betterStack({
-      telemetryToken: process.env.BETTER_STACK_TELEMETRY_TOKEN,
-      environment: process.env.BETTER_STACK_ENVIRONMENT || 'staging',
       enabled: process.env.ENABLE_OBSERVABILITY_PILOT === 'true',
     }),
     sitemap({ filter: (page) => !page.includes('/studio') }),
