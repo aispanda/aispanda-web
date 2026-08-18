@@ -1,0 +1,56 @@
+{
+  "$schema": "https://example.invalid/interface-state-evidence-profile/v1",
+  "schemaVersion": "1.0",
+  "project": {
+    "label": "Primary web consumer",
+    "repository": "local consumer repository",
+    "profileOwner": "Interface steward",
+    "lastReviewed": "2026-08-18"
+  },
+  "sourceOfTruth": {
+    "productionImplementation": [
+      "src/components/AssetCard.astro"
+    ],
+    "styles": [
+      "src/styles/global.css"
+    ],
+    "executionRecord": "https://linear.app/ai-spanda/issue/AI-44/asset-quality-001-define-reusable-interface-state-and-evidence",
+    "decisionRecord": "https://app.notion.com/p/3c0e4d72a7fd81209ac0feb9d9811844?pvs=204"
+  },
+  "adapter": {
+    "kind": "component catalog",
+    "configPath": ".storybook/main.ts",
+    "storyOrFixtureRoot": "src/ui-evidence",
+    "importsProductionStyles": true
+  },
+  "surfaces": [
+    {
+      "id": "catalogue-card",
+      "label": "Catalogue card",
+      "componentPath": "src/components/AssetCard.astro",
+      "fixturePath": "src/ui-evidence/catalogue-card.fixtures.ts",
+      "contextPacket": "ui-evidence/context/catalogue-card.md",
+      "stateContract": "ui-evidence/contracts/catalogue-card.md",
+      "states": [
+        "populated",
+        "featured",
+        "draft"
+      ]
+    }
+  ],
+  "verification": {
+    "install": "pnpm install --frozen-lockfile",
+    "render": "pnpm run storybook:build",
+    "interaction": "Manual keyboard and viewport review is required for the first adapter iteration.",
+    "accessibility": "Manual critical-path review is required for the first adapter iteration.",
+    "visual": "Review the static catalog build before approving any baseline workflow.",
+    "build": "pnpm run build",
+    "notes": "The current adapter renders real components with synthetic fixtures. It does not prove service behavior, authorization enforcement, privacy, security, data integrity, or field performance."
+  },
+  "boundaries": {
+    "syntheticFixturesOnly": true,
+    "noCredentials": true,
+    "noProductionData": true,
+    "releaseRequiresSeparateApproval": true
+  }
+}
