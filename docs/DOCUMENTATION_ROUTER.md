@@ -2,6 +2,12 @@
 
 Open this file first. One fact has one owning document; other files link rather than duplicate it.
 
+## Active execution
+
+- Current bounded implementation: `AISPANDA-COMMUNITY-BUILD@2` (Open-to-members Community vertical slice). Canonical owners below are the requirements source.
+- `docs/HANDOFF_GROK_COMMUNITY_REVIEW.md` is a temporary review record. Do not treat it as a second requirements file. After the slice lands, mark it Closed.
+
+
 ## Document-control rules
 
 1. **Reuse the existing owner first.** Before creating a document, search this router and the repository for the intended subject. Update the owning document when its scope already covers the change.

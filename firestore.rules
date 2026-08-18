@@ -404,6 +404,282 @@ service cloud.firestore {
           == get(commentPath(slug, resource.data.commentId)).data.likeCount - 1;
     }
 
+function isGroupMember(groupId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/communityGroupMembers/$(groupId + '_' + request.auth.uid));
+    }
+
+    function communityGroupPath(groupId) {
+      return /databases/$(database)/documents/communityGroups/$(groupId);
+    }
+
+    function communityDiscussionPath(discussionId) {
+      return /databases/$(database)/documents/communityDiscussions/$(discussionId);
+    }
+
+    function communityPostPath(postId) {
+      return /databases/$(database)/documents/communityPosts/$(postId);
+    }
+
+    function communityPostOwnerPath(postId) {
+      return /databases/$(database)/documents/communityPostOwners/$(postId);
+    }
+
+    function communityPostLikePath(postId) {
+      return /databases/$(database)/documents/communityPostLikes/$(postId + '_' + request.auth.uid);
+    }
+
+    function communityRemoveAuditPath(postId) {
+      return /databases/$(database)/documents/communityModerationActions/$( 'remove_' + postId );
+    }
+
+    function canReadCommunity() {
+      return hasStudioAccess();
+    }
+
+    match /communityGroups/{groupId} {
+      allow read: if canReadCommunity();
+      allow create: if (isAdministrator() || isPublisher())
+        && exists(profilePath())
+        && request.resource.data.access == 'open'
+        && request.resource.data.closed == false
+        && request.resource.data.closedAt == null
+        && request.resource.data.memberCount == 1
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 500
+        && existsAfter(/databases/$(database)/documents/communityGroupMembers/$(groupId + '_' + request.auth.uid));
+      allow update: if canReadCommunity()
+        && (
+          (
+            canComment()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+            && (
+              (
+                request.resource.data.memberCount == resource.data.memberCount + 1
+                && !isGroupMember(groupId)
+                && existsAfter(/databases/$(database)/documents/communityGroupMembers/$(groupId + '_' + request.auth.uid))
+              )
+              || (
+                request.resource.data.memberCount == resource.data.memberCount - 1
+                && isGroupMember(groupId)
+                && !existsAfter(/databases/$(database)/documents/communityGroupMembers/$(groupId + '_' + request.auth.uid))
+              )
+            )
+          )
+          || (
+            isAdministrator()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['closed', 'closedAt', 'updatedAt'])
+          )
+          || (
+            (isAdministrator() || (isPublisher() && resource.data.createdByUid == request.auth.uid))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'description', 'topics', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /communityGroupMembers/{memberId} {
+      allow read: if canReadCommunity();
+      allow create: if canComment()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.groupId is string
+        && memberId == request.resource.data.groupId + '_' + request.auth.uid
+        && existsAfter(communityGroupPath(request.resource.data.groupId))
+        && getAfter(communityGroupPath(request.resource.data.groupId)).data.access == 'open'
+        && getAfter(communityGroupPath(request.resource.data.groupId)).data.closed == false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /communityDiscussions/{discussionId} {
+      allow read: if canReadCommunity();
+      allow create: if canComment()
+        && isGroupMember(request.resource.data.groupId)
+        && exists(communityGroupPath(request.resource.data.groupId))
+        && get(communityGroupPath(request.resource.data.groupId)).data.closed == false
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.pinned == false
+        && request.resource.data.closed == false
+        && request.resource.data.replyCount == 0;
+      allow update: if canReadCommunity()
+        && (
+          (
+            canComment()
+            && isGroupMember(resource.data.groupId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActivityAt', 'updatedAt', 'replyCount'])
+          )
+          || (
+            (isAdministrator() || isPublisher())
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned', 'pinnedAt'])
+          )
+          || (
+            (isAdministrator() || isPublisher())
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['closed', 'closedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /communityPosts/{postId} {
+      allow read: if canReadCommunity();
+      allow create: if canComment()
+        && isGroupMember(request.resource.data.groupId)
+        && exists(communityGroupPath(request.resource.data.groupId))
+        && get(communityGroupPath(request.resource.data.groupId)).data.closed == false
+        && existsAfter(communityDiscussionPath(request.resource.data.discussionId))
+        && getAfter(communityDiscussionPath(request.resource.data.discussionId)).data.closed == false
+        && getAfter(communityDiscussionPath(request.resource.data.discussionId)).data.groupId == request.resource.data.groupId
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.deleted == false
+        && request.resource.data.edited == false
+        && request.resource.data.likeCount == 0
+        && existsAfter(communityPostOwnerPath(postId))
+        && getAfter(communityPostOwnerPath(postId)).data.authorUid == request.auth.uid;
+      allow update: if canComment()
+        && (
+          (
+            get(communityPostOwnerPath(postId)).data.authorUid == request.auth.uid
+            && resource.data.deleted == false
+            && request.resource.data.deleted == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'edited', 'updatedAt'])
+            && request.resource.data.body.size() > 0
+            && request.resource.data.body.size() <= 5000
+            && request.resource.data.edited == true
+          )
+          || (
+            get(communityPostOwnerPath(postId)).data.authorUid == request.auth.uid
+            && resource.data.deleted == false
+            && request.resource.data.deleted == true
+            && request.resource.data.body == ''
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'deleted', 'deletedAt', 'updatedAt'])
+          )
+          || (
+            isAdministrator()
+            && resource.data.deleted == false
+            && request.resource.data.deleted == true
+            && request.resource.data.body == ''
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'deleted', 'deletedAt', 'updatedAt'])
+            && existsAfter(communityRemoveAuditPath(postId))
+            && getAfter(communityRemoveAuditPath(postId)).data.action == 'remove'
+            && getAfter(communityRemoveAuditPath(postId)).data.actorUid == request.auth.uid
+            && getAfter(communityRemoveAuditPath(postId)).data.reason is string
+            && getAfter(communityRemoveAuditPath(postId)).data.reason.size() > 0
+          )
+          || (
+            resource.data.deleted == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+            && (
+              (
+                request.resource.data.likeCount == resource.data.likeCount + 1
+                && !exists(communityPostLikePath(postId))
+                && existsAfter(communityPostLikePath(postId))
+              )
+              || (
+                request.resource.data.likeCount == resource.data.likeCount - 1
+                && exists(communityPostLikePath(postId))
+                && !existsAfter(communityPostLikePath(postId))
+              )
+            )
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /communityPostOwners/{postId} {
+      allow read: if signedIn() && (resource.data.authorUid == request.auth.uid || isAdministrator());
+      allow create: if canComment()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.postId == postId
+        && existsAfter(communityPostPath(postId));
+      allow update, delete: if false;
+    }
+
+    match /communityPostLikes/{likeId} {
+      allow read: if signedIn() && (resource.data.userUid == request.auth.uid || isAdministrator());
+      allow create: if canComment()
+        && request.resource.data.userUid == request.auth.uid
+        && likeId == request.resource.data.postId + '_' + request.auth.uid
+        && exists(communityPostPath(request.resource.data.postId))
+        && getAfter(communityPostPath(request.resource.data.postId)).data.likeCount
+          == get(communityPostPath(request.resource.data.postId)).data.likeCount + 1;
+      allow delete: if canComment()
+        && resource.data.userUid == request.auth.uid
+        && getAfter(communityPostPath(resource.data.postId)).data.likeCount
+          == get(communityPostPath(resource.data.postId)).data.likeCount - 1;
+      allow update: if false;
+    }
+
+    // Discovery state is private to the signed-in member. It never grants
+    // access to a Group or Discussion and following a person is silent.
+    match /communityDiscussionBookmarks/{bookmarkId} {
+      allow read: if hasStudioAccess() && resource.data.uid == request.auth.uid;
+      allow create: if hasStudioAccess()
+        && request.resource.data.keys().hasOnly(['uid', 'discussionId', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.discussionId is string
+        && request.resource.data.discussionId.size() > 0
+        && bookmarkId == request.auth.uid + '_bookmark_' + request.resource.data.discussionId
+        && exists(communityDiscussionPath(request.resource.data.discussionId));
+      allow delete: if hasStudioAccess() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /communityFollows/{followId} {
+      allow read: if hasStudioAccess() && resource.data.uid == request.auth.uid;
+      allow create: if hasStudioAccess()
+        && request.resource.data.keys().hasOnly(['uid', 'targetType', 'targetId', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.targetType in ['group', 'discussion', 'person']
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId.size() > 0
+        && request.resource.data.targetId.size() <= 128
+        && followId == request.auth.uid + '_' + request.resource.data.targetType + '_' + request.resource.data.targetId
+        && (
+          request.resource.data.targetType == 'person'
+          || (request.resource.data.targetType == 'group' && exists(communityGroupPath(request.resource.data.targetId)))
+          || (request.resource.data.targetType == 'discussion' && exists(communityDiscussionPath(request.resource.data.targetId)))
+        );
+      allow delete: if hasStudioAccess() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /communityDiscussionReadStates/{readStateId} {
+      allow read: if hasStudioAccess() && resource.data.uid == request.auth.uid;
+      allow create, update: if hasStudioAccess()
+        && request.resource.data.keys().hasOnly(['uid', 'discussionId', 'lastOpenedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.discussionId is string
+        && request.resource.data.discussionId.size() > 0
+        && readStateId == request.auth.uid + '_read_' + request.resource.data.discussionId
+        && request.resource.data.lastOpenedAt is timestamp
+        && exists(communityDiscussionPath(request.resource.data.discussionId));
+      allow delete: if hasStudioAccess() && resource.data.uid == request.auth.uid;
+    }
+
+    match /communityModerationActions/{actionId} {
+      allow read: if isAdministrator() || (signedIn() && resource.data.actorUid == request.auth.uid);
+      allow create: if isAdministrator()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.action in ['remove', 'pin', 'unpin', 'close', 'reopen']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 500
+        && (
+          request.resource.data.action != 'remove'
+          || request.resource.data.reason.size() > 0
+        );
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

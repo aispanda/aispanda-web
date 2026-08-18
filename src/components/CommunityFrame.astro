@@ -1,0 +1,256 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+
+interface Props {
+  page: 'landing' | 'group' | 'discussion';
+  title: string;
+  description: string;
+  groupId?: string;
+  discussionId?: string;
+}
+
+const { page, title, description, groupId = '', discussionId = '' } = Astro.props;
+---
+
+<BaseLayout title={title} description={description} noindex={true}>
+  <section class="community-teaser shell" data-community-teaser>
+    <p class="eyebrow">Community · Work in progress</p>
+    <h1>A thoughtful place to learn together</h1>
+    <p>
+      We are shaping a member space for practical questions, careful discussion, and shared learning about AI.
+      Community is not open on this site yet, but it is on the way.
+    </p>
+    <a class="button button-secondary" href="/insights">Explore Insights while you wait</a>
+  </section>
+  <section
+    class="community shell"
+    data-community
+    data-community-page={page}
+    data-group-id={groupId}
+    data-discussion-id={discussionId}
+    hidden
+  >
+    <header class="community-header">
+      <div>
+        <p class="eyebrow">Community</p>
+        <h1>Groups and Discussions</h1>
+        <p>Thoughtful conversation for AI Spanda members. Not a live chat.</p>
+      </div>
+    </header>
+
+    <div class="community-notice" role="status" aria-live="polite" data-community-notice hidden></div>
+
+    <div class="community-account">
+      <div data-community-signed-out>
+        <p>Sign in with Google to view Groups, join, and post.</p>
+        <button class="community-button" type="button" data-community-signin>Sign in</button>
+      </div>
+
+      <form class="community-profile" data-community-profile hidden>
+        <div>
+          <strong>Complete your profile</strong>
+          <p>These optional choices help us understand the community. They never change your access.</p>
+        </div>
+        <div class="community-profile-grid">
+          <label>
+            <span>Professional role</span>
+            <select data-community-profile-role>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+              <option value="student">Student</option>
+              <option value="educator-researcher">Educator or researcher</option>
+              <option value="technology-ai-practitioner">Technology or AI practitioner</option>
+              <option value="business-operations-leader">Business or operations leader</option>
+              <option value="public-sector-policy">Public sector or policy</option>
+              <option value="writer-creator">Writer or creator</option>
+              <option value="independent-learner">Independent learner</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Primary interest</span>
+            <select data-community-profile-interest>
+              <option value="prefer-not-to-say">Prefer not to say</option>
+              <option value="practical-ai">Practical AI</option>
+              <option value="ai-strategy">AI strategy</option>
+              <option value="open-reusable-ai">Open and reusable AI</option>
+              <option value="ai-policy-social-impact">AI policy and social impact</option>
+              <option value="education-training">Education and training</option>
+              <option value="community-discussion">Community discussion</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span>Country or area</span>
+            <select data-community-profile-country>
+              <option value="">Prefer not to say</option>
+            </select>
+          </label>
+        </div>
+        <button class="community-button" type="submit" data-community-profile-submit>Continue</button>
+      </form>
+
+      <div class="community-member" data-community-member hidden>
+        <p>Signed in as <strong data-community-member-name></strong> <span data-community-member-role></span></p>
+        <button class="community-link-button" type="button" data-community-signout>Sign out</button>
+      </div>
+    </div>
+
+    <p class="community-view-only" data-community-view-only hidden>
+      Your account has View Only access. You can read permitted Groups but cannot join or post.
+    </p>
+
+    <div data-community-main>
+      <p>Loading Community…</p>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const localCommunityHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
+  if (localCommunityHosts.has(window.location.hostname)) {
+    document.querySelector<HTMLElement>('[data-community-teaser]')?.setAttribute('hidden', '');
+    document.querySelector<HTMLElement>('[data-community]')?.removeAttribute('hidden');
+    void import('@/scripts/community').then(({ initializeCommunity }) => initializeCommunity());
+  }
+</script>
+
+<style>
+  .community-teaser { max-width: 760px; padding: clamp(4rem, 10vw, 8rem) 0; }
+  .community-teaser h1 { max-width: 15ch; margin: .3rem 0 1rem; font-size: clamp(2.4rem, 6vw, 4.5rem); }
+  .community-teaser > p:not(.eyebrow) { max-width: 62ch; margin: 0 0 1.5rem; color: var(--muted); font-size: 1.08rem; }
+  .community-teaser[hidden] { display: none; }
+  .community :global([hidden]) { display: none !important; }
+  .community { padding: clamp(1.2rem, 3vw, 2.5rem) 0 4rem; }
+  .community-header h1 { margin: .2rem 0 .45rem; font-size: clamp(1.7rem, 3vw, 2.4rem); }
+  .community-header p { margin: 0; color: var(--muted); }
+  .community-notice,
+  .community-view-only {
+    margin: 1rem 0 0;
+    padding: .8rem 1rem;
+    border-radius: .7rem;
+    background: #fff6dd;
+    color: #6c4b00;
+  }
+  .community-account { margin-top: 1.25rem; }
+  .community-account p { margin: 0 0 .7rem; color: var(--muted); }
+  .community-button {
+    min-height: 42px;
+    padding: .65rem 1rem;
+    border: 1px solid var(--ink);
+    border-radius: .7rem;
+    background: var(--ink);
+    color: white;
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .community-button:hover { background: #2a2d33; }
+  .community-button:disabled { cursor: wait; opacity: .6; }
+  .community-link-button {
+    min-height: 42px;
+    border: 0;
+    background: transparent;
+    color: var(--blue);
+    font: inherit;
+    font-size: .86rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .community-profile {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: .8rem;
+    background: #faf9f5;
+  }
+  .community-profile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+  .community-profile label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 750; }
+  .community-profile select,
+  .community-composer input,
+  .community-composer textarea,
+  .community-composer select {
+    width: 100%;
+    min-height: 42px;
+    padding: .55rem .65rem;
+    border: 1px solid var(--line);
+    border-radius: .6rem;
+    background: white;
+    color: var(--ink);
+    font: inherit;
+  }
+  .community-composer textarea { min-height: 6rem; resize: vertical; }
+  .community-member {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .75rem 0;
+  }
+  .community-list { list-style: none; margin: 1rem 0; padding: 0; }
+  .community-list li { border-top: 1px solid var(--line); }
+  .community-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem; align-items: center; }
+  .community-list a {
+    display: grid;
+    gap: .25rem;
+    padding: 1rem 0;
+    text-decoration: none;
+  }
+  .community-list span { color: var(--muted); font-size: .86rem; }
+  .community-list p { margin: 0; color: var(--muted); }
+  .community-list-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+  .community-toolbar { display: flex; flex-wrap: wrap; gap: .8rem; align-items: end; margin: 1rem 0; }
+  .community-toolbar label { display: grid; gap: .3rem; min-width: 11rem; color: var(--muted); font-size: .78rem; font-weight: 750; }
+  .community-toolbar input, .community-toolbar select { min-height: 40px; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: .55rem; background: white; color: var(--ink); font: inherit; }
+  .community-inbox { margin: 1.25rem 0 1.5rem; padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: #f8fbff; }
+  .community-inbox h2 { margin: 0 0 .3rem; }
+  .community-inbox-list { list-style: none; margin: .8rem 0 0; padding: 0; }
+  .community-inbox-list li { border-top: 1px solid var(--line); }
+  .community-inbox-list a { display: grid; gap: .25rem; padding: .7rem 0; text-decoration: none; }
+  .community-inbox-list span { color: var(--muted); font-size: .86rem; }
+  .community-unread { display: inline-flex; align-items: center; min-height: 1.35rem; padding: 0 .45rem; border-radius: 99px; background: #e5f0ff; color: var(--blue); font-size: .7rem; font-weight: 800; }
+  .community-check { display: flex; align-items: center; gap: .45rem; color: var(--muted); font-size: .82rem; }
+  .community-check input { width: 1rem; height: 1rem; }
+  .community-composer {
+    display: grid;
+    gap: .55rem;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: .8rem;
+    background: #faf9f5;
+  }
+  .community-empty, .community-hint, .community-meta { color: var(--muted); }
+  .community-group-head h1 { margin: .2rem 0 .4rem; }
+  .community-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+  .community-post, .community-reply {
+    padding: 1.1rem 0;
+    border-top: 1px solid var(--line);
+  }
+  .community-reply { margin-left: 0; }
+  .community-post-meta { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .community-post-meta span { color: var(--muted); font-size: .78rem; }
+  .community-post-body { margin: .45rem 0 .6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .community-post-body.is-deleted { color: var(--muted); font-style: italic; }
+  .community-post-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+  .community-post-actions button {
+    min-height: 42px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--blue);
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  @media (max-width: 720px) {
+    .community-profile-grid { grid-template-columns: 1fr; }
+    .community-member { align-items: flex-start; }
+    .community-actions { flex-direction: column; align-items: flex-start; }
+    .community-list-row { grid-template-columns: 1fr; gap: .25rem; padding-bottom: .75rem; }
+    .community-toolbar { align-items: stretch; flex-direction: column; }
+    .community-toolbar label { min-width: 0; }
+  }
+</style>

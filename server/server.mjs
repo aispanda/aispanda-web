@@ -234,7 +234,8 @@ const resolveStaticFile = async (pathname) => {
 };
 
 const serveStatic = async (request, response, url) => {
-  const requested = url.pathname === '/' ? '/index.html' : url.pathname;
+  const pathname = url.pathname === '/' ? '/index.html' : url.pathname;
+  const requested = /^\/community\/.+/.test(pathname) ? '/community' : pathname;
   const file = await resolveStaticFile(requested) ?? await resolveStaticFile('/404.html');
   if (!file) throw Object.assign(new Error('Page not found.'), { statusCode: 404 });
   const status = file.endsWith(`${join('', '404.html')}`) && !requested.endsWith('/404.html') ? 404 : 200;

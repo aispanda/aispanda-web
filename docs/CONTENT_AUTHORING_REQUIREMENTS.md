@@ -305,20 +305,28 @@ Community
 
 - Administrators and Publishers manage a small controlled topic list. Eligible members select relevant topics when starting or editing a Discussion.
 - Groups are stable destinations; topics are lightweight labels that work across Groups. Avoid deep Group hierarchies and uncontrolled member-created tags in V1.
-- A Group provides `All` plus topic filters. Add `Unanswered`, `Following` and `Unread` when content volume justifies them.
+- A Group provides `All` plus topic filters. `Following` and `Unread` filters, a saved-items hub and jump-to-first-unread polish remain later volume-driven enhancements.
 - Site search spans Group names, Discussion titles, opening Posts and replies. Results are grouped into `Discussions` and `Posts`; every Post result shows and opens within its parent Discussion.
 - Search supports optional Group and topic filters. Add author and date filters after content volume makes them valuable.
-- Members may bookmark a Discussion or Post and later find saved items from their account area.
+- Members may privately bookmark a Discussion. V1 does not build a saved-items hub, and bookmarks never change access.
 
 ### Engagement, notifications and moderation
 
 - One member may like each Discussion or Post once and remove their own like. View Only cannot like.
-- Members may follow or unfollow a Group or Discussion. Posting follows that Discussion by default with a clear opt-out.
-- Notification levels are simple: `All activity`, `Replies and mentions`, and `Muted`. The default is replies and mentions.
-- Use one notification inbox with unread state and `Mark all read`. Notify direct replies, mentions, followed activity, role-request outcomes and pinned announcements.
+- Members may follow or unfollow a Group, Discussion or person. Following a person is silent: the followed person is not told. Posting follows that Discussion by default with a clear opt-out.
+- The first discovery slice provides one private in-app inbox/feed containing only allowed activity from followed Groups, Discussions and people. It sends no email, creates no public wall and never grants extra access.
+- Email notifications, notification preferences and extra notification types remain later; do not build them into this slice.
 - Every Post provides `Report`. Reports enter an Administrator queue with reporter, reason, target, status and audit history.
 - Moderation actions are explicit and logged: pin/unpin, close/reopen, remove with reason, restore when supported and resolve/reject report.
 - Read and write queries are paginated and bounded. Define retention, rate limits, abuse controls and cost alerts before public launch.
+
+### First implementation slice (AISPANDA-COMMUNITY-BUILD@2)
+
+The first local prototype proves Open-to-members Groups, membership, Discussions, Posts/Replies, owner edit/delete, Administrator remove-with-reason, pin, close/reopen, bounded discovery, private Discussion bookmarks, Group/Discussion/person follows, per-member unread state, a private in-app inbox/feed, Firestore rules and a desktop plus narrow-mobile journey.
+
+It uses signed-in read access, join-to-post, a plaintext 5,000-character composer, bounded list reads, user-owned member-state documents and Firestore tombstones with append-only `communityModerationActions`.
+
+These remain required later and must not be removed from this document: Invite-only Groups, site-wide search, structured Post composer, images, mentions, email notifications, notification preferences, saved-items hub, jump-to-first-unread polish, reporting, Events and Learning paths.
 
 ### Community acceptance criteria
 
@@ -326,7 +334,9 @@ Community
 - Administrator or Publisher can create a Group; Author or Commenter cannot, even through a direct request.
 - An eligible member can join a Group, draft and start a Discussion, reply with visible context, and edit or delete only their own Posts.
 - Administrator can remove any Post with an audit reason but cannot rewrite it as though the original member made the change.
-- The same Discussion list can open its beginning, first unread Post and latest activity as three predictable destinations.
+- The Discussion list supports bounded search, topic filtering, recent/oldest/most-discussed sorting and a per-member unread indicator; opening a Discussion clears only that member's unread state.
+- A signed-in member can privately bookmark and follow visible Discussions, follow visible Groups and follow people from visible Posts; unfollow removes only that member's state, and following a person does not notify them.
+- The private in-app inbox/feed shows only non-deleted activity from followed visible Groups, Discussions or people; it does not grant access or create a public wall.
 - A Discussion creator can mark their question Answered; authorized Group managers can pin, close, reopen or correct that state.
 - Search returns matching Discussions and Posts with Group, topic and parent context; no result opens a reply without its Discussion.
 - Report resolution and restoration leave audit records; repeated actions do not create duplicate moderation items.

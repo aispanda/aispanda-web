@@ -16,6 +16,8 @@ Rule: sequence by proven user value and risk reduction; dates require a separate
 | 8. Events and Learn | Members gather around scheduled activities and follow structured learning without a separate account or discussion system. | Simple RSVP Events; self-paced Learning paths with Sections, Lessons, `My learning plan`, progress and optional linked Discussions. Recurrence, payments, cohorts and scheduled release remain deferred. | One Event and one Learning path complete their create, discover, participate, progress, moderate and recovery journeys on desktop and mobile. |
 | 9. Reusable platform extraction | A proven generic package can launch purpose-specific content communities. | Brand/config profile, reusable schemas, auth/role module, publishing adapters, AI-router adapters, comments/community modules, optional Event/Learning modules, deployment templates and verification suites. | AIspanda is verified; at least one independent consumer validates portability; project-specific data is excluded. |
 
+The first Phase 7 proof (AISPANDA-COMMUNITY-BUILD@2) is an Open-to-members vertical slice: Community landing, Group join/leave, Discussions, Posts/Replies, owner edit/delete, Administrator remove-with-reason, pin, close/reopen, bounded Group/Discussion discovery, private bookmarks, Group/Discussion/person follows, per-member unread state, a private in-app feed, Firestore rules/indexes and focused permission tests. Email notifications, notification preferences, site-wide search, reporting, Invite-only Groups, load and cost-budget proof remain later Phase 7 gates and are not dropped.
+
 ## Cost and scale checkpoints
 
 - Set budgets and alerts before production Firestore or new Cloud Run services are enabled.

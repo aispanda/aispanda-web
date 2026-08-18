@@ -1,5 +1,6 @@
 export const navigation = [
   { label: 'Insights', href: '/insights' },
+  { label: 'Community', href: '/community' },
   { label: 'Principles', href: '/principles' },
   { label: 'Reusable assets', href: '/assets' },
   { label: 'About', href: '/about' },
