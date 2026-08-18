@@ -14,6 +14,12 @@ export default defineConfig({
       release: 'ai-48-observability-pilot',
       enabled: process.env.ENABLE_OBSERVABILITY_PILOT === 'true',
     }),
+    // Better Stack uptime monitoring (Phase 1 evidence)
+    betterStack({
+      telemetryToken: process.env.BETTER_STACK_TELEMETRY_TOKEN,
+      environment: process.env.BETTER_STACK_ENVIRONMENT || 'staging',
+      enabled: process.env.ENABLE_OBSERVABILITY_PILOT === 'true',
+    }),
     sitemap({ filter: (page) => !page.includes('/studio') }),
   ],
   vite: {
