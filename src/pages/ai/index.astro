@@ -166,9 +166,12 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
             <details class="connection-advanced" data-ai-setup>
               <summary>Connect your Cloudflare route</summary>
               <ol>
-                <li>Create an AI Gateway and deploy a dynamic route in Cloudflare.</li>
-                <li>Enter the three non-secret identifiers below.</li>
-                <li>Continue to Cloudflare and approve access. No API token is pasted into AI Spanda.</li>
+                <li>In Cloudflare, open <strong>AI</strong> → <strong>AI Gateway</strong> and create a gateway. Its name is your <strong>Gateway ID</strong>.</li>
+                <li>In that gateway, open <strong>Dynamic Routes</strong> and deploy a route. Its name is your <strong>Dynamic route name</strong> — enter it without the <code>dynamic/</code> prefix.</li>
+                <li>Open the gateway's <strong>Settings</strong> tab and turn <strong>Authenticated Gateway</strong> off. When it is on, Cloudflare requires an extra gateway token that AI Spanda does not hold, and the connection fails with an authentication error.</li>
+                <li>Copy your <strong>Account ID</strong> from the Cloudflare dashboard URL: <code>dash.cloudflare.com/&lt;account-id&gt;</code>. It is 32 characters.</li>
+                <li>Enter the three identifiers below. None of them is a secret.</li>
+                <li>Continue to Cloudflare and approve the two permissions. No API token is pasted into AI Spanda.</li>
               </ol>
               <form data-ai-config-form>
                 <label>
