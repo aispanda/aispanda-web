@@ -9,7 +9,7 @@ export default defineConfig({
   integrations: [
     sentry({
       dsn: process.env.SENTRY_DSN,
-      environment: process.env.SENTRY_ENVIRONMENT || 'production',
+      environment: 'staging' // Pilot: staging-only, never production,
       tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
       release: 'ai-48-observability-pilot',
       enabled: process.env.ENABLE_OBSERVABILITY_PILOT === 'true',
