@@ -1,10 +1,12 @@
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
+  getRedirectResult,
   getAuth,
   onAuthStateChanged,
   setPersistence,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -127,6 +129,12 @@ const signInErrorMessage = (error: unknown) => {
   }
   if (code === 'auth/network-request-failed') return 'The connection to Google failed. Check the network and try again.';
   return error instanceof Error ? error.message : 'Google sign-in did not complete.';
+};
+
+const shouldUseRedirectSignIn = () => {
+  const userAgent = window.navigator.userAgent;
+  return /codex|electron|webview|; wv\)/i.test(userAgent)
+    || window.matchMedia?.('(display-mode: standalone)').matches === true;
 };
 
 const rememberMemberSession = (user: User, role: MemberRole) => {
@@ -1053,7 +1061,11 @@ export const initializeCommunity = () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      await signInWithPopup(auth, provider);
+      if (shouldUseRedirectSignIn()) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
+      }
     } catch (error) {
       signInButton.disabled = false;
       setNotice(signInErrorMessage(error), true);
@@ -1067,6 +1079,10 @@ export const initializeCommunity = () => {
   });
 
   void setPersistence(auth, browserLocalPersistence).then(() => {
+    void getRedirectResult(auth).catch((error) => {
+      if (signInButton) signInButton.disabled = false;
+      setNotice(signInErrorMessage(error), true);
+    });
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         clearMemberSessions();
