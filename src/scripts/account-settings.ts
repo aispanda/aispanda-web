@@ -86,6 +86,7 @@ export const initializeAccountSettings = async () => {
   const country = find<HTMLSelectElement>('[data-account-country]');
   const profileSubmit = find<HTMLButtonElement>('[data-account-profile-submit]');
   const profileStatus = find<HTMLElement>('[data-account-profile-status]');
+  const returnHomeAfterSignIn = new URLSearchParams(window.location.search).get('return') === 'home';
 
   const activeRouterNote = find<HTMLElement>('[data-active-router-note]');
   const playgroundLink = find<HTMLAnchorElement>('[data-ai-playground-link]');
@@ -486,6 +487,10 @@ export const initializeAccountSettings = async () => {
       if (country) country.value = currentProfile.countryCode;
       if (studioLink) studioLink.hidden = !['administrator', 'publisher', 'author'].includes(memberRole);
       if (loading) loading.hidden = true;
+      if (returnHomeAfterSignIn) {
+        window.location.replace('/');
+        return;
+      }
       if (signedOut) signedOut.hidden = true;
       if (content) content.hidden = false;
       if (new URLSearchParams(window.location.search).get('section') === 'ai') {

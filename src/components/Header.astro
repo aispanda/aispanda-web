@@ -16,8 +16,8 @@ const currentPath = Astro.url.pathname;
       {navigation.map((item) => (
         <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
       ))}
-      <a href="/studio" data-staff-signin>Sign in</a>
-      <a href="/account" data-member-entry hidden>My account</a>
+      <a href="/account?return=home" data-member-signin>Sign in</a>
+      <a href="/account" data-member-entry hidden>My Account</a>
       <a href="/ai" data-ai-tools-entry hidden>AI Tools</a>
       <a href="/studio" data-studio-entry hidden>Content Studio</a>
       <a class="button button-small" href="/contact">Write</a>
@@ -36,7 +36,7 @@ const currentPath = Astro.url.pathname;
 
   const sessionKey = 'aispanda-studio-authorized-session-v1';
   const memberSessionKey = 'aispanda-member-session-v1';
-  const staffSignIn = document.querySelector<HTMLElement>('[data-staff-signin]');
+  const memberSignIn = document.querySelector<HTMLElement>('[data-member-signin]');
   const memberEntry = document.querySelector<HTMLElement>('[data-member-entry]');
   const aiToolsEntry = document.querySelector<HTMLElement>('[data-ai-tools-entry]');
   const studioEntry = document.querySelector<HTMLElement>('[data-studio-entry]');
@@ -54,7 +54,7 @@ const currentPath = Astro.url.pathname;
       authorized = false;
       signedIn = false;
     }
-    if (staffSignIn) staffSignIn.hidden = authorized || signedIn;
+    if (memberSignIn) memberSignIn.hidden = authorized || signedIn;
     if (memberEntry) memberEntry.hidden = !signedIn;
     if (aiToolsEntry) aiToolsEntry.hidden = !signedIn;
     if (studioEntry) studioEntry.hidden = !authorized;
