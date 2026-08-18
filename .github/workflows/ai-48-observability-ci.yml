@@ -1,0 +1,31 @@
+name: AI-48 Observability Pilot CI
+on:
+  push:
+    branches: [ai-48/sentry-setup]
+  pull_request:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install
+      - name: Build Astro
+        run: pnpm run build
+        env:
+          ENABLE_OBSERVABILITY_PILOT: 'true'
+          SENTRY_DSN: staging-dsn
+          SENTRY_ENVIRONMENT: staging
+          SENTRY_TRACES_SAMPLE_RATE: '0.1'
+      - name: Verify output
+        run: test -d dist && echo "Build successful"
