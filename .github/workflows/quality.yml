@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   chromium:
@@ -49,7 +50,7 @@ jobs:
     env:
       CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
       CANDIDATE_BRANCH: ${{ github.head_ref }}
-      PAGES_PROJECT: aispanda-web-preview
+      PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,36 +64,47 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Derive Cloudflare Pages branch preview URL
+      - name: Resolve immutable Cloudflare Pages preview URL
         id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          branch_alias="$(printf '%s' "$CANDIDATE_BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
-          if [ -z "$branch_alias" ]; then
-            echo "Unable to derive a Cloudflare Pages branch alias from the pull-request branch." >&2
-            exit 1
-          fi
-          preview_url="https://${branch_alias}.${PAGES_PROJECT}.pages.dev"
-          echo "branch_alias=$branch_alias" >> "$GITHUB_OUTPUT"
+          candidate_short_sha="${CANDIDATE_SHA:0:7}"
+          attempts=0
+          preview_url=""
+          until [ -n "$preview_url" ]; do
+            comments="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PULL_REQUEST_NUMBER}/comments?per_page=100")"
+            preview_url="$(printf '%s' "$comments" | jq -r --arg sha "$candidate_short_sha" '
+              [ .[]
+                | select(.user.login == "cloudflare-workers-and-pages[bot]")
+                | select(.body | contains($sha))
+                | try (.body | capture("Preview URL:[[:space:]]*(?<url>https://[^[:space:]]+)").url) catch empty
+              ] | last // empty
+            ')"
+            if [ -n "$preview_url" ]; then
+              break
+            fi
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge 60 ]; then
+              echo "Cloudflare did not publish an immutable preview URL for candidate ${CANDIDATE_SHA}." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          deployment_identifier="${preview_url#https://}"
+          deployment_identifier="${deployment_identifier%%.*}"
           echo "url=$preview_url" >> "$GITHUB_OUTPUT"
-          printf 'Preview candidate: %s\nCommit: %s\n' "$preview_url" "$CANDIDATE_SHA" >> "$GITHUB_STEP_SUMMARY"
-      - name: Wait for Cloudflare Pages preview
+          echo "deployment_identifier=$deployment_identifier" >> "$GITHUB_OUTPUT"
+          printf 'Preview candidate: %s\nCommit: %s\nDeployment: %s\n' "$preview_url" "$CANDIDATE_SHA" "$deployment_identifier" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify Cloudflare preview boundary
         id: preview-ready
         env:
           PREVIEW_URL: ${{ steps.preview.outputs.url }}
         shell: bash
         run: |
           set -euo pipefail
-          attempts=0
-          until curl --fail --silent --show-error --location --connect-timeout 10 "$PREVIEW_URL/support-form-demo" --output /dev/null; do
-            attempts=$((attempts + 1))
-            if [ "$attempts" -ge 60 ]; then
-              echo "Cloudflare Pages preview did not become reachable within ten minutes: $PREVIEW_URL" >&2
-              exit 1
-            fi
-            sleep 10
-          done
           curl --fail --silent --show-error --location --head "$PREVIEW_URL/support-form-demo" | tee preview-response-headers.txt
           if ! grep -Eiq '^x-robots-tag:.*noindex' preview-response-headers.txt; then
             echo "Expected Cloudflare preview noindex header is missing: $PREVIEW_URL" >&2
@@ -107,7 +119,7 @@ jobs:
         if: always()
         env:
           PREVIEW_URL: ${{ steps.preview.outputs.url }}
-          BRANCH_ALIAS: ${{ steps.preview.outputs.branch_alias }}
+          DEPLOYMENT_IDENTIFIER: ${{ steps.preview.outputs.deployment_identifier }}
           PLAYWRIGHT_RESULT: ${{ steps.preview-e2e.outcome }}
         shell: bash
         run: |
@@ -117,7 +129,7 @@ jobs:
             "candidate_sha": "${CANDIDATE_SHA}",
             "candidate_branch": "${CANDIDATE_BRANCH}",
             "preview_url": "${PREVIEW_URL}",
-            "cloudflare_branch_alias": "${BRANCH_ALIAS}",
+            "deployment_identifier": "${DEPLOYMENT_IDENTIFIER}",
             "environment": "non-production",
             "playwright_result": "${PLAYWRIGHT_RESULT}",
             "production_domain_touched": false

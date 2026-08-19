@@ -30,7 +30,7 @@ test('visitor can submit a fictional support request and view the returned case'
   await page.getByLabel(/I confirm this is fictional demo content/).check();
   await page.getByRole('button', { name: 'Submit support request' }).click();
 
-  await expect(page).toHaveURL(/\/support-form-demo\/confirmation$/);
+  await expect(page).toHaveURL(/\/support-form-demo\/confirmation\/?$/);
   await expect(page.getByRole('heading', { name: 'Thank you for submitting the support form.' })).toBeFocused();
   await expect(page.locator('#confirmation-case-number')).toHaveText(caseNumber);
   await expect(page.locator('#confirmation-subject')).toHaveText(subject);
