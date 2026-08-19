@@ -39,3 +39,100 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  preview-chromium:
+    name: Preview Chromium
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+      CANDIDATE_BRANCH: ${{ github.head_ref }}
+      PAGES_PROJECT: aispanda-web-preview
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Derive Cloudflare Pages branch preview URL
+        id: preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch_alias="$(printf '%s' "$CANDIDATE_BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+          if [ -z "$branch_alias" ]; then
+            echo "Unable to derive a Cloudflare Pages branch alias from the pull-request branch." >&2
+            exit 1
+          fi
+          preview_url="https://${branch_alias}.${PAGES_PROJECT}.pages.dev"
+          echo "branch_alias=$branch_alias" >> "$GITHUB_OUTPUT"
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+          printf 'Preview candidate: %s\nCommit: %s\n' "$preview_url" "$CANDIDATE_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Wait for Cloudflare Pages preview
+        id: preview-ready
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempts=0
+          until curl --fail --silent --show-error --location --connect-timeout 10 "$PREVIEW_URL/support-form-demo" --output /dev/null; do
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge 60 ]; then
+              echo "Cloudflare Pages preview did not become reachable within ten minutes: $PREVIEW_URL" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          curl --fail --silent --show-error --location --head "$PREVIEW_URL/support-form-demo" | tee preview-response-headers.txt
+          if ! grep -Eiq '^x-robots-tag:.*noindex' preview-response-headers.txt; then
+            echo "Expected Cloudflare preview noindex header is missing: $PREVIEW_URL" >&2
+            exit 1
+          fi
+      - name: Run Playwright against Cloudflare Pages preview
+        id: preview-e2e
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.preview.outputs.url }}
+        run: pnpm test:e2e
+      - name: Write preview evidence receipt
+        if: always()
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          BRANCH_ALIAS: ${{ steps.preview.outputs.branch_alias }}
+          PLAYWRIGHT_RESULT: ${{ steps.preview-e2e.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > preview-evidence-receipt.json <<EOF
+          {
+            "candidate_sha": "${CANDIDATE_SHA}",
+            "candidate_branch": "${CANDIDATE_BRANCH}",
+            "preview_url": "${PREVIEW_URL}",
+            "cloudflare_branch_alias": "${BRANCH_ALIAS}",
+            "environment": "non-production",
+            "playwright_result": "${PLAYWRIGHT_RESULT}",
+            "production_domain_touched": false
+          }
+          EOF
+          cat preview-evidence-receipt.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload preview evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-evidence-receipt
+          path: |
+            preview-evidence-receipt.json
+            preview-response-headers.txt
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
