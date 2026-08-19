@@ -1,8 +1,14 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 
-const intakeEndpoint = import.meta.env.PUBLIC_SUPPORTZERO_INTAKE_URL ?? '';
+const cloudflarePreview =
+  import.meta.env.CF_PAGES === '1' &&
+  Boolean(import.meta.env.CF_PAGES_BRANCH) &&
+  import.meta.env.CF_PAGES_BRANCH !== 'main';
+const previewTestEndpoint = cloudflarePreview ? '/test-supportzero-intake' : '';
+const intakeEndpoint = import.meta.env.PUBLIC_SUPPORTZERO_INTAKE_URL ?? previewTestEndpoint;
 const endpointConfigured = Boolean(intakeEndpoint);
+const previewTestMode = cloudflarePreview && !import.meta.env.PUBLIC_SUPPORTZERO_INTAKE_URL;
 ---
 
 <BaseLayout
@@ -91,7 +97,11 @@ const endpointConfigured = Boolean(intakeEndpoint);
             Submit support request
           </button>
           <p id="support-form-status" class="support-form-status" aria-live="polite">
-            {endpointConfigured ? 'Your request is not sent until you select Submit.' : 'The public demo service is not connected yet.'}
+            {previewTestMode
+              ? 'Preview-test mode: automated browser evidence intercepts this endpoint; manual demo submissions are not delivered to a service.'
+              : endpointConfigured
+                ? 'Your request is not sent until you select Submit.'
+                : 'The public demo service is not connected yet.'}
           </p>
         </form>
       </div>

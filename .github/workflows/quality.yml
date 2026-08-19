@@ -11,6 +11,8 @@ concurrency:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   chromium:
@@ -28,7 +30,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:ai
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
       - name: Upload Playwright failure artefacts
         if: failure()
@@ -38,4 +40,123 @@ jobs:
           path: |
             playwright-report/
             test-results/
+          retention-days: 7
+
+  preview-chromium:
+    name: Preview Chromium
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+      CANDIDATE_BRANCH: ${{ github.head_ref }}
+      PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium
+      - name: Resolve immutable Cloudflare Pages deployment URL
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_short_sha="${CANDIDATE_SHA:0:7}"
+          attempts=0
+          preview_url=""
+          until [ -n "$preview_url" ]; do
+            comments="$(gh pr view "$PULL_REQUEST_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments)"
+            preview_url="$(printf '%s' "$comments" | jq -r --arg sha "$candidate_short_sha" '
+              [ .comments[]
+                | select(.author.login == "cloudflare-workers-and-pages")
+                | select(.body | test("<code>" + $sha + "</code>"))
+                | try (.body | capture("Preview URL:</strong></td><td>[[:space:]]*<a href=.(?<url>https://[A-Za-z0-9._/-]+)").url) catch empty
+              ] | last // empty
+            ')"
+            if [ -n "$preview_url" ]; then
+              break
+            fi
+            attempts=$((attempts + 1))
+            if [ "$attempts" -ge 60 ]; then
+              echo "Cloudflare did not publish an immutable preview URL for candidate ${CANDIDATE_SHA}." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          deployment_identifier="${preview_url#https://}"
+          deployment_identifier="${deployment_identifier%%.*}"
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+          echo "deployment_identifier=$deployment_identifier" >> "$GITHUB_OUTPUT"
+          printf 'Immutable Cloudflare candidate: %s\nCommit: %s\nDeployment identifier: %s\n' "$preview_url" "$CANDIDATE_SHA" "$deployment_identifier" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify immutable Cloudflare preview boundary
+        id: preview-ready
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --head "$PREVIEW_URL/support-form-demo" | tee preview-response-headers.txt
+          if ! grep -Eiq '^x-robots-tag:.*noindex' preview-response-headers.txt; then
+            echo "Expected Cloudflare preview noindex header is missing: $PREVIEW_URL" >&2
+            exit 1
+          fi
+      - name: Run Playwright against immutable Cloudflare Pages preview
+        id: preview-e2e
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.preview.outputs.url }}
+          PLAYWRIGHT_INTERCEPTION_EVIDENCE_PATH: preview-origin-interception-receipt.json
+        run: pnpm test:e2e
+      - name: Write immutable preview evidence receipt
+        if: always()
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
+          DEPLOYMENT_IDENTIFIER: ${{ steps.preview.outputs.deployment_identifier }}
+          PLAYWRIGHT_RESULT: ${{ steps.preview-e2e.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f preview-origin-interception-receipt.json ]; then
+            printf 'null\n' > preview-origin-interception-receipt.json
+          fi
+          jq -n \
+            --arg candidate_sha "$CANDIDATE_SHA" \
+            --arg candidate_branch "$CANDIDATE_BRANCH" \
+            --arg immutable_preview_url "$PREVIEW_URL" \
+            --arg provider_deployment_identifier "$DEPLOYMENT_IDENTIFIER" \
+            --arg playwright_result "$PLAYWRIGHT_RESULT" \
+            --slurpfile origin_interception preview-origin-interception-receipt.json \
+            '{
+              candidate_sha: $candidate_sha,
+              candidate_branch: $candidate_branch,
+              immutable_preview_url: $immutable_preview_url,
+              provider_deployment_identifier: $provider_deployment_identifier,
+              environment: "non-production",
+              playwright_result: $playwright_result,
+              origin_interception: ($origin_interception[0] // null),
+              production_domain_touched: false
+            }' > preview-evidence-receipt.json
+          cat preview-evidence-receipt.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload immutable preview evidence receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-evidence-receipt
+          path: |
+            preview-evidence-receipt.json
+            preview-origin-interception-receipt.json
+            preview-response-headers.txt
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
           retention-days: 7
