@@ -166,3 +166,8 @@ docs/content/
 docs/private/
 docs/research/
 docs/Roadmap.pdf
+
+# Playwright generated results and reports
+playwright-report/
+test-results/
+blob-report/
