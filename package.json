@@ -12,6 +12,7 @@
     "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-content-boundary.mjs dist",
     "preview": "astro preview",
     "test:ai": "node --test tests/ai-connections.test.ts tests/ai-vault-core.test.mjs",
+    "test:e2e": "playwright test",
     "validate:profile": "node scripts/validate-site-profile.mjs",
     "validate:content": "node scripts/validate-content-boundary.mjs"
   },
@@ -20,5 +21,8 @@
     "astro": "7.2.0",
     "firebase": "^12.17.1",
     "firebase-admin": "^13.5.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }
