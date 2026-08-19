@@ -81,7 +81,7 @@ jobs:
               [ .comments[]
                 | select(.author.login == "cloudflare-workers-and-pages")
                 | select(.body | test("<code>" + $sha + "</code>"))
-                | try (.body | capture("Preview URL:</strong></td><td>[[:space:]]*<a href='(?<url>https://[^']+)").url) catch empty
+                | try (.body | capture("Preview URL:</strong></td><td>[[:space:]]*<a href=.(?<url>https://[^[:space:]>]+)").url) catch empty
               ] | last // empty
             ')"
             if [ -n "$preview_url" ]; then
