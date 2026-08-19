@@ -1,0 +1,43 @@
+name: AI-48 Observability CI
+
+on:
+  push:
+    branches:
+      - ai-48/sentry-setup
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_TRACES_SAMPLE_RATE: '0.1'
+          ENABLE_OBSERVABILITY_PILOT: 'true'
+
+      - name: Verify Sentry integration present in build output
+        run: |
+          if ! grep -r "sentry" dist/ -il > /dev/null 2>&1; then
+            echo "ERROR: No Sentry references found in build output"
+            exit 1
+          fi
+          echo "Sentry integration verified in build output"

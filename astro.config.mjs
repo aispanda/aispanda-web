@@ -1,11 +1,21 @@
-import { defineConfig } from 'astro/config';
+﻿import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
+import sentry from '@sentry/astro';
 
 export default defineConfig({
   site: 'https://aispanda.com',
   output: 'static',
   trailingSlash: 'never',
-  integrations: [sitemap({ filter: (page) => !page.includes('/studio') })],
+  integrations: [
+    sentry({
+      dsn: process.env.SENTRY_DSN,
+      environment: 'staging', // Pilot: staging-only, never production
+      tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '0.1'),
+      release: 'ai-48-observability-pilot',
+      enabled: process.env.ENABLE_OBSERVABILITY_PILOT === 'true',
+    }),
+    sitemap({ filter: (page) => !page.includes('/studio') }),
+  ],
   vite: {
     server: {
       proxy: {
