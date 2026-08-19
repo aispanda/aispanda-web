@@ -115,6 +115,7 @@ jobs:
         id: preview-e2e
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.preview.outputs.url }}
+          PLAYWRIGHT_INTERCEPTION_EVIDENCE_PATH: preview-origin-interception-receipt.json
         run: pnpm test:e2e
       - name: Write immutable preview evidence receipt
         if: always()
@@ -125,17 +126,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat > preview-evidence-receipt.json <<EOF
-          {
-            "candidate_sha": "${CANDIDATE_SHA}",
-            "candidate_branch": "${CANDIDATE_BRANCH}",
-            "immutable_preview_url": "${PREVIEW_URL}",
-            "provider_deployment_identifier": "${DEPLOYMENT_IDENTIFIER}",
-            "environment": "non-production",
-            "playwright_result": "${PLAYWRIGHT_RESULT}",
-            "production_domain_touched": false
-          }
-          EOF
+          if [ ! -f preview-origin-interception-receipt.json ]; then
+            printf 'null\n' > preview-origin-interception-receipt.json
+          fi
+          jq -n \
+            --arg candidate_sha "$CANDIDATE_SHA" \
+            --arg candidate_branch "$CANDIDATE_BRANCH" \
+            --arg immutable_preview_url "$PREVIEW_URL" \
+            --arg provider_deployment_identifier "$DEPLOYMENT_IDENTIFIER" \
+            --arg playwright_result "$PLAYWRIGHT_RESULT" \
+            --slurpfile origin_interception preview-origin-interception-receipt.json \
+            '{
+              candidate_sha: $candidate_sha,
+              candidate_branch: $candidate_branch,
+              immutable_preview_url: $immutable_preview_url,
+              provider_deployment_identifier: $provider_deployment_identifier,
+              environment: "non-production",
+              playwright_result: $playwright_result,
+              origin_interception: ($origin_interception[0] // null),
+              production_domain_touched: false
+            }' > preview-evidence-receipt.json
           cat preview-evidence-receipt.json >> "$GITHUB_STEP_SUMMARY"
       - name: Upload immutable preview evidence receipt
         if: always()
@@ -144,6 +154,7 @@ jobs:
           name: preview-evidence-receipt
           path: |
             preview-evidence-receipt.json
+            preview-origin-interception-receipt.json
             preview-response-headers.txt
             playwright-report/
             test-results/

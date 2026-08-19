@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { test, expect } from '@playwright/test';
 
 test('visitor can submit a fictional support request and view the returned case', async ({ page }) => {
@@ -33,7 +34,27 @@ test('visitor can submit a fictional support request and view the returned case'
   await page.getByRole('button', { name: 'Submit support request' }).click();
 
   await expect.poll(() => interceptedRequestUrl).not.toBe('');
-  expect(new URL(interceptedRequestUrl).origin).toBe(new URL(page.url()).origin);
+  const testedPageOrigin = new URL(page.url()).origin;
+  const interceptedRequestOrigin = new URL(interceptedRequestUrl).origin;
+  expect(interceptedRequestOrigin).toBe(testedPageOrigin);
+
+  if (process.env.PLAYWRIGHT_INTERCEPTION_EVIDENCE_PATH) {
+    await writeFile(
+      process.env.PLAYWRIGHT_INTERCEPTION_EVIDENCE_PATH,
+      `${JSON.stringify(
+        {
+          assertion: 'intercepted request origin matches tested page origin',
+          tested_page_origin: testedPageOrigin,
+          intercepted_request_url: interceptedRequestUrl,
+          intercepted_request_origin: interceptedRequestOrigin,
+          result: 'pass',
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
+
   await expect(page).toHaveURL(/\/support-form-demo\/confirmation\/?$/);
   await expect(page.getByRole('heading', { name: 'Thank you for submitting the support form.' })).toBeFocused();
   await expect(page.locator('#confirmation-case-number')).toHaveText(caseNumber);
