@@ -76,12 +76,12 @@ jobs:
           attempts=0
           preview_url=""
           until [ -n "$preview_url" ]; do
-            comments="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PULL_REQUEST_NUMBER}/comments?per_page=100")"
+            comments="$(gh pr view "$PULL_REQUEST_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments)"
             preview_url="$(printf '%s' "$comments" | jq -r --arg sha "$candidate_short_sha" '
-              [ .[]
-                | select(.body | contains("Cloudflare Pages"))
-                | select(.body | contains("Latest commit: " + $sha))
-                | try (.body | capture("Preview URL:[[:space:]]*(?<url>https://[^[:space:]]+)").url) catch empty
+              [ .comments[]
+                | select(.author.login == "cloudflare-workers-and-pages")
+                | select(.body | test("<code>" + $sha + "</code>"))
+                | try (.body | capture("Preview URL:</strong></td><td>[[:space:]]*<a href='(?<url>https://[^']+)").url) catch empty
               ] | last // empty
             ')"
             if [ -n "$preview_url" ]; then
