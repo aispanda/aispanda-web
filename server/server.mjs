@@ -31,6 +31,7 @@ import {
   withContentFailureAudit,
 } from './content-publishing.mjs';
 import { isInternalArticleShellFile } from './static-routing.mjs';
+import { buildRuntimePublicConfig, injectRuntimePublicConfig } from './runtime-config.mjs';
 
 const PORT = Number(process.env.PORT) || 8080;
 const DIST_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -38,12 +39,16 @@ const VAULT_KEY = decodeVaultKey(process.env.AI_VAULT_KEY_B64);
 const JSON_LIMIT = 64 * 1024;
 const CONTENT_JSON_LIMIT = 600 * 1024;
 const SITE_ORIGIN = new URL(process.env.PUBLIC_SITE_ORIGIN ?? 'https://aispanda.com').origin;
+const RUNTIME_PUBLIC_CONFIG = buildRuntimePublicConfig(process.env);
+const FIREBASE_AUTH_ORIGIN = new URL(`https://${RUNTIME_PUBLIC_CONFIG?.firebase.authDomain ?? 'aispanda.firebaseapp.com'}`);
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 30;
 const requestsByUser = new Map();
 const contentRequestsByUser = new Map();
 let articleShellPromise;
-const app = getApps()[0] ?? initializeApp();
+const app = getApps()[0] ?? (RUNTIME_PUBLIC_CONFIG
+  ? initializeApp({ projectId: RUNTIME_PUBLIC_CONFIG.firebase.projectId })
+  : initializeApp());
 const auth = getAuth(app);
 // Interim cost decision: use the project's default Firestore database. The
 // browser is still denied vault access by rules; the dedicated Cloud Run
@@ -197,12 +202,7 @@ const handleApi = async (request, response, url) => {
         loadArticleShell(),
       ]);
       const html = renderPublishedPreview(template, { ...preview, draftId: contentRoute.draftId }, SITE_ORIGIN);
-      response.writeHead(200, {
-        ...securityHeaders,
-        'Cache-Control': 'no-store',
-        'Content-Type': 'text/html; charset=utf-8',
-      });
-      response.end(html);
+      serveText(request, response, html, 'text/html; charset=utf-8', 200, 'no-store');
       return;
     }
     const result = contentRoute.action === 'preview'
@@ -281,13 +281,13 @@ const handleApi = async (request, response, url) => {
 };
 
 const proxyFirebaseAuth = async (request, response, url) => {
-  const target = new URL(url.pathname + url.search, 'https://aispanda.firebaseapp.com');
+  const target = new URL(url.pathname + url.search, FIREBASE_AUTH_ORIGIN);
   const headers = new Headers();
   for (const [name, value] of Object.entries(request.headers)) {
     if (value === undefined || ['host', 'connection', 'content-length'].includes(name.toLowerCase())) continue;
     headers.set(name, Array.isArray(value) ? value.join(', ') : value);
   }
-  headers.set('host', 'aispanda.firebaseapp.com');
+  headers.set('host', FIREBASE_AUTH_ORIGIN.host);
   const body = ['GET', 'HEAD'].includes(request.method ?? 'GET') ? undefined : Buffer.concat(await Array.fromAsync(request));
   const upstream = await fetch(target, { method: request.method, headers, body, redirect: 'manual' });
   const responseHeaders = Object.fromEntries(upstream.headers.entries());
@@ -324,7 +324,11 @@ const loadArticleShell = () => {
   return articleShellPromise;
 };
 
-const serveFile = (request, response, file, status = 200) => {
+const serveFile = async (request, response, file, status = 200) => {
+  if (extname(file).toLowerCase() === '.html') {
+    serveText(request, response, await readFile(file, 'utf8'), 'text/html; charset=utf-8', status);
+    return;
+  }
   const immutable = /\.(?:css|js|png|jpg|jpeg|webp|gif|ico|svg|woff2)$/i.test(file);
   response.writeHead(status, {
     ...securityHeaders,
@@ -335,13 +339,23 @@ const serveFile = (request, response, file, status = 200) => {
   else createReadStream(file).pipe(response);
 };
 
-const serveText = (request, response, body, contentType) => {
-  response.writeHead(200, {
+const serveText = (
+  request,
+  response,
+  body,
+  contentType,
+  status = 200,
+  cacheControl = 'public, max-age=0, must-revalidate',
+) => {
+  const renderedBody = contentType.startsWith('text/html')
+    ? injectRuntimePublicConfig(body, RUNTIME_PUBLIC_CONFIG)
+    : body;
+  response.writeHead(status, {
     ...securityHeaders,
-    'Cache-Control': 'public, max-age=0, must-revalidate',
+    'Cache-Control': cacheControl,
     'Content-Type': contentType,
   });
-  response.end(request.method === 'HEAD' ? '' : body);
+  response.end(request.method === 'HEAD' ? '' : renderedBody);
 };
 
 const loadPublishedArticlesSafely = async () => {
@@ -369,7 +383,7 @@ const serveStatic = async (request, response, url) => {
     return;
   }
   if (file && !isInternalArticleShellFile(file, DIST_ROOT)) {
-    serveFile(request, response, file);
+    await serveFile(request, response, file);
     return;
   }
 
@@ -379,19 +393,14 @@ const serveStatic = async (request, response, url) => {
     if (article) {
       const template = await loadArticleShell();
       const html = renderPublishedArticle(template, article, SITE_ORIGIN);
-      response.writeHead(200, {
-        ...securityHeaders,
-        'Cache-Control': 'public, max-age=0, must-revalidate',
-        'Content-Type': 'text/html; charset=utf-8',
-      });
-      response.end(request.method === 'HEAD' ? '' : html);
+      serveText(request, response, html, 'text/html; charset=utf-8');
       return;
     }
   }
 
   const notFound = await resolveStaticFile('/404.html');
   if (!notFound) throw Object.assign(new Error('Page not found.'), { statusCode: 404 });
-  serveFile(request, response, notFound, 404);
+  await serveFile(request, response, notFound, 404);
 };
 
 const server = createServer(async (request, response) => {

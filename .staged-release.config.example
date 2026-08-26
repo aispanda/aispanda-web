@@ -1,0 +1,34 @@
+# Copy to .staged-release.config after the dedicated staging project is approved and bootstrapped.
+# This project file is a profile only; the controller remains owned by reusable asset RA-002.
+
+RELEASE_PROJECT=replace-release-project
+STAGING_PROJECT=replace-staging-project
+PRODUCTION_PROJECT=aispanda
+STAGING_SERVICE=aispanda-web-staging
+PRODUCTION_SERVICE=aispanda-web
+STAGING_RUNTIME_IDENTITY=replace-with-isolated-staging-runtime-identity
+PRODUCTION_RUNTIME_IDENTITY=aispanda-web-runtime@aispanda.iam.gserviceaccount.com
+BUILD_SERVICE_ACCOUNT=build@replace-release-project.iam.gserviceaccount.com
+SOURCE_BUCKET=gs://replace-release-project-cloudbuild-source/source
+REGION=us-east1
+RELEASE_BRANCH=codex/ai-89-runtime-publishing
+STAGING_DOMAIN=AUTO
+PRODUCTION_DOMAIN=https://aispanda.com
+BUILD_WORKING_DIRECTORY=.
+BUILD_COMMAND=pnpm build && pnpm test:runtime && pnpm test:release-preflight && pnpm test:content && pnpm test:ai
+CLOUD_BUILD_CONFIG=cloudbuild.image.yaml
+IMAGE_REPOSITORY=us-east1-docker.pkg.dev/replace-release-project/aispanda-web/aispanda-web
+ISOLATION_VERIFY_COMMAND=node scripts/verify-release-isolation.mjs
+STAGING_PREREQUISITE_VERIFY_COMMAND=node scripts/verify-release-prerequisites.mjs staging
+PRODUCTION_PREREQUISITE_VERIFY_COMMAND=node scripts/verify-release-prerequisites.mjs production
+STAGING_VERIFY_COMMAND=PLAYWRIGHT_BASE_URL="$TARGET_URL" pnpm test:staging
+RUNTIME_CONFIG_FILES=server/runtime-config.mjs,server/server.mjs,src/scripts/firebase-client.ts,cloudbuild.image.yaml
+RULES_FILE=firestore.rules
+HEALTH_ROUTE=/studio
+STAGING_DATA_BOUNDARY=project:replace-staging-project/firestore:(default)
+PRODUCTION_DATA_BOUNDARY=project:aispanda/firestore:(default)
+STAGING_RECEIPT=.release-evidence/staging.json
+PROMOTION_RECEIPT=.release-evidence/production.json
+EXPECTED_STAGING_TRAFFIC_PERCENT=100
+EXPECTED_PRODUCTION_TRAFFIC_PERCENT=100
+RECEIPT_MAX_AGE_HOURS=72
