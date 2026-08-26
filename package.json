@@ -9,9 +9,11 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-content-boundary.mjs dist",
+    "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-runtime-publication.mjs && node scripts/validate-content-boundary.mjs dist",
     "preview": "astro preview",
     "test:ai": "node --test tests/ai-connections.test.ts tests/ai-vault-core.test.mjs",
+    "test:content": "node --test tests/content-publishing.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-aispanda \"node --test tests/firestore-rules.test.mjs\"",
     "test:e2e": "playwright test",
     "validate:profile": "node scripts/validate-site-profile.mjs",
     "validate:content": "node scripts/validate-content-boundary.mjs"
@@ -20,9 +22,12 @@
     "@astrojs/sitemap": "3.7.3",
     "astro": "7.2.0",
     "firebase": "^12.17.1",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "sanitize-html": "2.17.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1"
+    "@firebase/rules-unit-testing": "5.0.2",
+    "@playwright/test": "^1.62.1",
+    "firebase-tools": "15.28.1"
   }
 }

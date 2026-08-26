@@ -5,7 +5,7 @@ import { getEntry, render } from 'astro:content';
 const entry = await getEntry('insights', 'open-the-ai');
 
 if (!entry) {
-  throw new Error('Missing insight body for studio prototype');
+  throw new Error('Missing seed insight body for Content Studio');
 }
 
 const { Content } = await render(entry);
@@ -17,7 +17,7 @@ const { Content } = await render(entry);
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>Content Studio prototype · AI Spanda</title>
+    <title>Content Studio · AI Spanda</title>
     <link rel="icon" type="image/png" href="/brand/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -41,7 +41,6 @@ const { Content } = await render(entry);
             <span aria-hidden="true">G</span>
             Continue with Google
           </button>
-          <button class="studio-button" type="button" data-local-access hidden>Continue with local prototype</button>
           <button class="studio-button studio-button-secondary" type="button" data-access-retry hidden>Use another account</button>
         </div>
         <form class="studio-profile-form" data-profile-form hidden>
@@ -122,6 +121,7 @@ const { Content } = await render(entry);
             <button type="button" data-filter="draft"><span>Drafts</span><small data-draft-count>0</small></button>
             <button type="button" data-filter="published"><span>Published</span><small data-published-count>1</small></button>
             <button type="button" data-filter="unpublished"><span>Unpublished</span><small data-unpublished-count>0</small></button>
+            <button type="button" data-filter="archived"><span>Archived</span><small data-archived-count>0</small></button>
             <button type="button" disabled title="Book workspace comes after the article MVP">
               <span>Books</span><small>Next</small>
             </button>
@@ -139,8 +139,8 @@ const { Content } = await render(entry);
         </div>
 
         <div class="studio-sidebar-note">
-          <strong>Prototype mode</strong>
-          <span data-persistence-note>Drafts stay in this browser. Real publishing comes next.</span>
+          <strong>Cloud publishing</strong>
+          <span data-persistence-note>Drafts save to your account and publish directly to the site.</span>
         </div>
 
         <div class="studio-account" data-studio-account hidden>
@@ -155,6 +155,19 @@ const { Content } = await render(entry);
 
       <section class="studio-workspace">
         <header class="studio-topbar">
+          <details class="studio-mobile-nav">
+            <summary aria-label="Open content navigation">☰</summary>
+            <nav aria-label="Mobile content navigation">
+              <button type="button" data-filter="all">All content</button>
+              <button type="button" data-filter="draft">Drafts</button>
+              <button type="button" data-filter="published">Published</button>
+              <button type="button" data-filter="unpublished">Unpublished</button>
+              <button type="button" data-filter="archived">Archived</button>
+              <button type="button" data-new-article>New article</button>
+              <a href="/account">Account settings</a>
+              <button type="button" data-studio-signout>Sign out</button>
+            </nav>
+          </details>
           <div>
             <p class="studio-kicker" data-topbar-kicker>Article</p>
             <p class="studio-save-state" role="status" aria-live="polite" data-save-state>Draft · ready</p>
@@ -204,7 +217,7 @@ const { Content } = await render(entry);
 
             <footer class="studio-editor-footer">
               <span data-word-count>0 words</span>
-              <span>Changes autosave locally</span>
+              <span>Changes autosave to the cloud</span>
             </footer>
           </section>
 
@@ -241,13 +254,23 @@ const { Content } = await render(entry);
             </div>
 
             <div class="studio-revisions">
-              <p class="studio-kicker">Local revisions</p>
+              <p class="studio-kicker">Cloud revisions</p>
               <ol data-revisions>
                 <li>No explicit checkpoints yet</li>
               </ol>
             </div>
           </aside>
         </div>
+
+        <section class="studio-publication-receipt" data-publication-receipt hidden>
+          <div>
+            <p class="studio-kicker">Published release</p>
+            <strong>Your article is live.</strong>
+            <a data-publication-live target="_blank" rel="noopener noreferrer"></a>
+            <small>Release <code data-publication-release></code></small>
+          </div>
+          <button class="studio-button studio-button-secondary" type="button" data-receipt-unpublish>Unpublish</button>
+        </section>
 
         <section class="studio-content-library" data-content-library hidden>
           <header class="studio-library-header">
@@ -278,14 +301,7 @@ const { Content } = await render(entry);
         </div>
       </div>
       <div class="studio-preview-stage">
-        <article class="studio-preview-frame" data-preview-frame>
-          <header class="studio-preview-header">
-            <p class="eyebrow">Incentive design</p>
-            <h1 data-preview-title></h1>
-            <p class="lede" data-preview-excerpt></p>
-          </header>
-          <div class="studio-preview-prose insight-prose" data-preview-body></div>
-        </article>
+        <iframe class="studio-preview-frame" data-preview-frame title="Production-style article preview" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
       </div>
     </dialog>
 
@@ -306,13 +322,13 @@ const { Content } = await render(entry);
           <div><span>Delivery</span><strong>Web only</strong></div>
         </div>
 
-        <p class="studio-prototype-warning">
-          Local demo only—no live changes. In production, Publish will securely update the live site and report deployment status here.
+        <p class="studio-publication-warning">
+          Publishing creates a permanent release and makes this URL public immediately. Future edits remain private until you publish again.
         </p>
 
         <div class="studio-publish-actions">
           <button class="studio-button studio-button-secondary" value="cancel">Back to editing</button>
-          <button class="studio-button" type="button" data-publish-local>Publish demo locally</button>
+          <button class="studio-button" type="button" data-publish>Publish to AI Spanda</button>
         </div>
       </form>
     </dialog>
@@ -421,9 +437,6 @@ const { Content } = await render(entry);
       const canPublish = studioBackend.role === 'administrator' || studioBackend.role === 'publisher';
       const draftId = new URLSearchParams(window.location.search).get('draft') ?? 'open-the-ai';
       const isNewDraft = draftId !== 'open-the-ai';
-      const documentStoragePrefix = 'aispanda-studio-prototype-v2-';
-      const deletedDocumentIdsKey = 'aispanda-studio-deleted-document-ids-v1';
-      const storageKey = `aispanda-studio-prototype-v2-${draftId}`;
       const studio = document.querySelector<HTMLElement>('[data-studio]');
       const title = document.querySelector<HTMLTextAreaElement>('[data-title]');
       const editor = document.querySelector<HTMLElement>('[data-editor]');
@@ -440,6 +453,7 @@ const { Content } = await render(entry);
       const draftCount = document.querySelector<HTMLElement>('[data-draft-count]');
       const publishedCount = document.querySelector<HTMLElement>('[data-published-count]');
       const unpublishedCount = document.querySelector<HTMLElement>('[data-unpublished-count]');
+      const archivedCount = document.querySelector<HTMLElement>('[data-archived-count]');
       const persistenceNote = document.querySelector<HTMLElement>('[data-persistence-note]');
       const filterButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
       const editorWorkspace = document.querySelector<HTMLElement>('[data-editor-workspace]');
@@ -453,8 +467,12 @@ const { Content } = await render(entry);
       const saveMenu = document.querySelector<HTMLDetailsElement>('[data-save-menu]');
       const previewDialog = document.querySelector<HTMLDialogElement>('[data-preview-dialog]');
       const publishDialog = document.querySelector<HTMLDialogElement>('[data-publish-dialog]');
-      const previewFrame = document.querySelector<HTMLElement>('[data-preview-frame]');
+      const previewFrame = document.querySelector<HTMLIFrameElement>('[data-preview-frame]');
       const toast = document.querySelector<HTMLElement>('[data-toast]');
+      const publicationReceipt = document.querySelector<HTMLElement>('[data-publication-receipt]');
+      const publicationLive = document.querySelector<HTMLAnchorElement>('[data-publication-live]');
+      const publicationRelease = document.querySelector<HTMLElement>('[data-publication-release]');
+      const receiptUnpublish = document.querySelector<HTMLButtonElement>('[data-receipt-unpublish]');
       const manageAccess = document.querySelector<HTMLButtonElement>('[data-manage-access]');
       const accessDialog = document.querySelector<HTMLDialogElement>('[data-access-dialog]');
       const accessRequestList = document.querySelector<HTMLElement>('[data-access-request-list]');
@@ -470,8 +488,8 @@ const { Content } = await render(entry);
       const aiConnectionState = document.querySelector<HTMLElement>('[data-ai-connection-state]');
       const aiConnectionDetail = document.querySelector<HTMLElement>('[data-ai-connection-detail]');
 
-      if (!studio || !title || !editor || !excerpt || !slug || !tags || !saveState || !wordCount || !readTime || !slugPreview || !documentList || !listHeading || !allCount || !draftCount || !publishedCount || !unpublishedCount || !editorWorkspace || !contentLibrary || !libraryList || !libraryTitle || !librarySummary || !topbarKicker || !editorActions || !revisionsList || !saveMenu || !previewDialog || !publishDialog || !previewFrame || !toast || !openAi || !aiDialog || !aiInstruction || !aiPreview || !aiSelectionScope || !aiFallback || !aiCopyOpen || !aiManualCopy || !aiConnectionState || !aiConnectionDetail) {
-        throw new Error('Content Studio prototype failed to initialize');
+      if (!studio || !title || !editor || !excerpt || !slug || !tags || !saveState || !wordCount || !readTime || !slugPreview || !documentList || !listHeading || !allCount || !draftCount || !publishedCount || !unpublishedCount || !archivedCount || !editorWorkspace || !contentLibrary || !libraryList || !libraryTitle || !librarySummary || !topbarKicker || !editorActions || !revisionsList || !saveMenu || !previewDialog || !publishDialog || !previewFrame || !toast || !openAi || !aiDialog || !aiInstruction || !aiPreview || !aiSelectionScope || !aiFallback || !aiCopyOpen || !aiManualCopy || !aiConnectionState || !aiConnectionDetail) {
+        throw new Error('Content Studio failed to initialize');
       }
 
       type Revision = { savedAt: string; title: string };
@@ -482,16 +500,20 @@ const { Content } = await render(entry);
         slug: string;
         tags: string;
         publicationStatus: 'draft' | 'published' | 'published-with-changes' | 'unpublished';
+        publicationReleaseId: string;
+        publicationLiveUrl: string;
         updatedAt: string;
+        archivedAt?: string;
         revisions: Revision[];
       };
-      type ContentFilter = 'all' | 'draft' | 'published' | 'unpublished';
+      type ContentFilter = 'all' | 'draft' | 'published' | 'unpublished' | 'archived';
       type DocumentSummary = {
         id: string;
         title: string;
         publicationStatus: DraftState['publicationStatus'];
         updatedAt: string;
         publicPath?: string;
+        archivedAt?: string;
       };
 
       let autosaveTimer = 0;
@@ -501,12 +523,19 @@ const { Content } = await render(entry);
       let currentFilter: ContentFilter = 'all';
       let cloudMutationQueue = Promise.resolve();
       let lastKnownUpdatedAt = '1970-01-01T00:00:00.000Z';
+      let publicationReleaseId = '';
+      let publicationLiveUrl = '';
+      let publishIdempotencyKey = '';
+      let editVersion = 0;
+      let savedVersion = 0;
+      let pendingCloudMutations = 0;
       let lastEditorSelection = '';
+      const draftRecords = new Map<string, DraftState>();
 
-      if (persistenceNote && studioBackend.mode === 'cloud') {
-        persistenceNote.textContent = 'Drafts sync securely across signed-in devices. Real publishing comes next.';
+      if (persistenceNote) {
+        persistenceNote.textContent = 'Drafts save to your account and publish directly to the site.';
       }
-      document.querySelectorAll<HTMLElement>('[data-open-publish], [data-publish-local]').forEach((control) => {
+      document.querySelectorAll<HTMLElement>('[data-open-publish], [data-publish]').forEach((control) => {
         control.hidden = !canPublish;
       });
 
@@ -731,6 +760,8 @@ const { Content } = await render(entry);
         slug: normalizeSlug(slug.value),
         tags: tags.value.trim(),
         publicationStatus,
+        publicationReleaseId,
+        publicationLiveUrl,
         updatedAt: new Date().toISOString(),
         revisions,
       });
@@ -759,86 +790,47 @@ const { Content } = await render(entry);
           || !Array.isArray(value.revisions)
           || !['draft', 'published', 'published-with-changes', 'unpublished'].includes(String(value.publicationStatus))
         ) return null;
-        return value as DraftState;
+        return {
+          ...(value as DraftState),
+          publicationReleaseId: typeof value.publicationReleaseId === 'string' ? value.publicationReleaseId : '',
+          publicationLiveUrl: typeof value.publicationLiveUrl === 'string' ? value.publicationLiveUrl : '',
+          archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : undefined,
+        };
       };
 
-      const synchronizeDraftCache = async () => {
-        if (studioBackend.mode !== 'cloud') return;
-        try {
-          const remoteDrafts = await studioBackend.listDrafts();
-          const deletedIds = readDeletedDocumentIds();
-          for (const [id, remoteRecord] of Object.entries(remoteDrafts)) {
-            if (deletedIds.has(id)) continue;
-            const remote = parseDraftState(remoteRecord);
-            if (!remote) continue;
-            const localKey = `${documentStoragePrefix}${id}`;
-            try {
-              const localRaw = localStorage.getItem(localKey);
-              const local = localRaw ? parseDraftState(JSON.parse(localRaw) as Partial<DraftState>) : null;
-              if (!local || remote.updatedAt > local.updatedAt) localStorage.setItem(localKey, JSON.stringify(remote));
-            } catch {
-              localStorage.setItem(localKey, JSON.stringify(remote));
-            }
-          }
-
-          for (let index = 0; index < localStorage.length; index += 1) {
-            const key = localStorage.key(index);
-            if (!key?.startsWith(documentStoragePrefix)) continue;
-            const id = key.slice(documentStoragePrefix.length);
-            if (deletedIds.has(id)) continue;
-            try {
-              const local = parseDraftState(JSON.parse(localStorage.getItem(key) ?? '') as Partial<DraftState>);
-              const remote = parseDraftState(remoteDrafts[id] ?? {});
-              if (local && (!remote || local.updatedAt > remote.updatedAt)) await studioBackend.saveDraft(id, local);
-            } catch {
-              // Keep a malformed local record isolated from the remaining draft sync.
-            }
-          }
-        } catch {
-          if (persistenceNote) persistenceNote.textContent = 'Cloud sync is unavailable. Changes remain safely cached in this browser.';
-        }
-      };
-
-      const readDeletedDocumentIds = () => {
-        try {
-          return new Set<string>(JSON.parse(localStorage.getItem(deletedDocumentIdsKey) ?? '[]'));
-        } catch {
-          return new Set<string>();
+      const loadCloudDrafts = async () => {
+        const remoteDrafts = await studioBackend.listDrafts();
+        draftRecords.clear();
+        for (const [id, record] of Object.entries(remoteDrafts)) {
+          const draft = parseDraftState(record);
+          if (draft) draftRecords.set(id, draft);
         }
       };
 
       const readDocumentIndex = (): DocumentSummary[] => {
         const indexed = new Map<string, DocumentSummary>();
-        const deletedIds = readDeletedDocumentIds();
-        if (!deletedIds.has('open-the-ai')) {
-          indexed.set('open-the-ai', {
-            id: 'open-the-ai',
-            title: 'Own the Shared Track. Make AI Providers Compete for the Work.',
-            publicationStatus: 'published',
-            updatedAt: '2026-08-16T00:00:00.000Z',
-            publicPath: '/open-the-ai',
-          });
-        }
+        indexed.set('open-the-ai', {
+          id: 'open-the-ai',
+          title: 'Own the Shared Track. Make AI Providers Compete for the Work.',
+          publicationStatus: 'published',
+          updatedAt: '2026-08-16T00:00:00.000Z',
+          publicPath: '/open-the-ai',
+        });
 
-        for (let index = 0; index < localStorage.length; index += 1) {
-          const key = localStorage.key(index);
-          if (!key?.startsWith(documentStoragePrefix)) continue;
-          const id = key.slice(documentStoragePrefix.length);
-          if (deletedIds.has(id)) continue;
-          try {
-            const draft = JSON.parse(localStorage.getItem(key) ?? '') as Partial<DraftState>;
-            const rawStatus = draft.publicationStatus ?? 'draft';
-            const normalizedStatus = id === 'open-the-ai' && rawStatus === 'draft' ? 'published' : rawStatus;
-            indexed.set(id, {
-              id,
-              title: draft.title?.trim() || 'Untitled article',
-              publicationStatus: normalizedStatus,
-              updatedAt: draft.updatedAt ?? '1970-01-01T00:00:00.000Z',
-              publicPath: id === 'open-the-ai' ? '/open-the-ai' : undefined,
-            });
-          } catch {
-            // Ignore a malformed prototype entry without hiding other drafts.
-          }
+        for (const [id, draft] of draftRecords) {
+          const normalizedStatus = id === 'open-the-ai' && draft.publicationStatus === 'draft'
+            ? 'published'
+            : draft.publicationStatus;
+          indexed.set(id, {
+            id,
+            title: draft.title.trim() || 'Untitled article',
+            publicationStatus: normalizedStatus,
+            updatedAt: draft.updatedAt,
+            archivedAt: draft.archivedAt,
+            publicPath: hasLiveVersion({ id, title: draft.title, publicationStatus: normalizedStatus, updatedAt: draft.updatedAt })
+              ? id === 'open-the-ai' ? '/open-the-ai' : `/${draft.slug}`
+              : undefined,
+          });
         }
 
         return [...indexed.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -846,13 +838,16 @@ const { Content } = await render(entry);
 
       const renderDocumentIndex = () => {
         const documents = readDocumentIndex();
-        const drafts = documents.filter(hasDraftWork);
-        const published = documents.filter(hasLiveVersion);
-        const unpublished = documents.filter((item) => item.publicationStatus === 'unpublished');
-        allCount.textContent = String(documents.length);
+        const active = documents.filter((item) => !item.archivedAt);
+        const archived = documents.filter((item) => item.archivedAt);
+        const drafts = active.filter(hasDraftWork);
+        const published = active.filter(hasLiveVersion);
+        const unpublished = active.filter((item) => item.publicationStatus === 'unpublished');
+        allCount.textContent = String(active.length);
         draftCount.textContent = String(drafts.length);
         publishedCount.textContent = String(published.length);
         unpublishedCount.textContent = String(unpublished.length);
+        archivedCount.textContent = String(archived.length);
 
         const visible = currentFilter === 'draft'
           ? drafts
@@ -860,14 +855,18 @@ const { Content } = await render(entry);
             ? published
             : currentFilter === 'unpublished'
               ? unpublished
-              : documents;
+              : currentFilter === 'archived'
+                ? archived
+                : active;
         listHeading.textContent = currentFilter === 'draft'
           ? 'Drafts'
           : currentFilter === 'published'
             ? 'Published'
             : currentFilter === 'unpublished'
               ? 'Unpublished'
-              : 'All content';
+              : currentFilter === 'archived'
+                ? 'Archived'
+                : 'All content';
         documentList.replaceChildren();
 
         if (!visible.length) {
@@ -886,12 +885,17 @@ const { Content } = await render(entry);
           const editPath = item.id === 'open-the-ai' ? '/studio' : `/studio?draft=${encodeURIComponent(item.id)}`;
           const itemTitle = document.createElement('a');
           itemTitle.className = 'studio-document-title';
-          itemTitle.href = item.publicPath && hasLiveVersion(item) ? item.publicPath : editPath;
           itemTitle.textContent = item.title;
-          itemTitle.setAttribute('aria-label', item.publicPath && hasLiveVersion(item) ? `Read ${item.title}` : `Edit ${item.title}`);
+          if (item.archivedAt) {
+            itemTitle.removeAttribute('href');
+            itemTitle.setAttribute('aria-label', `${item.title}, archived`);
+          } else {
+            itemTitle.href = item.publicPath && hasLiveVersion(item) ? item.publicPath : editPath;
+            itemTitle.setAttribute('aria-label', item.publicPath && hasLiveVersion(item) ? `Read ${item.title}` : `Edit ${item.title}`);
+          }
           const itemMeta = document.createElement('div');
           const itemStatus = document.createElement('small');
-          itemStatus.textContent = statusLabel(item.publicationStatus);
+          itemStatus.textContent = item.archivedAt ? 'Archived' : statusLabel(item.publicationStatus);
           itemMeta.append(itemStatus);
           if (item.publicPath && hasLiveVersion(item)) {
             const editLink = document.createElement('a');
@@ -906,37 +910,25 @@ const { Content } = await render(entry);
         }
       };
 
-      const readDocumentState = (item: DocumentSummary): DraftState | null => {
-        try {
-          const storedDocument = localStorage.getItem(`${documentStoragePrefix}${item.id}`);
-          const parsed = storedDocument ? parseDraftState(JSON.parse(storedDocument) as Partial<DraftState>) : null;
-          return parsed ?? (item.id === draftId ? getState() : null);
-        } catch {
-          return item.id === draftId ? getState() : null;
-        }
-      };
+      const readDocumentState = (item: DocumentSummary): DraftState | null =>
+        draftRecords.get(item.id) ?? (item.id === draftId ? getState() : null);
 
-      const setDocumentStatus = (item: DocumentSummary, nextStatus: DraftState['publicationStatus']) => {
-        const nextState = readDocumentState(item);
-        if (!nextState) {
-          showToast('This prototype could not load the article state');
-          return false;
-        }
-        nextState.publicationStatus = nextStatus;
-        nextState.updatedAt = new Date().toISOString();
-        localStorage.setItem(`${documentStoragePrefix}${item.id}`, JSON.stringify(nextState));
-        queueCloudMutation(() => studioBackend.saveDraft(item.id, nextState));
+      const unpublishDocument = async (item: DocumentSummary) => {
+        const state = readDocumentState(item);
+        if (!state) throw new Error('The cloud draft could not be loaded.');
+        const result = await studioBackend.unpublishDraft(item.id, state.updatedAt);
+        const nextState = { ...state, publicationStatus: 'unpublished' as const, updatedAt: result.updatedAt };
+        draftRecords.set(item.id, nextState);
         if (item.id === draftId) {
-          publicationStatus = nextStatus;
-          lastKnownUpdatedAt = nextState.updatedAt;
+          publicationStatus = 'unpublished';
+          lastKnownUpdatedAt = result.updatedAt;
         }
-        return true;
       };
 
       const duplicateDocument = async (item: DocumentSummary) => {
         const source = readDocumentState(item);
         if (!source) {
-          showToast('This prototype could not duplicate the article');
+          showToast('The cloud draft could not be duplicated');
           return;
         }
         const duplicateId = window.crypto.randomUUID();
@@ -946,55 +938,75 @@ const { Content } = await render(entry);
           title: duplicateTitle,
           slug: normalizeSlug(duplicateTitle),
           publicationStatus: 'draft',
+          publicationReleaseId: '',
+          publicationLiveUrl: '',
           updatedAt: new Date().toISOString(),
           revisions: [],
         };
-        localStorage.setItem(`${documentStoragePrefix}${duplicateId}`, JSON.stringify(duplicate));
-        if (studioBackend.mode === 'cloud') {
-          try {
-            await studioBackend.saveDraft(duplicateId, duplicate);
-          } catch {
-            showToast('Copy saved in this browser; cloud sync failed');
-          }
-        }
-        window.location.assign(`/studio?draft=${encodeURIComponent(duplicateId)}`);
-      };
-
-      const deleteDocument = async (item: DocumentSummary) => {
-        if (hasLiveVersion(item)) {
-          showToast('Unpublish this article before deleting it');
+        try {
+          await studioBackend.saveDraft(duplicateId, duplicate);
+          draftRecords.set(duplicateId, duplicate);
+        } catch {
+          showToast('The copy could not be saved to the cloud');
           return;
         }
-        const confirmed = item.publicationStatus === 'unpublished'
-          ? window.prompt(`Type the article title to delete it permanently:\n\n${item.title}`) === item.title
-          : window.confirm(`Delete the draft “${item.title}”?`);
-        if (!confirmed) return;
-        if (studioBackend.mode === 'cloud') {
-          try {
-            await studioBackend.deleteDraft(item.id);
-          } catch {
-            showToast('Could not delete the cloud draft; nothing was changed');
-            return;
-          }
+        await navigateAfterSave(`/studio?draft=${encodeURIComponent(duplicateId)}`);
+      };
+
+      const archiveDocument = async (item: DocumentSummary) => {
+        if (hasLiveVersion(item)) {
+          showToast('Unpublish this article before archiving its draft');
+          return;
         }
-        const deletedIds = readDeletedDocumentIds();
-        deletedIds.add(item.id);
-        localStorage.setItem(deletedDocumentIdsKey, JSON.stringify([...deletedIds]));
-        localStorage.removeItem(`${documentStoragePrefix}${item.id}`);
-        showToast(item.publicationStatus === 'unpublished' ? 'Article deleted' : 'Draft deleted');
-        renderDocumentIndex();
-        renderContentLibrary();
+        const confirmed = window.confirm(`Archive the cloud draft “${item.title}”? Its audit history will be preserved.`);
+        if (!confirmed) return;
+        const state = readDocumentState(item);
+        if (!state) {
+          showToast('The cloud draft could not be loaded');
+          return;
+        }
+        try {
+          const result = await studioBackend.archiveDraft(item.id, state.updatedAt);
+          draftRecords.set(item.id, { ...state, archivedAt: result.archivedAt, updatedAt: result.archivedAt });
+        } catch {
+          showToast('Could not archive the cloud draft; nothing was changed');
+          return;
+        }
+        showToast('Cloud draft archived');
+        showContentLibrary('archived');
+      };
+
+      const restoreDocument = async (item: DocumentSummary) => {
+        const state = readDocumentState(item);
+        if (!state?.archivedAt) {
+          showToast('The archived cloud draft could not be loaded');
+          return;
+        }
+        try {
+          const result = await studioBackend.restoreDraft(item.id, state.updatedAt);
+          const { archivedAt: _archivedAt, ...activeState } = state;
+          draftRecords.set(item.id, { ...activeState, updatedAt: result.updatedAt });
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : 'The cloud draft could not be restored');
+          return;
+        }
+        showToast('Cloud draft restored');
+        showContentLibrary('all');
       };
 
       const renderContentLibrary = () => {
         const documents = readDocumentIndex();
+        const active = documents.filter((item) => !item.archivedAt);
+        const archived = documents.filter((item) => item.archivedAt);
         const visible = currentFilter === 'draft'
-          ? documents.filter(hasDraftWork)
+          ? active.filter(hasDraftWork)
           : currentFilter === 'published'
-            ? documents.filter(hasLiveVersion)
+            ? active.filter(hasLiveVersion)
             : currentFilter === 'unpublished'
-              ? documents.filter((item) => item.publicationStatus === 'unpublished')
-              : documents;
+              ? active.filter((item) => item.publicationStatus === 'unpublished')
+              : currentFilter === 'archived'
+                ? archived
+                : active;
 
         const heading = currentFilter === 'draft'
           ? 'Drafts'
@@ -1002,7 +1014,9 @@ const { Content } = await render(entry);
             ? 'Published'
             : currentFilter === 'unpublished'
               ? 'Unpublished'
-              : 'All content';
+              : currentFilter === 'archived'
+                ? 'Archived'
+                : 'All content';
         libraryTitle.textContent = heading;
         const guidance = currentFilter === 'published'
           ? 'Select a title to read the live article; Edit draft opens unpublished work.'
@@ -1010,6 +1024,8 @@ const { Content } = await render(entry);
             ? 'Includes unpublished articles and draft changes to published articles.'
             : currentFilter === 'unpublished'
               ? 'These articles are offline and may be republished or deleted.'
+              : currentFilter === 'archived'
+                ? 'Archived drafts are hidden from editing and publishing until restored.'
               : 'Published titles open the live article; Edit draft opens unpublished work.';
         librarySummary.textContent = `${visible.length} ${visible.length === 1 ? 'item' : 'items'} · ${guidance}`;
         libraryList.replaceChildren();
@@ -1050,8 +1066,8 @@ const { Content } = await render(entry);
           identity.append(itemTitle);
 
           const status = document.createElement('span');
-          status.className = `studio-library-status is-${item.publicationStatus}`;
-          status.textContent = statusLabel(item.publicationStatus);
+          status.className = `studio-library-status is-${item.archivedAt ? 'archived' : item.publicationStatus}`;
+          status.textContent = item.archivedAt ? 'Archived' : statusLabel(item.publicationStatus);
 
           const updated = document.createElement('time');
           updated.dateTime = item.updatedAt;
@@ -1085,31 +1101,41 @@ const { Content } = await render(entry);
             menuItems.append(button);
           };
 
-          addMenuButton('Duplicate', () => duplicateDocument(item));
-          if (hasLiveVersion(item)) {
+          if (item.archivedAt) {
+            addMenuButton('Restore draft', () => restoreDocument(item));
+          } else {
+            addMenuButton('Duplicate', () => duplicateDocument(item));
+          }
+          if (item.archivedAt) {
+            // Restoring is the only mutation available for an archived draft.
+          } else if (hasLiveVersion(item)) {
             if (canPublish) {
-              addMenuButton('Unpublish', () => {
-                const confirmed = window.confirm(`Record “${item.title}” as unpublished in this prototype? The live site will not change yet.`);
-                if (!confirmed || !setDocumentStatus(item, 'unpublished')) return;
-                showToast('Recorded as unpublished; the live site was not changed');
-                showContentLibrary('unpublished');
+              addMenuButton('Unpublish', async () => {
+                const confirmed = window.confirm(`Unpublish “${item.title}”? Its public URL will stop working, but the cloud draft and release history will be preserved.`);
+                if (!confirmed) return;
+                try {
+                  await unpublishDocument(item);
+                  showToast('Article unpublished; the cloud draft was preserved');
+                  showContentLibrary('unpublished');
+                } catch (error) {
+                  showToast(error instanceof Error ? error.message : 'The article could not be unpublished');
+                }
               }, true);
             }
           } else if (item.publicationStatus === 'unpublished') {
             if (canPublish) {
               addMenuButton('Republish', () => {
-                if (!setDocumentStatus(item, 'published')) return;
-                showToast('Recorded as published; the live site was not changed');
-                showContentLibrary('published');
+                void navigateAfterSave(item.id === 'open-the-ai' ? '/studio' : `/studio?draft=${encodeURIComponent(item.id)}`);
               });
             }
-            addMenuButton('Delete permanently', () => deleteDocument(item), true);
+            addMenuButton('Archive draft', () => archiveDocument(item), true);
           } else {
-            addMenuButton('Delete draft', () => deleteDocument(item), true);
+            addMenuButton('Archive draft', () => archiveDocument(item), true);
           }
 
           menu.append(menuTrigger, menuItems);
-          actions.append(editLink, menu);
+          if (!item.archivedAt) actions.append(editLink);
+          actions.append(menu);
           row.append(identity, status, updated, actions);
           libraryList.append(row);
         }
@@ -1149,54 +1175,80 @@ const { Content } = await render(entry);
         slugPreview.textContent = normalizeSlug(slug.value) || 'untitled';
       };
 
+      const renderPublicationReceipt = () => {
+        if (!publicationReceipt || !publicationLive || !publicationRelease) return;
+        const visible = hasLiveVersion({
+          id: draftId,
+          title: title.value,
+          publicationStatus,
+          updatedAt: lastKnownUpdatedAt,
+        }) && Boolean(publicationLiveUrl && publicationReleaseId);
+        publicationReceipt.hidden = !visible;
+        if (!visible) return;
+        publicationLive.href = publicationLiveUrl;
+        publicationLive.textContent = publicationLiveUrl;
+        publicationRelease.textContent = publicationReleaseId;
+      };
+
       const renderStatus = (override?: string) => {
+        renderPublicationReceipt();
+        if (draftRecords.get(draftId)?.archivedAt) {
+          saveState.textContent = 'Archived · restore to edit';
+          return;
+        }
         if (override) {
           saveState.textContent = override;
           return;
         }
         if (publicationStatus === 'published') {
-          saveState.textContent = studioBackend.mode === 'cloud' ? 'Published prototype · draft synced' : 'Published locally · saved';
+          saveState.textContent = 'Published · cloud release active';
         } else if (publicationStatus === 'published-with-changes') {
-          saveState.textContent = studioBackend.mode === 'cloud' ? 'Live article · draft changes synced' : 'Published locally · unpublished changes';
+          saveState.textContent = 'Live article · unpublished changes saved';
         } else if (publicationStatus === 'unpublished') {
-          saveState.textContent = studioBackend.mode === 'cloud' ? 'Unpublished prototype · draft synced' : 'Unpublished · saved locally';
+          saveState.textContent = 'Unpublished · cloud draft saved';
         } else {
-          saveState.textContent = studioBackend.mode === 'cloud' ? 'Draft · synced' : 'Draft · saved locally';
+          saveState.textContent = 'Draft · saved to cloud';
         }
       };
 
-      const queueCloudMutation = (operation: () => Promise<void>) => {
-        if (studioBackend.mode !== 'cloud') return;
+      const queueCloudMutation = async (operation: () => Promise<void>) => {
         renderStatus('Saving to cloud…');
-        cloudMutationQueue = cloudMutationQueue
-          .then(operation)
-          .then(() => renderStatus())
-          .catch(() => renderStatus('Saved in browser · cloud sync failed'));
+        pendingCloudMutations += 1;
+        const queued = cloudMutationQueue.then(operation);
+        cloudMutationQueue = queued.catch(() => undefined);
+        try {
+          await queued;
+          renderStatus();
+          return true;
+        } catch (error) {
+          renderStatus('Save failed · cloud draft unchanged');
+          showToast(error instanceof Error ? error.message : 'The cloud draft could not be saved');
+          return false;
+        } finally {
+          pendingCloudMutations = Math.max(0, pendingCloudMutations - 1);
+        }
       };
 
-      const persist = (checkpoint = false) => {
-        try {
-          const currentStored = localStorage.getItem(storageKey);
-          const currentStoredState = currentStored
-            ? parseDraftState(JSON.parse(currentStored) as Partial<DraftState>)
-            : null;
-          if (currentStoredState && currentStoredState.updatedAt > lastKnownUpdatedAt) {
-            renderStatus('Newer changes exist in another tab · reload required');
-            showToast('This tab was not saved because a newer version exists');
-            return false;
-          }
-        } catch {
-          // A malformed prior cache cannot block a valid replacement save.
-        }
+      const persist = async (checkpoint = false) => {
+        const versionToSave = editVersion;
+        const previousRevisions = revisions;
         if (checkpoint) {
           revisions = [...revisions, { savedAt: new Date().toISOString(), title: title.value.trim() }].slice(-20);
         }
         const nextState = getState();
-        localStorage.setItem(storageKey, JSON.stringify(nextState));
-        lastKnownUpdatedAt = nextState.updatedAt;
         renderRevisions();
-        if (studioBackend.mode === 'cloud') queueCloudMutation(() => studioBackend.saveDraft(draftId, nextState));
-        else renderStatus();
+        const saved = await queueCloudMutation(async () => {
+          const expectedUpdatedAt = draftRecords.get(draftId)?.updatedAt;
+          await studioBackend.saveDraft(draftId, nextState, expectedUpdatedAt);
+          draftRecords.set(draftId, nextState);
+          lastKnownUpdatedAt = nextState.updatedAt;
+        });
+        if (!saved) {
+          revisions = previousRevisions;
+          renderRevisions();
+          return false;
+        }
+        savedVersion = Math.max(savedVersion, versionToSave);
         renderDocumentIndex();
         return true;
       };
@@ -1207,30 +1259,63 @@ const { Content } = await render(entry);
         window.setTimeout(() => toast.classList.remove('is-visible'), 2400);
       };
 
+      const hasUnsavedChanges = () => editVersion > savedVersion || pendingCloudMutations > 0;
+
+      const flushPendingSave = async () => {
+        window.clearTimeout(autosaveTimer);
+        autosaveTimer = 0;
+        if (editVersion > savedVersion && !await persist(false)) return false;
+        await cloudMutationQueue;
+        return !hasUnsavedChanges();
+      };
+
+      const navigateAfterSave = async (href: string) => {
+        if (!await flushPendingSave()) {
+          showToast('Navigation paused because the cloud save did not finish');
+          return;
+        }
+        window.location.assign(href);
+      };
+
       const markChanged = () => {
         if (publicationStatus === 'published') publicationStatus = 'published-with-changes';
+        editVersion += 1;
+        publishIdempotencyKey = '';
         renderStatus('Saving…');
         updateMetrics();
         window.clearTimeout(autosaveTimer);
-        autosaveTimer = window.setTimeout(() => persist(false), 700);
+        autosaveTimer = window.setTimeout(() => void persist(false), 700);
       };
 
-      await synchronizeDraftCache();
-      const stored = localStorage.getItem(storageKey);
+      try {
+        await loadCloudDrafts();
+      } catch (error) {
+        if (persistenceNote) persistenceNote.textContent = 'Cloud drafts are unavailable. Editing is disabled until the connection recovers.';
+        renderStatus('Cloud unavailable · editing disabled');
+        title.disabled = true;
+        excerpt.disabled = true;
+        slug.disabled = true;
+        tags.disabled = true;
+        editor.contentEditable = 'false';
+        editorActions.querySelectorAll<HTMLButtonElement>('button').forEach((button) => { button.disabled = true; });
+        throw error;
+      }
+      const stored = draftRecords.get(draftId);
+      if (stored?.archivedAt) {
+        showContentLibrary('archived');
+        showToast('This draft is archived. Restore it before editing.');
+      }
       if (stored) {
-        try {
-          const draft = JSON.parse(stored) as Partial<DraftState>;
-          if (typeof draft.title === 'string') title.value = draft.title;
-          if (typeof draft.body === 'string') editor.innerHTML = draft.body;
-          if (typeof draft.excerpt === 'string') excerpt.value = draft.excerpt;
-          if (typeof draft.slug === 'string') slug.value = draft.slug;
-          if (typeof draft.tags === 'string') tags.value = draft.tags;
-          if (draft.publicationStatus) publicationStatus = draft.publicationStatus;
-          if (Array.isArray(draft.revisions)) revisions = draft.revisions;
-          if (typeof draft.updatedAt === 'string') lastKnownUpdatedAt = draft.updatedAt;
-        } catch {
-          localStorage.removeItem(storageKey);
-        }
+        title.value = stored.title;
+        editor.innerHTML = stored.body;
+        excerpt.value = stored.excerpt;
+        slug.value = stored.slug;
+        tags.value = stored.tags;
+        publicationStatus = stored.publicationStatus;
+        publicationReleaseId = stored.publicationReleaseId;
+        publicationLiveUrl = stored.publicationLiveUrl;
+        revisions = stored.revisions;
+        lastKnownUpdatedAt = stored.updatedAt;
       } else if (isNewDraft) {
         title.value = '';
         editor.innerHTML = '<p><br></p>';
@@ -1242,29 +1327,33 @@ const { Content } = await render(entry);
       if (!isNewDraft && publicationStatus === 'draft') publicationStatus = 'published';
 
       for (const button of filterButtons) {
-        button.addEventListener('click', () => {
-          if (!editorWorkspace.hidden) persist(false);
+        button.addEventListener('click', async () => {
+          if (!editorWorkspace.hidden && !await flushPendingSave()) return;
           showContentLibrary((button.dataset.filter ?? 'all') as ContentFilter);
         });
       }
-
-      window.addEventListener('storage', (event) => {
-        if (event.key !== storageKey || !event.newValue) return;
-        try {
-          const external = parseDraftState(JSON.parse(event.newValue) as Partial<DraftState>);
-          if (external && external.updatedAt > lastKnownUpdatedAt) {
-            renderStatus('Newer changes exist in another tab · reload required');
-          }
-        } catch {
-          // Ignore malformed storage events from unrelated prototype work.
-        }
-      });
 
       document.addEventListener('click', (event) => {
         const target = event.target;
         for (const openMenu of document.querySelectorAll<HTMLDetailsElement>('.studio-row-menu[open]')) {
           if (!(target instanceof Node) || !openMenu.contains(target)) openMenu.open = false;
         }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!hasUnsavedChanges() || event.defaultPrevented || event.button !== 0) return;
+        const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null;
+        if (!target || target.target || target.hasAttribute('download')) return;
+        const destination = new URL(target.href, window.location.href);
+        if (destination.origin !== window.location.origin) return;
+        event.preventDefault();
+        void navigateAfterSave(destination.toString());
+      }, true);
+
+      window.addEventListener('beforeunload', (event) => {
+        if (!hasUnsavedChanges()) return;
+        event.preventDefault();
+        event.returnValue = '';
       });
 
       document.addEventListener('keydown', (event) => {
@@ -1275,9 +1364,9 @@ const { Content } = await render(entry);
       });
 
       document.querySelectorAll<HTMLButtonElement>('[data-new-article]').forEach((button) => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
           const nextDraftId = window.crypto.randomUUID();
-          window.location.assign(`/studio?draft=${encodeURIComponent(nextDraftId)}`);
+          await navigateAfterSave(`/studio?draft=${encodeURIComponent(nextDraftId)}`);
         });
       });
 
@@ -1311,8 +1400,17 @@ const { Content } = await render(entry);
       });
 
       document.querySelector<HTMLButtonElement>('[data-link]')?.addEventListener('click', () => {
-        const href = window.prompt('Link URL', 'https://');
-        if (!href) return;
+        const input = window.prompt('Link URL (https://, http:// or mailto:)', 'https://');
+        if (!input) return;
+        let href = '';
+        try {
+          const candidate = new URL(input);
+          if (!['https:', 'http:', 'mailto:'].includes(candidate.protocol)) throw new Error('Unsupported link scheme');
+          href = candidate.toString();
+        } catch {
+          showToast('Use a complete http, https or mailto link');
+          return;
+        }
         editor.focus();
         document.execCommand('createLink', false, href);
         markChanged();
@@ -1324,24 +1422,27 @@ const { Content } = await render(entry);
         markChanged();
       });
 
-      document.querySelector<HTMLButtonElement>('[data-save-draft]')?.addEventListener('click', () => {
-        const saved = persist(true);
+      document.querySelector<HTMLButtonElement>('[data-save-draft]')?.addEventListener('click', async () => {
+        const saved = await persist(true);
         saveMenu.open = false;
-        if (saved) showToast(studioBackend.mode === 'cloud' ? 'Draft checkpoint queued for cloud sync' : 'Draft checkpoint saved');
+        if (saved) showToast('Draft checkpoint saved to the cloud');
       });
 
-      const refreshPreview = () => {
-        const previewTitle = document.querySelector<HTMLElement>('[data-preview-title]');
-        const previewExcerpt = document.querySelector<HTMLElement>('[data-preview-excerpt]');
-        const previewBody = document.querySelector<HTMLElement>('[data-preview-body]');
-        if (previewTitle) previewTitle.textContent = title.value.trim() || 'Untitled article';
-        if (previewExcerpt) previewExcerpt.textContent = excerpt.value.trim();
-        if (previewBody) previewBody.innerHTML = editor.innerHTML;
+      const refreshPreview = async () => {
+        previewFrame.srcdoc = await studioBackend.previewDocument(draftId, getState());
       };
 
-      document.querySelector<HTMLButtonElement>('[data-preview]')?.addEventListener('click', () => {
-        refreshPreview();
-        previewDialog.showModal();
+      document.querySelector<HTMLButtonElement>('[data-preview]')?.addEventListener('click', async (event) => {
+        const previewButton = event.currentTarget as HTMLButtonElement;
+        previewButton.disabled = true;
+        try {
+          await refreshPreview();
+          previewDialog.showModal();
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : 'The safe preview could not be rendered');
+        } finally {
+          previewButton.disabled = false;
+        }
       });
 
       document.querySelector<HTMLButtonElement>('[data-close-preview]')?.addEventListener('click', () => previewDialog.close());
@@ -1354,8 +1455,8 @@ const { Content } = await render(entry);
         });
       });
 
-      document.querySelector<HTMLButtonElement>('[data-open-publish]')?.addEventListener('click', () => {
-        if (!persist(true)) return;
+      document.querySelector<HTMLButtonElement>('[data-open-publish]')?.addEventListener('click', async () => {
+        if (!await persist(true)) return;
         saveMenu.open = false;
         const reviewTitle = document.querySelector<HTMLElement>('[data-review-title]');
         const reviewSlug = document.querySelector<HTMLElement>('[data-review-slug]');
@@ -1364,11 +1465,53 @@ const { Content } = await render(entry);
         publishDialog.showModal();
       });
 
-      document.querySelector<HTMLButtonElement>('[data-publish-local]')?.addEventListener('click', () => {
-        publicationStatus = 'published';
-        if (!persist(true)) return;
-        publishDialog.close();
-        showToast('Published locally — the live site was not changed');
+      document.querySelector<HTMLButtonElement>('[data-publish]')?.addEventListener('click', async (event) => {
+        const publishButton = event.currentTarget as HTMLButtonElement;
+        publishButton.disabled = true;
+        publishButton.textContent = 'Publishing…';
+        renderStatus('Publishing to AI Spanda…');
+        try {
+          await cloudMutationQueue;
+          publishIdempotencyKey ||= window.crypto.randomUUID();
+          const result = await studioBackend.publishDraft(draftId, lastKnownUpdatedAt, publishIdempotencyKey);
+          publicationStatus = 'published';
+          publicationReleaseId = result.releaseId;
+          publicationLiveUrl = result.liveUrl;
+          lastKnownUpdatedAt = result.updatedAt;
+          draftRecords.set(draftId, {
+            ...getState(),
+            publicationStatus: 'published',
+            updatedAt: result.updatedAt,
+          });
+          publishDialog.close();
+          renderStatus();
+          renderDocumentIndex();
+          publishIdempotencyKey = '';
+          showToast('Published · the release receipt is shown below');
+        } catch (error) {
+          renderStatus('Publish failed · cloud draft preserved');
+          showToast(error instanceof Error ? error.message : 'The article could not be published');
+        } finally {
+          publishButton.disabled = false;
+          publishButton.textContent = 'Publish to AI Spanda';
+        }
+      });
+
+      receiptUnpublish?.addEventListener('click', async () => {
+        if (!window.confirm('Unpublish this article? Its cloud draft and immutable release history will be preserved.')) return;
+        receiptUnpublish.disabled = true;
+        try {
+          const item = readDocumentIndex().find((document) => document.id === draftId);
+          if (!item) throw new Error('The cloud draft could not be loaded.');
+          await unpublishDocument(item);
+          renderStatus();
+          renderDocumentIndex();
+          showToast('Article unpublished; the cloud draft was preserved');
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : 'The article could not be unpublished');
+        } finally {
+          receiptUnpublish.disabled = false;
+        }
       });
 
       renderAiConnection();
@@ -1376,8 +1519,8 @@ const { Content } = await render(entry);
       updateMetrics();
       renderRevisions();
       renderStatus();
-      if (isNewDraft && !stored) persist(false);
-      else renderDocumentIndex();
+      if (isNewDraft && !stored) await persist(false);
+      else if (!stored?.archivedAt) renderDocumentIndex();
     </script>
   </body>
 </html>
@@ -1447,6 +1590,12 @@ const { Content } = await render(entry);
   .studio-account a:hover, .studio-account button:hover { color: white; text-decoration: underline; }
   .studio-workspace { min-width: 0; height: 100vh; overflow: hidden; }
   .studio-topbar { position: relative; z-index: 20; display: flex; align-items: center; justify-content: space-between; min-height: 74px; padding: 0 1.35rem; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.94); backdrop-filter: blur(14px); }
+  .studio-mobile-nav { display: none; position: relative; }
+  .studio-mobile-nav summary { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); border-radius: .55rem; background: white; color: var(--ink); cursor: pointer; font-size: 1.15rem; list-style: none; }
+  .studio-mobile-nav summary::-webkit-details-marker { display: none; }
+  .studio-mobile-nav nav { position: absolute; top: calc(100% + .45rem); left: 0; display: grid; width: min(250px, calc(100vw - 1.6rem)); padding: .45rem; border: 1px solid var(--line); border-radius: .7rem; background: white; box-shadow: var(--shadow); }
+  .studio-mobile-nav button, .studio-mobile-nav a { padding: .7rem .75rem; border: 0; border-radius: .45rem; background: transparent; color: var(--ink); text-align: left; text-decoration: none; cursor: pointer; }
+  .studio-mobile-nav button:hover, .studio-mobile-nav button.is-active, .studio-mobile-nav a:hover { background: var(--soft-solar); }
   .studio-save-state { margin: .15rem 0 0; color: var(--muted); font-size: .84rem; }
   .studio-actions { display: flex; align-items: center; gap: .65rem; }
   .studio-button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 42px; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: .7rem; background: var(--ink); color: white; font-weight: 750; cursor: pointer; }
@@ -1527,19 +1676,20 @@ const { Content } = await render(entry);
   .studio-device-toggle button.is-active { background: var(--ink); color: white; }
   .studio-icon-button { font-size: 1.5rem; line-height: 1; }
   .studio-preview-stage { overflow: auto; max-height: calc(100vh - 110px); padding: 1.5rem; }
-  .studio-preview-frame { width: min(820px, 100%); margin: 0 auto; padding: clamp(1.5rem, 5vw, 4rem); border: 1px solid var(--line); border-radius: .5rem; background: white; transition: width .2s ease; }
+  .studio-preview-frame { display: block; width: min(1100px, 100%); height: min(760px, calc(100vh - 150px)); margin: 0 auto; border: 1px solid var(--line); border-radius: .5rem; background: white; transition: width .2s ease; }
   .studio-preview-frame.is-mobile { width: min(390px, 100%); }
-  .studio-preview-header { padding-bottom: 2rem; border-bottom: 1px solid var(--line); }
-  .studio-preview-header h1 { margin: .5rem 0 0; font-size: clamp(2.2rem, 6vw, 4rem); }
-  .studio-preview-frame.is-mobile .studio-preview-header h1 { font-size: 2.25rem; }
-  .studio-preview-prose { padding-top: 1rem; }
   .studio-publish-dialog { width: min(620px, calc(100vw - 2rem)); }
   .studio-publish-dialog form { margin: 0; }
   .studio-publish-summary { display: grid; gap: .8rem; padding: 1.25rem; }
   .studio-publish-summary div { display: grid; grid-template-columns: 110px 1fr; gap: 1rem; padding-bottom: .8rem; border-bottom: 1px solid var(--line); }
   .studio-publish-summary span { color: var(--muted); font-size: .8rem; }
   .studio-publish-summary strong { overflow-wrap: anywhere; }
-  .studio-prototype-warning { margin: 0 1.25rem; padding: .85rem; border: 1px solid #e3c57d; border-radius: .7rem; background: var(--soft-solar); color: #684305; font-size: .85rem; }
+  .studio-publication-warning { margin: 0 1.25rem; padding: .85rem; border: 1px solid #e3c57d; border-radius: .7rem; background: var(--soft-solar); color: #684305; font-size: .85rem; }
+  .studio-publication-receipt { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 1.15rem 1rem; padding: 1rem 1.1rem; border: 1px solid color-mix(in srgb, var(--teal) 38%, var(--line)); border-radius: .8rem; background: color-mix(in srgb, var(--teal) 8%, white); }
+  .studio-publication-receipt > div { display: grid; gap: .25rem; min-width: 0; }
+  .studio-publication-receipt a { color: var(--teal); font-weight: 700; overflow-wrap: anywhere; }
+  .studio-publication-receipt small { color: var(--muted); }
+  .studio-publication-receipt code { color: var(--ink); }
   .studio-publish-actions { display: flex; justify-content: flex-end; gap: .65rem; padding: 1.25rem; }
   .studio-ai-dialog { width: min(760px, calc(100vw - 2rem)); }
   .studio-ai-content { display: grid; gap: 1rem; max-height: min(66vh, 680px); overflow: auto; padding: 1.2rem; }
@@ -1598,6 +1748,8 @@ const { Content } = await render(entry);
     .studio-sidebar { display: none; }
     .studio-workspace { height: auto; min-height: 100vh; }
     .studio-topbar { position: sticky; top: 0; padding: .65rem .8rem; }
+    .studio-mobile-nav { display: block; flex: 0 0 auto; }
+    .studio-topbar > div:not(.studio-actions) { flex: 1; min-width: 0; padding-left: .55rem; }
     .studio-grid { display: block; height: auto; }
     .studio-grid[hidden] { display: none; }
     .studio-content-library { height: auto; min-height: calc(100vh - 67px); padding: 1.25rem .8rem; }
@@ -1615,7 +1767,6 @@ const { Content } = await render(entry);
     .studio-button { min-height: 40px; padding: .55rem .8rem; }
     .studio-save-options { right: 0; }
     .studio-preview-stage { padding: .65rem; }
-    .studio-preview-frame { padding: 1.25rem; }
     .studio-publish-actions { flex-direction: column-reverse; }
     .studio-ai-actions { flex-direction: column-reverse; }
     .studio-ai-connection-heading, .studio-ai-connection-actions { align-items: stretch; flex-direction: column; }

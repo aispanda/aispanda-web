@@ -1,0 +1,74 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Comments from '@/components/Comments.astro';
+---
+
+<BaseLayout title="@@AISPANDA_ARTICLE_TITLE@@" description="@@AISPANDA_ARTICLE_DESCRIPTION@@">
+  <article class="insight-article">
+    <div class="shell insight-layout">
+      <div class="insight-main">
+        <header class="insight-hero">
+          <div class="insight-hero-meta">
+            <p class="eyebrow">Insight · @@AISPANDA_ARTICLE_READ_TIME@@</p>
+            <a
+              class="insight-edit"
+              href="/studio?draft=@@AISPANDA_ARTICLE_DRAFT_ID@@"
+              data-local-edit
+              hidden
+            >Edit article</a>
+            <a class="insight-back" href="/insights">← All insights</a>
+          </div>
+          <h1>@@AISPANDA_ARTICLE_TITLE@@</h1>
+          <p class="lede">@@AISPANDA_ARTICLE_DESCRIPTION@@</p>
+        </header>
+
+        <section class="content-card insight-body">
+          <div class="insight-prose">@@AISPANDA_ARTICLE_BODY@@</div>
+        </section>
+
+        <!--@@AISPANDA_INTERACTIVE_START@@-->
+        <Comments articleSlug="@@AISPANDA_ARTICLE_SLUG@@" />
+        <!--@@AISPANDA_INTERACTIVE_END@@-->
+      </div>
+    </div>
+  </article>
+</BaseLayout>
+
+<script>
+  import { enhanceInsightTables } from '@/scripts/enhance-insight-tables';
+  enhanceInsightTables();
+
+  const sessionKey = 'aispanda-studio-authorized-session-v1';
+  const editLink = document.querySelector<HTMLElement>('[data-local-edit]');
+  const refreshEditAccess = () => {
+    let authorized = false;
+    try {
+      const session = JSON.parse(window.localStorage.getItem(sessionKey) ?? '{}') as { role?: string; expiresAt?: number };
+      authorized = ['administrator', 'publisher', 'author'].includes(session.role ?? '')
+        && Number(session.expiresAt) > Date.now();
+    } catch {
+      authorized = false;
+    }
+    if (editLink) editLink.hidden = !authorized;
+  };
+  refreshEditAccess();
+  window.addEventListener('storage', (event) => {
+    if (event.key === sessionKey) refreshEditAccess();
+  });
+</script>
+
+<style>
+  .insight-layout { grid-template-columns: minmax(0, 1fr); }
+  .insight-main { width: min(900px, 100%); margin-inline: auto; }
+  .insight-edit {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--blue);
+    font-size: .85rem;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .insight-edit:hover { text-decoration: underline; text-underline-offset: .18em; }
+  .insight-edit + .insight-back { margin-left: .9rem; }
+</style>

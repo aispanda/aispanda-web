@@ -24,6 +24,7 @@ import { insights, insightHref } from '@/data/site';
               <small>{insight.eyebrow}</small><div><h3>{insight.title}</h3><p>{insight.summary}</p></div><span>{insight.readTime} →</span>
             </a>
           ))}
+          <Fragment set:html={'<!--@@AISPANDA_DYNAMIC_INSIGHTS@@-->'} />
         </div>
       )}
     </div>

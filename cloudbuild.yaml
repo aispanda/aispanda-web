@@ -1,15 +1,27 @@
 steps:
+  - name: node:24-bookworm-slim
+    id: deploy-firestore-rules
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        corepack enable
+        pnpm install --frozen-lockfile
+        pnpm exec firebase deploy --only firestore:rules --project="$PROJECT_ID" --non-interactive
   - name: gcr.io/cloud-builders/docker
+    id: build-application
     args:
       - build
       - --tag
       - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
       - .
   - name: gcr.io/cloud-builders/docker
+    id: push-application
     args:
       - push
       - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: deploy-application
     entrypoint: gcloud
     args:
       - run
@@ -26,6 +38,7 @@ steps:
       - --memory=256Mi
       - --concurrency=80
       - --timeout=60
+      - --set-env-vars=PUBLIC_SITE_ORIGIN=https://aispanda.com
       - --set-secrets=AI_VAULT_KEY_B64=aispanda-ai-vault-key:2
       - --service-account=aispanda-web-runtime@aispanda.iam.gserviceaccount.com
 images:

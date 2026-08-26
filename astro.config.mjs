@@ -5,7 +5,7 @@ export default defineConfig({
   site: 'https://aispanda.com',
   output: 'static',
   trailingSlash: 'never',
-  integrations: [sitemap({ filter: (page) => !page.includes('/studio') })],
+  integrations: [sitemap({ filter: (page) => !page.includes('/studio') && !page.includes('/article-shell-internal') })],
   vite: {
     server: {
       proxy: {

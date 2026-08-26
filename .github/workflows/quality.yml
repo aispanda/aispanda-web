@@ -27,8 +27,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:ai
+      - run: pnpm test:content
+      - run: pnpm test:rules
       - run: pnpm build
       - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e

@@ -10,12 +10,12 @@ import {
 } from 'firebase/auth';
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
   getFirestore,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -30,7 +30,15 @@ import {
 } from '../data/member-profile';
 import { getFirebaseClientApp, googleClientId, isFirebaseConfigured } from './firebase-client';
 
-export type StudioDraftRecord = Record<string, unknown> & { updatedAt?: string };
+export type StudioDraftRecord = Record<string, unknown> & { updatedAt?: string; archivedAt?: string };
+export type PublicationPreview = {
+  title: string;
+  bodyHtml: string;
+  excerpt: string;
+  slug: string;
+  tags: string[];
+  readMinutes: number;
+};
 export type StudioRole = 'administrator' | 'publisher' | 'author' | 'commenter' | 'viewer';
 export type EditorialRole = Extract<StudioRole, 'administrator' | 'publisher' | 'author'>;
 export type RoleRequest = {
@@ -46,29 +54,27 @@ export type RoleRequest = {
 };
 
 export type StudioBackend = {
-  mode: 'local' | 'cloud';
+  mode: 'cloud';
   role: StudioRole;
   accountEmail?: string;
   listDrafts: () => Promise<Record<string, StudioDraftRecord>>;
-  saveDraft: (id: string, draft: StudioDraftRecord) => Promise<void>;
-  deleteDraft: (id: string) => Promise<void>;
+  saveDraft: (id: string, draft: StudioDraftRecord, expectedUpdatedAt?: string) => Promise<void>;
+  archiveDraft: (id: string, expectedUpdatedAt: string) => Promise<{ archivedAt: string }>;
+  restoreDraft: (id: string, expectedUpdatedAt: string) => Promise<{ restoredAt: string; updatedAt: string }>;
+  previewDraft: (id: string, draft: StudioDraftRecord) => Promise<PublicationPreview>;
+  previewDocument: (id: string, draft: StudioDraftRecord) => Promise<string>;
+  publishDraft: (id: string, expectedUpdatedAt: string, idempotencyKey: string) => Promise<{
+    releaseId: string;
+    liveUrl: string;
+    slug: string;
+    updatedAt: string;
+  }>;
+  unpublishDraft: (id: string, expectedUpdatedAt: string) => Promise<{ slug: string; updatedAt: string }>;
   listRoleRequests: () => Promise<RoleRequest[]>;
   reviewRoleRequest: (request: RoleRequest, decision: 'approved' | 'denied') => Promise<void>;
 };
 
-const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
 const isConfigured = isFirebaseConfigured;
-
-const localBackend: StudioBackend = {
-  mode: 'local',
-  role: 'administrator',
-  listDrafts: async () => ({}),
-  saveDraft: async () => undefined,
-  deleteDraft: async () => undefined,
-  listRoleRequests: async () => [],
-  reviewRoleRequest: async () => undefined,
-};
 
 const find = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector);
 
@@ -80,7 +86,7 @@ const unlockStudio = (backend: StudioBackend) => {
   const accountRole = find<HTMLElement>('[data-studio-account-role]');
   if (gate) gate.hidden = true;
   if (studio) studio.hidden = false;
-  if (backend.mode === 'cloud' && account && accountEmail) {
+  if (account && accountEmail) {
     accountEmail.textContent = backend.accountEmail ?? 'Authorized author';
     if (accountRole) accountRole.textContent = backend.role;
     account.hidden = false;
@@ -112,24 +118,6 @@ const signInErrorMessage = (error: unknown) => {
       return error instanceof Error ? error.message : 'Google sign-in did not complete.';
   }
 };
-
-const waitForLocalAccess = () => new Promise<StudioBackend>((resolve) => {
-  if (isLocalHost) {
-    window.sessionStorage.setItem('aispanda-studio-local-access', 'true');
-    unlockStudio(localBackend);
-    resolve(localBackend);
-    return;
-  }
-  const localButton = find<HTMLButtonElement>('[data-local-access]');
-  if (!localButton) return;
-  localButton.hidden = false;
-  const unlock = () => {
-    window.sessionStorage.setItem('aispanda-studio-local-access', 'true');
-    unlockStudio(localBackend);
-    resolve(localBackend);
-  };
-  localButton.addEventListener('click', unlock, { once: true });
-});
 
 const authorizedSessionKey = 'aispanda-studio-authorized-session-v1';
 const memberSessionKey = 'aispanda-member-session-v1';
@@ -236,6 +224,40 @@ const recordAuthorizedProfile = async (user: User) => {
 
 const createCloudBackend = (user: User, role: EditorialRole) => {
   const db = getFirestore();
+  const contentRequest = async <T>(
+    id: string,
+    action: 'publish' | 'unpublish' | 'preview' | 'archive' | 'restore',
+    body: Record<string, unknown>,
+  ): Promise<T> => {
+    const response = await fetch(`/api/content/drafts/${encodeURIComponent(id)}/${action}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await user.getIdToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({})) as { error?: string } & T;
+    if (!response.ok) throw new Error(payload.error ?? 'The publication request failed.');
+    return payload;
+  };
+  const previewDocumentRequest = async (id: string, draft: StudioDraftRecord) => {
+    const response = await fetch(`/api/content/drafts/${encodeURIComponent(id)}/preview-document`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await user.getIdToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ draft }),
+    });
+    const payload = await response.text();
+    if (!response.ok) {
+      let message = 'The production-style preview could not be rendered.';
+      try { message = JSON.parse(payload).error ?? message; } catch { /* Keep the bounded fallback. */ }
+      throw new Error(message);
+    }
+    return payload;
+  };
   return {
     mode: 'cloud' as const,
     role,
@@ -249,16 +271,32 @@ const createCloudBackend = (user: User, role: EditorialRole) => {
       );
       return Object.fromEntries(snapshot.docs.map((draft) => [draft.id, draft.data() as StudioDraftRecord]));
     },
-    saveDraft: async (id: string, draft: StudioDraftRecord) => {
-      await setDoc(doc(db, 'contentDrafts', id), {
-        ...draft,
-        ownerUid: user.uid,
-        ownerEmail: user.email,
+    saveDraft: async (id: string, draft: StudioDraftRecord, expectedUpdatedAt?: string) => {
+      const draftRef = doc(db, 'contentDrafts', id);
+      await runTransaction(db, async (transaction) => {
+        const current = await transaction.get(draftRef);
+        const currentData = current.exists() ? current.data() : undefined;
+        if (currentData?.archivedAt) {
+          throw new Error('This draft is archived and must be restored before it can be edited.');
+        }
+        if (currentData && expectedUpdatedAt && currentData.updatedAt !== expectedUpdatedAt) {
+          throw new Error('This draft changed in another session. Reload before saving.');
+        }
+        transaction.set(draftRef, {
+          ...draft,
+          ownerUid: currentData?.ownerUid ?? user.uid,
+          ownerEmail: currentData?.ownerEmail ?? user.email,
+        });
       });
     },
-    deleteDraft: async (id: string) => {
-      await deleteDoc(doc(db, 'contentDrafts', id));
-    },
+    archiveDraft: (id: string, expectedUpdatedAt: string) => contentRequest(id, 'archive', { expectedUpdatedAt }),
+    restoreDraft: (id: string, expectedUpdatedAt: string) => contentRequest(id, 'restore', { expectedUpdatedAt }),
+    previewDraft: (id: string, draft: StudioDraftRecord) => contentRequest(id, 'preview', { draft }),
+    previewDocument: previewDocumentRequest,
+    publishDraft: (id: string, expectedUpdatedAt: string, idempotencyKey: string) =>
+      contentRequest(id, 'publish', { expectedUpdatedAt, idempotencyKey }),
+    unpublishDraft: (id: string, expectedUpdatedAt: string) =>
+      contentRequest(id, 'unpublish', { expectedUpdatedAt }),
     listRoleRequests: async () => {
       if (role !== 'administrator') return [];
       const snapshot = await getDocs(query(collection(db, 'roleRequests'), where('status', '==', 'pending')));
@@ -399,7 +437,7 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
       'Google sign-in needs configuration',
       'Connect this site to its Firebase project to enable authorized access and cross-device drafts.',
     );
-    return waitForLocalAccess();
+    return new Promise<StudioBackend>(() => undefined);
   }
 
   const app = getFirebaseClientApp();
@@ -495,11 +533,13 @@ export const initializeStudioBackend = async (): Promise<StudioBackend> => {
         rememberAuthorizedSession(user, role);
         stopObserving();
         unlockStudio(backend);
-        find<HTMLButtonElement>('[data-studio-signout]')?.addEventListener('click', async () => {
-          clearAuthorizedSession();
-          clearMemberSession();
-          await signOut(auth);
-          window.location.reload();
+        document.querySelectorAll<HTMLButtonElement>('[data-studio-signout]').forEach((control) => {
+          control.addEventListener('click', async () => {
+            clearAuthorizedSession();
+            clearMemberSession();
+            await signOut(auth);
+            window.location.reload();
+          });
         });
         resolve(backend);
       } catch (error) {

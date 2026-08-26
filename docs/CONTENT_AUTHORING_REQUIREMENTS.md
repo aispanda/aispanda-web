@@ -8,7 +8,7 @@ Scope: authenticated blog authoring and article comments first; structured books
 
 AIspanda should provide a private content studio where authorized staff initially sign in with Google, create or update content with a structured rich-text editor, preview it in the real site design, save it as a draft and deliberately publish it. The identity model must permit additional sign-in providers for future community members.
 
-The public site should remain fast and static-first. The first release should preserve Markdown as the published source format and the existing Cloud Build deployment path, while removing Markdown and deployment work from the normal author experience.
+The public site should remain fast and static-first. Studio-authored articles are published as immutable Firestore snapshots rendered by Cloud Run at request time, while established source-owned pages remain in the existing Astro and Cloud Build path.
 
 ## Product principles
 
@@ -127,7 +127,21 @@ Use three plain author-facing states:
 
 ## Article editor
 
-### Required blocks for the first release
+### Publishing foundation release — AI-89
+
+AI-89 establishes cloud drafts, safe preview, deliberate publication and runtime delivery. Its bounded transition editor supports:
+
+- Title, paragraph, Heading 2 and Heading 3
+- Bold and italic
+- Validated HTTP, HTTPS and mailto links
+- Bulleted and numbered lists
+- Block quote and callout
+
+The transition editor remains intentionally small so the cloud publication seam can ship without coupling it to an editor-framework migration. Server sanitization is authoritative; client HTML is never trusted as publication output.
+
+### Professional structured editor — AI-91
+
+[AI-91](https://linear.app/ai-spanda/issue/AI-91/build-a-professional-tiptap-editor-for-content-studio) replaces the transition editor with a governed Tiptap implementation. Its required blocks and controls are:
 
 - Title
 - Paragraph
@@ -141,6 +155,8 @@ Use three plain author-facing states:
 - Image with upload, alt text, caption and optional credit
 - Table with an accessible header row
 - Embed/bookmark with a safe URL allowlist
+
+It also adds undo/redo, nested-list indent/outdent, accessible toolbar state and semantic typography presets. Font family, point size, arbitrary colour, highlight, underline and strike are excluded from the initial professional editor: authors choose meaning while the publication theme owns presentation. A semantic mark or correction treatment may be added later only when an evidenced editorial need and accessibility design exist.
 
 ### Later blocks
 
@@ -399,8 +415,8 @@ The preview and publish pipeline must run the same content-boundary checks used 
 ### Preserve the public site
 
 - Keep the existing Astro static output, Nginx container and Cloud Run deployment.
-- Keep published articles as Markdown in `src/content/insights` for the first phase.
-- Keep the existing build validation and Cloud Build release path as the final publication gate.
+- Keep established source-owned pages and their build validation in the existing Cloud Build release path.
+- Treat Studio-authored article slugs as the bounded dynamic exception: Cloud Run renders a validated immutable Firestore publication snapshot when no static route owns the path.
 
 ### Add a separate private studio
 
@@ -414,22 +430,21 @@ Recommended components:
 | Authorization | Private access/role records, Firestore security rules and Cloud Run role checks | Supports multiple roles without trusting browser visibility or exposing the allowlist in public code. |
 | Drafts and revisions | Firestore | Autosave, revision metadata and structured editor JSON without changing the public renderer. |
 | Media | Google Cloud Storage with signed uploads | Durable originals, controlled writes and future image processing. |
-| Publish API | Small Cloud Run service | Verifies identity, validates content, creates releases and reports deployment state. |
-| Repository write | GitHub App scoped to the content paths | Preserves reviewable Markdown history without storing a personal access token in the browser. |
-| Release | Existing Cloud Build pipeline | Reuses the current validated deployment mechanism. |
+| Publish API | Small Cloud Run service | Verifies identity and role, rejects stale or conflicting work, sanitizes content, creates an immutable release and returns the live URL. |
+| Article release | Firestore publication snapshot plus Cloud Run renderer | Makes a reviewed article live immediately without repository or deployment credentials in the authoring path. |
+| Platform release | Existing Cloud Build pipeline | Keeps application-code changes on the reviewed deployment mechanism. |
 | Observability | Structured audit log plus Cloud Logging | Records actor, action, revision, release and failure reason. |
 
-The canonical draft should be versioned editor JSON. Publishing converts it deterministically to Markdown, validates it, commits it and records the resulting commit and deployment status. A tested Markdown-to-editor converter keeps the existing authoring route reversible.
+The canonical draft is versioned editor data in Firestore. Publishing validates and sanitizes that cloud draft, creates an immutable release snapshot, updates the canonical public-slug pointer and records the release ID, live URL and audit event. Platform source remains Git-controlled, but article publication never writes the repository.
 
-### Future instant-publication option
+### Instant-publication boundary
 
-If build latency becomes unacceptable, move selected content routes to an API-backed or on-demand renderer. Do not do this in the first release: it changes caching, availability, security and rollback behavior and removes the current static publication gate.
+Only Studio-authored article slugs use the on-demand renderer. Static files win route resolution, reserved slugs cannot be claimed, HTML is sanitized on the server, published snapshots are immutable, and unpublish removes only the public pointer while preserving the draft and release history.
 
 ## Security and operational requirements
 
 - No OAuth credentials, repository tokens or service-account keys in browser code.
 - Verify identity tokens and role authorization on every mutation.
-- Restrict the repository integration to required branches and content paths.
 - Sanitize rendered HTML and embeds; disable arbitrary scripts in author content.
 - Use signed, size-limited media uploads and validate MIME type.
 - Log sign-in, draft checkpoint, publish, unpublish, rollback, permission and destructive actions.
@@ -442,12 +457,12 @@ If build latency becomes unacceptable, move selected content routes to an API-ba
 
 | Stage | Scope | Indicative effort for one experienced engineer |
 |---|---|---|
-| Technical spike | Auth, one editor document, Markdown round-trip, preview and one non-production publish path | 2-3 days |
-| Blog MVP | Single owner, content list, editor, autosave, preview, draft/revisions, media, SEO basics, Git-backed publish and status | 10-15 focused engineering days |
+| Technical spike | Auth, one cloud editor document, preview and one non-production runtime publish path | 2-3 days |
+| Blog MVP | Single owner, content list, cloud autosave, preview, draft/revisions, media, SEO basics, immutable runtime publish and status | 10-15 focused engineering days |
 | Production hardening | Conflict handling, rollback, audit, accessibility, failure recovery, security review and operational runbook | 5-10 days |
 | Books phase | Hierarchy, reordering, manuscript navigation, cross-chapter tools and export pipeline | 4-8 additional weeks |
 
-These are planning ranges, not commitments. The largest uncertainty is lossless conversion between structured editor content and the current Markdown/rendering conventions.
+These are planning ranges, not commitments. The largest uncertainty is preserving preview/public rendering parity while keeping the author HTML allowlist narrow and safe.
 
 ## Preparation checklist
 
@@ -455,10 +470,9 @@ These are planning ranges, not commitments. The largest uncertainty is lossless 
 - Keep the initial Studio at the protected `/studio` route; reassess a separate application only if scale or release independence requires it.
 - Create development and production Google/Firebase projects.
 - Register OAuth origins and redirect URLs.
-- Define the editor block schema and Markdown conversion contract.
-- Build round-trip fixtures from the existing long-form article, including links, headings, quotes, tables and Unicode text.
+- Define the editor block schema and server-side publication allowlist.
+- Build publication fixtures from the existing long-form article, including links, headings, quotes, tables and Unicode text.
 - Define media limits, image variants, alt-text policy and retention.
-- Create the restricted repository integration and non-production publish branch.
 - Define preview-link lifetime and sharing policy.
 - Specify release-state UI and failure messages.
 - Create acceptance tests for autosave, concurrent edits, preview parity, publish, failed publish and rollback.
@@ -466,6 +480,6 @@ These are planning ranges, not commitments. The largest uncertainty is lossless 
 
 ## MVP cut line
 
-The first production release is complete when the authorized owner can sign in with Google, open the existing article, edit it in structured rich text, see `Saved`, preview the exact desktop/mobile public rendering, save a revision as draft, publish through final review, receive a live URL after successful deployment and recover the unchanged draft after a simulated publish failure.
+The first production release is complete when the authorized owner can sign in with Google, open an article, edit it in structured rich text, see `Saved`, preview the desktop/mobile public rendering, save a revision as a cloud draft, publish through final review, receive an immediately readable live URL and recover the unchanged cloud draft after a simulated publish failure.
 
-Books, collaboration, comments, Community Groups and Discussions, Events, Learning paths, newsletters, paid membership, arbitrary HTML, site-wide theme editing and instant database-backed publication are explicitly outside that first cut.
+Books, collaborative editing, Community Groups and Discussions, Events, Learning paths, newsletters, paid membership, arbitrary HTML and site-wide theme editing remain outside that first cut.

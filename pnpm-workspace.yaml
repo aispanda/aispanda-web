@@ -2,5 +2,6 @@ allowBuilds:
   '@firebase/util': true
   esbuild: true
   protobufjs: true
+  re2: false
 minimumReleaseAgeExclude:
   - astro@7.2.0

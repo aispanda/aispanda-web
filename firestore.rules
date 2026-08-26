@@ -177,7 +177,8 @@ service cloud.firestore {
     function validDraft() {
       return request.resource.data.keys().hasOnly([
           'title', 'body', 'excerpt', 'slug', 'tags', 'publicationStatus',
-          'updatedAt', 'revisions', 'ownerUid', 'ownerEmail'
+          'updatedAt', 'revisions', 'ownerUid', 'ownerEmail',
+          'publicationReleaseId', 'publicationLiveUrl'
         ])
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 300
@@ -196,7 +197,9 @@ service cloud.firestore {
         && request.resource.data.revisions is list
         && request.resource.data.revisions.size() <= 20
         && request.resource.data.ownerUid is string
-        && request.resource.data.ownerEmail is string;
+        && request.resource.data.ownerEmail is string
+        && request.resource.data.get('publicationReleaseId', '') is string
+        && request.resource.data.get('publicationLiveUrl', '') is string;
     }
 
     function validProfile(uid) {
@@ -342,14 +345,48 @@ service cloud.firestore {
         || (isAuthor() && resource.data.ownerUid == request.auth.uid);
       allow create: if validDraft()
         && (isAdministrator() || isPublisher()
-          || (isAuthor() && request.resource.data.ownerUid == request.auth.uid));
+          || (isAuthor() && request.resource.data.ownerUid == request.auth.uid))
+        && request.resource.data.publicationStatus == 'draft'
+        && request.resource.data.get('publicationReleaseId', '') == ''
+        && request.resource.data.get('publicationLiveUrl', '') == '';
       allow update: if validDraft()
+        && resource.data.get('archivedAt', '') == ''
         && (isAdministrator() || isPublisher()
           || (isAuthor()
             && resource.data.ownerUid == request.auth.uid
-            && request.resource.data.ownerUid == request.auth.uid));
-      allow delete: if isAdministrator() || isPublisher()
-        || (isAuthor() && resource.data.ownerUid == request.auth.uid);
+            && request.resource.data.ownerUid == request.auth.uid))
+        && request.resource.data.get('publicationReleaseId', '')
+          == resource.data.get('publicationReleaseId', '')
+        && request.resource.data.get('publicationLiveUrl', '')
+          == resource.data.get('publicationLiveUrl', '')
+        && (
+          request.resource.data.publicationStatus == resource.data.publicationStatus
+          || (
+            resource.data.publicationStatus == 'published'
+            && request.resource.data.publicationStatus == 'published-with-changes'
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /publishedContent/{slug} {
+      allow read, write: if false;
+    }
+
+    match /contentPublicationIndex/{draftId} {
+      allow read, write: if false;
+    }
+
+    match /contentPublicationRequests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /contentReleases/{releaseId} {
+      allow read, write: if false;
+    }
+
+    match /contentAuditEvents/{eventId} {
+      allow read, write: if false;
     }
 
     match /publishedContent/{slug}/comments/{commentId} {
