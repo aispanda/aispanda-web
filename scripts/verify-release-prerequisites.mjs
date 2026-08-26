@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { validateRuntimePrerequisites } from './release-preflight-core.mjs';
+import { firebaseManagementHeaders, validateRuntimePrerequisites } from './release-preflight-core.mjs';
+import { spawnGcloudSync } from './gcloud-process.mjs';
 
 const expectedEnvironment = process.argv[2];
 if (!['staging', 'production'].includes(expectedEnvironment)) throw new Error('Expected staging or production argument.');
@@ -14,7 +14,7 @@ const region = required('TARGET_REGION');
 const expectedRuntimeIdentity = required(
   expectedEnvironment === 'staging' ? 'STAGING_RUNTIME_IDENTITY' : 'PRODUCTION_RUNTIME_IDENTITY',
 );
-const described = spawnSync('gcloud', [
+const described = spawnGcloudSync([
   'run', 'services', 'describe', service, '--project', project, '--region', region, '--format=json',
 ], { encoding: 'utf8' });
 if (described.status !== 0) throw new Error('Cloud Run prerequisite query failed.');
@@ -25,14 +25,16 @@ const firebaseAppId = runtimeEnvironment.get('RUNTIME_FIREBASE_APP_ID')?.value;
 if (typeof firebaseAppId !== 'string' || firebaseAppId.trim().length === 0) {
   throw new Error('RUNTIME_FIREBASE_APP_ID is missing from the Cloud Run runtime profile.');
 }
-const token = spawnSync('gcloud', ['auth', 'print-access-token'], { encoding: 'utf8' });
+const token = spawnGcloudSync(['auth', 'print-access-token'], { encoding: 'utf8' });
 if (token.status !== 0 || token.stdout.trim().length === 0) {
   throw new Error('Firebase configuration verification could not obtain a read-only access token.');
 }
 const configResponse = await fetch(
+  // The URL selects the Firebase resource project. The header below only
+  // attributes quota/billing to that already-selected target project.
   `https://firebase.googleapis.com/v1beta1/projects/${encodeURIComponent(project)}/webApps/${encodeURIComponent(firebaseAppId)}/config`,
   {
-    headers: { Authorization: `Bearer ${token.stdout.trim()}` },
+    headers: firebaseManagementHeaders(token.stdout, project),
     signal: AbortSignal.timeout(15_000),
   },
 );
@@ -46,7 +48,7 @@ validateRuntimePrerequisites({
   authoritativeFirebaseConfig,
 });
 
-const database = spawnSync('gcloud', [
+const database = spawnGcloudSync([
   'firestore', 'databases', 'describe', '--database=(default)', '--project', project, '--format=json',
 ], { encoding: 'utf8' });
 if (database.status !== 0) throw new Error('The target default Firestore database is missing or inaccessible.');

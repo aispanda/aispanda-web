@@ -76,6 +76,19 @@ export const validateEffectiveDenials = (checks) => {
   }
 };
 
+export const firebaseManagementHeaders = (accessToken, project) => {
+  if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
+    throw new Error('Firebase Management access token is required.');
+  }
+  if (typeof project !== 'string' || project.trim().length === 0) {
+    throw new Error('Firebase Management quota project is required.');
+  }
+  return {
+    Authorization: `Bearer ${accessToken.trim()}`,
+    'x-goog-user-project': project.trim(),
+  };
+};
+
 const environmentMap = (service) => {
   const containers = service?.spec?.template?.spec?.containers;
   if (!Array.isArray(containers) || containers.length !== 1) throw new Error('Cloud Run service must have one container.');

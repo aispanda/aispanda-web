@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
 import { validateEffectiveDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
+import { spawnGcloudSync } from './gcloud-process.mjs';
 
 const required = (name) => {
   const result = String(process.env[name] ?? '').trim();
@@ -7,7 +7,7 @@ const required = (name) => {
   return result;
 };
 const gcloudJson = (args) => {
-  const result = spawnSync('gcloud', [...args, '--format=json'], { encoding: 'utf8' });
+  const result = spawnGcloudSync([...args, '--format=json'], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`Read-only gcloud query failed: gcloud ${args.slice(0, 3).join(' ')}`);
   return JSON.parse(result.stdout);
 };
@@ -106,7 +106,7 @@ const crossBoundaryPairs = [
   [productionRuntimeIdentity, stagingTarget],
 ];
 const effectiveChecks = crossBoundaryPairs.flatMap(([principal, target]) => targetResources(target).map(({ permission, resource }) => {
-  const result = spawnSync('gcloud', [
+  const result = spawnGcloudSync([
     'policy-intelligence', 'troubleshoot-policy', 'iam',
     resource,
     `--principal-email=${principal}`,
