@@ -3,9 +3,11 @@ import test from 'node:test';
 import { requireSuccessfulGcloud, resolveGcloudInvocation, spawnGcloudSync } from '../scripts/gcloud-process.mjs';
 import {
   firebaseManagementHeaders,
+  policyTroubleshooterAccess,
   policyTroubleshooterArgs,
   releaseProjectListsBucket,
   validateEffectiveDenials,
+  validatePinnedSecretDenials,
   validateReleaseIsolation,
   validateRuntimePrerequisites,
 } from '../scripts/release-preflight-core.mjs';
@@ -90,8 +92,14 @@ test('Policy Troubleshooter explicitly bills only the dedicated release project'
     '--principal-email=build@example.invalid',
     '--permission=run.services.update',
     '--billing-project=release-project',
-    '--format=value(access)',
+    '--format=json',
   ]);
+});
+
+test('Policy Troubleshooter accepts only a known overall access state', () => {
+  assert.equal(policyTroubleshooterAccess('{"overallAccessState":"CANNOT_ACCESS"}'), 'CANNOT_ACCESS');
+  assert.throws(() => policyTroubleshooterAccess('{"overallAccessState":"MAYBE"}'), /unknown overall access state/);
+  assert.throws(() => policyTroubleshooterAccess('not-json'), /invalid JSON/);
 });
 
 test('release isolation accepts only artifact/log build duties and no staging-to-production role', () => {
@@ -146,6 +154,12 @@ test('effective IAM isolation fails closed on inherited or group-derived access'
     permission: 'datastore.entities.get',
     access: 'GRANTED',
   }]), /Effective IAM isolation failed/);
+});
+
+test('pinned secret policy rejects cross-environment and broad direct access', () => {
+  assert.throws(() => validatePinnedSecretDenials({ bindings: [binding('roles/secretmanager.secretAccessor', 'build@example.invalid')] }, ['build@example.invalid'], 'stage/vault'), /outside its environment/);
+  assert.throws(() => validatePinnedSecretDenials({ bindings: [{ role: 'roles/secretmanager.secretAccessor', members: ['allAuthenticatedUsers'] }] }, ['build@example.invalid'], 'stage/vault'), /outside its environment/);
+  validatePinnedSecretDenials({ bindings: [binding('roles/secretmanager.secretAccessor', 'stage@example.invalid')] }, ['build@example.invalid'], 'stage/vault');
 });
 
 const service = (environment, project, origin = 'https://stage.example.test', identity = 'stage@example.invalid') => ({

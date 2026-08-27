@@ -70,8 +70,54 @@ export const validateReleaseIsolation = ({
 export const validateEffectiveDenials = (checks) => {
   if (!Array.isArray(checks) || checks.length === 0) throw new Error('Effective IAM checks are required.');
   for (const check of checks) {
-    if (check.access !== 'DENIED') {
+    if (check.access !== 'CANNOT_ACCESS') {
       throw new Error(`Effective IAM isolation failed: ${check.principal} has or may have ${check.permission} on ${check.project}.`);
+    }
+  }
+};
+
+export const policyTroubleshooterAccess = (output) => {
+  let result;
+  try {
+    result = JSON.parse(output);
+  } catch {
+    throw new Error('Policy Troubleshooter output is invalid JSON.');
+  }
+  const access = result?.overallAccessState;
+  if (!['CANNOT_ACCESS', 'CAN_ACCESS', 'UNKNOWN_INFO'].includes(access)) {
+    throw new Error('Policy Troubleshooter returned an unknown overall access state.');
+  }
+  return access;
+};
+
+export const validatePinnedSecretDenials = (policy, forbiddenServiceAccounts, label) => {
+  if (!policy || typeof policy !== 'object' || !Array.isArray(policy.bindings)) {
+    throw new Error(`${label} direct IAM policy is invalid.`);
+  }
+  if (!Array.isArray(forbiddenServiceAccounts) || forbiddenServiceAccounts.some((account) => typeof account !== 'string' || !account)) {
+    throw new Error(`${label} forbidden service accounts are invalid.`);
+  }
+  const forbidden = new Set([
+    ...forbiddenServiceAccounts.map(member),
+    'allUsers',
+    'allAuthenticatedUsers',
+  ]);
+  const secretAccessRoles = new Set([
+    'roles/secretmanager.secretAccessor',
+    'roles/secretmanager.admin',
+    'roles/editor',
+    'roles/owner',
+  ]);
+  for (const binding of policy.bindings) {
+    if (!binding || typeof binding.role !== 'string' || !Array.isArray(binding.members)) {
+      throw new Error(`${label} direct IAM binding is invalid.`);
+    }
+    const customRole = binding.role.startsWith('projects/') || binding.role.startsWith('organizations/');
+    if (!secretAccessRoles.has(binding.role) && !customRole) continue;
+    for (const memberName of binding.members) {
+      if (forbidden.has(memberName) || memberName.startsWith('group:') || memberName.startsWith('domain:') || customRole) {
+        throw new Error(`${label} direct IAM policy may grant secret access outside its environment: ${memberName}.`);
+      }
     }
   }
 };
@@ -92,7 +138,7 @@ export const policyTroubleshooterArgs = ({ resource, principalEmail, permission,
     `--principal-email=${principalEmail}`,
     `--permission=${permission}`,
     `--billing-project=${billingProject}`,
-    '--format=value(access)',
+    '--format=json',
   ];
 };
 

@@ -1,4 +1,4 @@
-import { policyTroubleshooterArgs, releaseProjectListsBucket, validateEffectiveDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
+import { policyTroubleshooterAccess, policyTroubleshooterArgs, releaseProjectListsBucket, validateEffectiveDenials, validatePinnedSecretDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
 import { spawnGcloudSync } from './gcloud-process.mjs';
 
 const required = (name) => {
@@ -47,7 +47,7 @@ validateReleaseIsolation({
 const cloudRunService = (project, service) => gcloudJson([
   'run', 'services', 'describe', service, '--project', project, '--region', region,
 ]);
-const secretVersionResource = (project, serviceDocument) => {
+const pinnedSecret = (project, serviceDocument) => {
   const containers = serviceDocument?.spec?.template?.spec?.containers;
   const environment = new Map((containers?.[0]?.env ?? []).map((entry) => [entry.name, entry]));
   const reference = environment.get('AI_VAULT_KEY_B64')?.valueFrom?.secretKeyRef;
@@ -56,12 +56,13 @@ const secretVersionResource = (project, serviceDocument) => {
   if (!/^[A-Za-z0-9_-]+$/.test(name) || !/^(latest|[1-9][0-9]*)$/.test(version)) {
     throw new Error(`AI_VAULT_KEY_B64 must reference a secret owned by ${project}.`);
   }
-  return `//secretmanager.googleapis.com/projects/${project}/secrets/${name}/versions/${version}`;
+  return { name, version };
 };
-const targetResources = ({ project, service, runtimeIdentity, document }) => [
+const projectResource = (project) => `//cloudresourcemanager.googleapis.com/projects/${project}`;
+const targetResources = ({ project, service, runtimeIdentity }) => [
   {
     permission: 'resourcemanager.projects.setIamPolicy',
-    resource: `//cloudresourcemanager.googleapis.com/projects/${project}`,
+    resource: projectResource(project),
   },
   {
     permission: 'iam.serviceAccounts.actAs',
@@ -73,15 +74,15 @@ const targetResources = ({ project, service, runtimeIdentity, document }) => [
   },
   {
     permission: 'datastore.entities.get',
-    resource: `//firestore.googleapis.com/projects/${project}/databases/(default)`,
+    resource: projectResource(project),
   },
   {
     permission: 'datastore.entities.create',
-    resource: `//firestore.googleapis.com/projects/${project}/databases/(default)`,
+    resource: projectResource(project),
   },
   {
     permission: 'secretmanager.versions.access',
-    resource: secretVersionResource(project, document),
+    resource: projectResource(project),
   },
 ];
 const stagingTarget = {
@@ -110,7 +111,18 @@ const effectiveChecks = crossBoundaryPairs.flatMap(([principal, target]) => targ
     billingProject: releaseProject,
   }), { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`Effective IAM query failed for ${principal} on ${target.project}.`);
-  return { principal, project: target.project, permission, access: result.stdout.trim() };
+  return { principal, project: target.project, permission, access: policyTroubleshooterAccess(result.stdout) };
 }));
 validateEffectiveDenials(effectiveChecks);
+for (const [target, forbiddenServiceAccounts] of [
+  [stagingTarget, [buildServiceAccount, productionRuntimeIdentity]],
+  [productionTarget, [buildServiceAccount, stagingRuntimeIdentity]],
+]) {
+  const secret = pinnedSecret(target.project, target.document);
+  validatePinnedSecretDenials(
+    gcloudJson(['secrets', 'get-iam-policy', secret.name, '--project', target.project]),
+    forbiddenServiceAccounts,
+    `${target.project}/${secret.name}`,
+  );
+}
 console.log('PASS: direct and effective IAM checks keep build, staging runtime and production duties separated.');
