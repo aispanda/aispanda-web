@@ -1168,3 +1168,13 @@ test('Studio cloud contract prevents local article storage and all direct browse
   assert.match(server, /SITE_ORIGIN/);
   assert.match(insights, /AISPANDA_DYNAMIC_INSIGHTS/);
 });
+
+test('production image packages and verifies the shared Studio schema', async () => {
+  const dockerfile = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
+  const schemaCopy = 'COPY --from=build /app/src/scripts/studio-tiptap-schema.mjs ./src/scripts/studio-tiptap-schema.mjs';
+  const importCheck = 'RUN node --input-type=module --eval "await import(\'./server/studio-content-document.mjs\')"';
+
+  assert.equal(dockerfile.includes(schemaCopy), true);
+  assert.equal(dockerfile.includes(importCheck), true);
+  assert.ok(dockerfile.indexOf(schemaCopy) < dockerfile.indexOf(importCheck));
+});
