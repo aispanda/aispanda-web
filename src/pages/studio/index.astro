@@ -175,42 +175,76 @@ const { Content } = await render(entry);
 
           <div class="studio-actions" data-editor-actions>
             <button class="studio-button studio-button-secondary" type="button" data-open-ai>AI assist</button>
+            <button class="studio-button studio-button-secondary" type="button" data-migrate-draft hidden>Convert to professional editor</button>
+            <button class="studio-button studio-button-secondary" type="button" data-save-draft>Save checkpoint</button>
             <button class="studio-button studio-button-secondary" type="button" data-preview>Preview</button>
-            <details class="studio-save-menu" data-save-menu>
-              <summary class="studio-button">Save <span aria-hidden="true">⌄</span></summary>
-              <div class="studio-save-options">
-                <button type="button" data-save-draft>
-                  <strong>Save as draft</strong>
-                  <span>Create a revision checkpoint</span>
-                </button>
-                <button type="button" data-open-publish>
-                  <strong>Publish</strong>
-                  <span>Review before publishing</span>
-                </button>
-              </div>
-            </details>
+            <button class="studio-button" type="button" data-open-publish>Publish</button>
           </div>
         </header>
 
         <div class="studio-grid" data-editor-workspace>
           <section class="studio-editor-column" aria-label="Article editor">
-            <div class="studio-toolbar" role="toolbar" aria-label="Text formatting">
-              <button type="button" data-command="bold" title="Bold"><strong>B</strong></button>
-              <button type="button" data-command="italic" title="Italic"><em>I</em></button>
-              <span aria-hidden="true"></span>
-              <button type="button" data-block="h2">H2</button>
-              <button type="button" data-block="h3">H3</button>
-              <button type="button" data-block="blockquote" title="Quote">Quote</button>
-              <button type="button" data-command="insertUnorderedList" title="Bulleted list">• List</button>
-              <button type="button" data-command="insertOrderedList" title="Numbered list">1. List</button>
-              <button type="button" data-link title="Add link">Link</button>
-              <button type="button" data-callout title="Insert callout">Callout</button>
+            <div class="studio-toolbar" role="toolbar" aria-label="Article formatting" aria-controls="studio-article-body" data-toolbar>
+              <label class="studio-toolbar-style">
+                <span>Style</span>
+                <select data-text-style data-toolbar-roving aria-label="Text style" title="Choose paragraph or heading style">
+                  <option value="paragraph">Paragraph</option>
+                  <option value="h2">Heading 2</option>
+                  <option value="h3">Heading 3</option>
+                </select>
+              </label>
+
+              <button type="button" data-editor-action="bold" data-toolbar-roving aria-label="Bold" aria-keyshortcuts="Control+B Meta+B" aria-pressed="false" title="Bold (Ctrl or Cmd + B)"><strong aria-hidden="true">B</strong></button>
+              <button type="button" data-editor-action="italic" data-toolbar-roving aria-label="Italic" aria-keyshortcuts="Control+I Meta+I" aria-pressed="false" title="Italic (Ctrl or Cmd + I)"><em aria-hidden="true">I</em></button>
+              <button class="studio-toolbar-primary-link" type="button" data-editor-action="link" data-toolbar-roving aria-label="Add or edit link" aria-keyshortcuts="Control+K Meta+K" aria-pressed="false" title="Add or edit link (Ctrl or Cmd + K)"><span aria-hidden="true">↗</span><span class="studio-toolbar-label">Link</span></button>
+
+              <span class="studio-toolbar-separator studio-toolbar-wide" aria-hidden="true"></span>
+              <button class="studio-toolbar-wide" type="button" data-editor-action="bulletList" data-toolbar-roving aria-label="Bulleted list" aria-pressed="false" title="Bulleted list"><span aria-hidden="true">•</span><span>Bullets</span></button>
+              <button class="studio-toolbar-wide" type="button" data-editor-action="orderedList" data-toolbar-roving aria-label="Numbered list" aria-pressed="false" title="Numbered list"><span aria-hidden="true">1.</span><span>Numbering</span></button>
+              <button class="studio-toolbar-wide studio-toolbar-icon-only" type="button" data-editor-action="liftListItem" data-toolbar-roving aria-label="Decrease list indent" title="Decrease list indent"><span aria-hidden="true">⇤</span></button>
+              <button class="studio-toolbar-wide studio-toolbar-icon-only" type="button" data-editor-action="sinkListItem" data-toolbar-roving aria-label="Increase list indent" title="Increase list indent"><span aria-hidden="true">⇥</span></button>
+              <button class="studio-toolbar-wide" type="button" data-editor-action="blockquote" data-toolbar-roving aria-label="Quote" aria-pressed="false" title="Quote"><span aria-hidden="true">“</span><span>Quote</span></button>
+
+              <details class="studio-toolbar-menu studio-toolbar-wide" data-toolbar-menu>
+                <summary data-toolbar-roving aria-label="Insert content" title="Insert content"><span aria-hidden="true">＋</span><span>Insert</span></summary>
+                <div class="studio-toolbar-menu-items">
+                  <button type="button" data-editor-action="image"><span aria-hidden="true">▧</span><span><strong>Image</strong><small>Upload with alt text</small></span></button>
+                  <button type="button" data-editor-action="callout"><span aria-hidden="true">▣</span><span><strong>Callout</strong><small>Highlighted note</small></span></button>
+                  <button type="button" data-editor-action="horizontalRule"><span aria-hidden="true">―</span><span><strong>Divider</strong><small>Section break</small></span></button>
+                </div>
+              </details>
+
+              <span class="studio-toolbar-separator studio-toolbar-wide" aria-hidden="true"></span>
+              <button class="studio-toolbar-wide studio-toolbar-icon-only" type="button" data-editor-action="undo" data-toolbar-roving aria-label="Undo" aria-keyshortcuts="Control+Z Meta+Z" title="Undo (Ctrl or Cmd + Z)"><span aria-hidden="true">↶</span></button>
+              <button class="studio-toolbar-wide studio-toolbar-icon-only" type="button" data-editor-action="redo" data-toolbar-roving aria-label="Redo" title="Redo"><span aria-hidden="true">↷</span></button>
+
+              <details class="studio-toolbar-menu studio-toolbar-more" data-toolbar-menu>
+                <summary data-toolbar-roving aria-label="More formatting options" title="More formatting options"><span aria-hidden="true">•••</span><span class="studio-toolbar-more-label">More</span></summary>
+                <div class="studio-toolbar-menu-items">
+                  <button type="button" data-editor-action="bulletList" aria-pressed="false"><span aria-hidden="true">•</span><span>Bulleted list</span></button>
+                  <button type="button" data-editor-action="orderedList" aria-pressed="false"><span aria-hidden="true">1.</span><span>Numbered list</span></button>
+                  <button type="button" data-editor-action="liftListItem"><span aria-hidden="true">⇤</span><span>Decrease list indent</span></button>
+                  <button type="button" data-editor-action="sinkListItem"><span aria-hidden="true">⇥</span><span>Increase list indent</span></button>
+                  <button type="button" data-editor-action="blockquote" aria-pressed="false"><span aria-hidden="true">“</span><span>Quote</span></button>
+                  <button type="button" data-editor-action="image"><span aria-hidden="true">▧</span><span>Insert image</span></button>
+                  <button type="button" data-editor-action="callout"><span aria-hidden="true">▣</span><span>Insert callout</span></button>
+                  <button type="button" data-editor-action="horizontalRule"><span aria-hidden="true">―</span><span>Insert divider</span></button>
+                  <button type="button" data-editor-action="undo"><span aria-hidden="true">↶</span><span>Undo</span></button>
+                  <button type="button" data-editor-action="redo"><span aria-hidden="true">↷</span><span>Redo</span></button>
+                </div>
+              </details>
+            </div>
+
+            <div class="studio-image-context" role="group" aria-label="Selected image" data-image-tools hidden>
+              <strong>Image selected</strong>
+              <button type="button" data-edit-image>Edit or replace</button>
+              <button type="button" data-remove-image>Remove</button>
             </div>
 
             <article class="studio-paper">
               <textarea class="studio-title" rows="2" aria-label="Article title" data-title>{entry.data.title}</textarea>
               <p class="studio-byline">Incentive design <span>·</span> <span data-read-time>{entry.data.readTime}</span></p>
-              <div class="studio-prose insight-prose" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Article body" data-editor>
+              <div id="studio-article-body" class="studio-prose insight-prose" data-editor>
                 <Content />
               </div>
             </article>
@@ -301,7 +335,7 @@ const { Content } = await render(entry);
         </div>
       </div>
       <div class="studio-preview-stage">
-        <iframe class="studio-preview-frame" data-preview-frame title="Production-style article preview" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+        <iframe class="studio-preview-frame" data-preview-frame title="Production-style article preview" sandbox referrerpolicy="no-referrer"></iframe>
       </div>
     </dialog>
 
@@ -325,10 +359,75 @@ const { Content } = await render(entry);
         <p class="studio-publication-warning">
           Publishing creates a permanent release and makes this URL public immediately. Future edits remain private until you publish again.
         </p>
+        <p class="studio-publication-readiness" role="status" data-publish-readiness></p>
+        <div class="studio-publication-error" role="alert" tabindex="-1" data-publish-error hidden>
+          <p></p>
+          <button class="studio-button studio-button-secondary" type="button" data-publication-fix></button>
+        </div>
 
         <div class="studio-publish-actions">
           <button class="studio-button studio-button-secondary" value="cancel">Back to editing</button>
           <button class="studio-button" type="button" data-publish>Publish to AI Spanda</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="studio-dialog studio-link-dialog" data-link-dialog aria-labelledby="studio-link-title">
+      <form data-link-form>
+        <div class="studio-dialog-header">
+          <div>
+            <p class="studio-kicker">Text link</p>
+            <h2 id="studio-link-title">Add or edit link</h2>
+          </div>
+          <button class="studio-icon-button" type="button" data-close-link aria-label="Close link editor">×</button>
+        </div>
+        <div class="studio-link-content">
+          <label>
+            <span>Web or email address</span>
+            <input type="text" inputmode="url" autocomplete="url" placeholder="https://example.com" data-link-url />
+          </label>
+          <p>Use a complete web address, email link, or a domain such as example.com. Unsafe link types are blocked.</p>
+        </div>
+        <div class="studio-link-actions">
+          <button class="studio-button studio-button-secondary" type="button" data-remove-link hidden>Remove link</button>
+          <span></span>
+          <button class="studio-button studio-button-secondary" type="button" data-close-link>Cancel</button>
+          <button class="studio-button" type="submit">Apply link</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="studio-dialog studio-image-dialog" data-image-dialog aria-labelledby="studio-image-title">
+      <form data-image-form>
+        <div class="studio-dialog-header">
+          <div>
+            <p class="studio-kicker">Article image</p>
+            <h2 id="studio-image-title" data-image-dialog-title>Insert image</h2>
+          </div>
+          <button class="studio-icon-button" type="button" data-close-image aria-label="Close image editor">×</button>
+        </div>
+        <div class="studio-image-content">
+          <label>
+            <span>Image file <small>PNG, JPEG, or WebP · maximum 5 MB</small></span>
+            <input type="file" accept="image/png,image/jpeg,image/webp" data-image-file />
+          </label>
+          <label>
+            <span>Alternative text</span>
+            <input type="text" maxlength="500" placeholder="Describe what the image communicates" data-image-alt />
+          </label>
+          <label class="studio-image-decorative">
+            <input type="checkbox" data-image-decorative />
+            <span><strong>This image is decorative</strong><small>Screen readers will skip it. Use only when the image adds no information.</small></span>
+          </label>
+          <label>
+            <span>Caption <small>Optional</small></span>
+            <textarea rows="3" maxlength="1000" placeholder="Context shown below the image" data-image-caption></textarea>
+          </label>
+          <p class="studio-image-status" role="status" aria-live="polite" data-image-status></p>
+        </div>
+        <div class="studio-image-actions">
+          <button class="studio-button studio-button-secondary" type="button" data-close-image>Cancel</button>
+          <button class="studio-button" type="submit" data-submit-image>Upload and insert</button>
         </div>
       </form>
     </dialog>
@@ -414,7 +513,17 @@ const { Content } = await render(entry);
     <div class="studio-toast" role="status" aria-live="polite" data-toast></div>
 
     <script>
+      import { Editor, type JSONContent } from '@tiptap/core';
       import { initializeStudioBackend, type RoleRequest, type StudioDraftRecord } from '@/scripts/studio-firebase';
+      import { configureStudioImageLoader, studioTiptapExtensions } from '@/scripts/studio-tiptap-schema.mjs';
+      import { createStudioImageOperationCoordinator } from '@/scripts/studio-image-operations.mjs';
+      import { captureStudioPreviewState, isStudioPreviewStateCurrent } from '@/scripts/studio-preview-operations.mjs';
+      import {
+        closeToolbarMenuAndFocusSummary,
+        evaluateStudioClipboardPaste,
+        evaluateStudioPasteHtml,
+        nextToolbarControlIndex,
+      } from '@/scripts/studio-toolbar-navigation.mjs';
       import {
         AiActiveConnectionManager,
         AiConnectorRegistry,
@@ -424,6 +533,7 @@ const { Content } = await render(entry);
       } from '@/scripts/ai-connections';
 
       const studioBackend = await initializeStudioBackend();
+      configureStudioImageLoader((assetId) => studioBackend.loadImage(assetId));
       const aiConnectors = new AiConnectorRegistry([
         createOpenRouterConnector({
           appName: 'AI Spanda Content Studio',
@@ -435,8 +545,10 @@ const { Content } = await render(entry);
       const aiConnectionManager = new AiActiveConnectionManager(aiConnectors);
       const openRouterConnector = aiConnectors.get('openrouter');
       const canPublish = studioBackend.role === 'administrator' || studioBackend.role === 'publisher';
-      const draftId = new URLSearchParams(window.location.search).get('draft') ?? 'open-the-ai';
-      const isNewDraft = draftId !== 'open-the-ai';
+      const requestedDraftId = new URLSearchParams(window.location.search).get('draft');
+      const draftId = requestedDraftId ?? 'open-the-ai';
+      const isLibraryLanding = requestedDraftId === null;
+      const isNewDraft = requestedDraftId !== null;
       const studio = document.querySelector<HTMLElement>('[data-studio]');
       const title = document.querySelector<HTMLTextAreaElement>('[data-title]');
       const editor = document.querySelector<HTMLElement>('[data-editor]');
@@ -463,16 +575,38 @@ const { Content } = await render(entry);
       const librarySummary = document.querySelector<HTMLElement>('[data-library-summary]');
       const topbarKicker = document.querySelector<HTMLElement>('[data-topbar-kicker]');
       const editorActions = document.querySelector<HTMLElement>('[data-editor-actions]');
+      const migrateDraftButton = document.querySelector<HTMLButtonElement>('[data-migrate-draft]');
       const revisionsList = document.querySelector<HTMLOListElement>('[data-revisions]');
-      const saveMenu = document.querySelector<HTMLDetailsElement>('[data-save-menu]');
       const previewDialog = document.querySelector<HTMLDialogElement>('[data-preview-dialog]');
       const publishDialog = document.querySelector<HTMLDialogElement>('[data-publish-dialog]');
+      const toolbar = document.querySelector<HTMLElement>('[data-toolbar]');
+      const textStyle = document.querySelector<HTMLSelectElement>('[data-text-style]');
+      const linkDialog = document.querySelector<HTMLDialogElement>('[data-link-dialog]');
+      const linkForm = document.querySelector<HTMLFormElement>('[data-link-form]');
+      const linkUrl = document.querySelector<HTMLInputElement>('[data-link-url]');
+      const removeLink = document.querySelector<HTMLButtonElement>('[data-remove-link]');
+      const imageDialog = document.querySelector<HTMLDialogElement>('[data-image-dialog]');
+      const imageForm = document.querySelector<HTMLFormElement>('[data-image-form]');
+      const imageFile = document.querySelector<HTMLInputElement>('[data-image-file]');
+      const imageAlt = document.querySelector<HTMLInputElement>('[data-image-alt]');
+      const imageDecorative = document.querySelector<HTMLInputElement>('[data-image-decorative]');
+      const imageCaption = document.querySelector<HTMLTextAreaElement>('[data-image-caption]');
+      const imageStatus = document.querySelector<HTMLElement>('[data-image-status]');
+      const imageDialogTitle = document.querySelector<HTMLElement>('[data-image-dialog-title]');
+      const submitImage = document.querySelector<HTMLButtonElement>('[data-submit-image]');
+      const imageTools = document.querySelector<HTMLElement>('[data-image-tools]');
+      const editImage = document.querySelector<HTMLButtonElement>('[data-edit-image]');
+      const removeImage = document.querySelector<HTMLButtonElement>('[data-remove-image]');
       const previewFrame = document.querySelector<HTMLIFrameElement>('[data-preview-frame]');
       const toast = document.querySelector<HTMLElement>('[data-toast]');
       const publicationReceipt = document.querySelector<HTMLElement>('[data-publication-receipt]');
       const publicationLive = document.querySelector<HTMLAnchorElement>('[data-publication-live]');
       const publicationRelease = document.querySelector<HTMLElement>('[data-publication-release]');
       const receiptUnpublish = document.querySelector<HTMLButtonElement>('[data-receipt-unpublish]');
+      const publishReadiness = document.querySelector<HTMLElement>('[data-publish-readiness]');
+      const publishError = document.querySelector<HTMLElement>('[data-publish-error]');
+      const publishErrorText = publishError?.querySelector<HTMLParagraphElement>('p');
+      const publicationFix = document.querySelector<HTMLButtonElement>('[data-publication-fix]');
       const manageAccess = document.querySelector<HTMLButtonElement>('[data-manage-access]');
       const accessDialog = document.querySelector<HTMLDialogElement>('[data-access-dialog]');
       const accessRequestList = document.querySelector<HTMLElement>('[data-access-request-list]');
@@ -488,14 +622,15 @@ const { Content } = await render(entry);
       const aiConnectionState = document.querySelector<HTMLElement>('[data-ai-connection-state]');
       const aiConnectionDetail = document.querySelector<HTMLElement>('[data-ai-connection-detail]');
 
-      if (!studio || !title || !editor || !excerpt || !slug || !tags || !saveState || !wordCount || !readTime || !slugPreview || !documentList || !listHeading || !allCount || !draftCount || !publishedCount || !unpublishedCount || !archivedCount || !editorWorkspace || !contentLibrary || !libraryList || !libraryTitle || !librarySummary || !topbarKicker || !editorActions || !revisionsList || !saveMenu || !previewDialog || !publishDialog || !previewFrame || !toast || !openAi || !aiDialog || !aiInstruction || !aiPreview || !aiSelectionScope || !aiFallback || !aiCopyOpen || !aiManualCopy || !aiConnectionState || !aiConnectionDetail) {
+      if (!studio || !title || !editor || !excerpt || !slug || !tags || !saveState || !wordCount || !readTime || !slugPreview || !documentList || !listHeading || !allCount || !draftCount || !publishedCount || !unpublishedCount || !archivedCount || !editorWorkspace || !contentLibrary || !libraryList || !libraryTitle || !librarySummary || !topbarKicker || !editorActions || !migrateDraftButton || !revisionsList || !previewDialog || !publishDialog || !publishReadiness || !publishError || !publishErrorText || !publicationFix || !toolbar || !textStyle || !linkDialog || !linkForm || !linkUrl || !removeLink || !imageDialog || !imageForm || !imageFile || !imageAlt || !imageDecorative || !imageCaption || !imageStatus || !imageDialogTitle || !submitImage || !imageTools || !editImage || !removeImage || !previewFrame || !toast || !openAi || !aiDialog || !aiInstruction || !aiPreview || !aiSelectionScope || !aiFallback || !aiCopyOpen || !aiManualCopy || !aiConnectionState || !aiConnectionDetail) {
         throw new Error('Content Studio failed to initialize');
       }
 
       type Revision = { savedAt: string; title: string };
       type DraftState = {
         title: string;
-        body: string;
+        body?: string;
+        content?: JSONContent;
         excerpt: string;
         slug: string;
         tags: string;
@@ -503,6 +638,10 @@ const { Content } = await render(entry);
         publicationReleaseId: string;
         publicationLiveUrl: string;
         updatedAt: string;
+        contentFormat: 'legacy' | 'tiptap-json';
+        revision: number;
+        contentSha256?: string;
+        sourceSha256?: string;
         archivedAt?: string;
         revisions: Revision[];
       };
@@ -525,11 +664,21 @@ const { Content } = await render(entry);
       let lastKnownUpdatedAt = '1970-01-01T00:00:00.000Z';
       let publicationReleaseId = '';
       let publicationLiveUrl = '';
+      let contentFormat: DraftState['contentFormat'] = 'tiptap-json';
+      let currentRevision = 0;
+      let currentContentSha256: string | undefined;
+      let currentSourceSha256: string | undefined;
+      let tiptapEditor: Editor | null = null;
       let publishIdempotencyKey = '';
+      let publicationPreviewReceiptId = '';
+      let lastPreviewError = '';
+      let publicationFixTarget: 'title' | 'slug' | 'preview' = 'preview';
       let editVersion = 0;
       let savedVersion = 0;
       let pendingCloudMutations = 0;
       let lastEditorSelection = '';
+      let editingImageAttrs: { assetId: string; alt: string; decorative: boolean; caption: string } | null = null;
+      const imageOperations = createStudioImageOperationCoordinator();
       const draftRecords = new Map<string, DraftState>();
 
       if (persistenceNote) {
@@ -557,7 +706,7 @@ const { Content } = await render(entry);
         return [
           `Title: ${title.value.trim() || 'Untitled article'}`,
           excerpt.value.trim() ? `Excerpt: ${excerpt.value.trim()}` : '',
-          `Article:\n${editor.innerText.trim()}`,
+          `Article:\n${(tiptapEditor?.getText() ?? editor.innerText).trim()}`,
         ].filter(Boolean).join('\n\n');
       };
 
@@ -755,14 +904,19 @@ const { Content } = await render(entry);
 
       const getState = (): DraftState => ({
         title: title.value.trim(),
-        body: editor.innerHTML,
+        body: contentFormat === 'legacy' ? editor.innerHTML : undefined,
+        content: contentFormat === 'tiptap-json' ? tiptapEditor?.getJSON() : undefined,
         excerpt: excerpt.value.trim(),
         slug: normalizeSlug(slug.value),
         tags: tags.value.trim(),
         publicationStatus,
         publicationReleaseId,
         publicationLiveUrl,
-        updatedAt: new Date().toISOString(),
+        updatedAt: lastKnownUpdatedAt,
+        contentFormat,
+        revision: currentRevision,
+        contentSha256: currentContentSha256,
+        sourceSha256: currentSourceSha256,
         revisions,
       });
 
@@ -780,18 +934,24 @@ const { Content } = await render(entry);
         item.publicationStatus === 'draft' || item.publicationStatus === 'published-with-changes';
 
       const parseDraftState = (value: Partial<DraftState> | StudioDraftRecord): DraftState | null => {
+        const parsedFormat: DraftState['contentFormat'] = value.contentFormat === 'legacy' ? 'legacy' : 'tiptap-json';
         if (
           typeof value.title !== 'string'
-          || typeof value.body !== 'string'
           || typeof value.excerpt !== 'string'
           || typeof value.slug !== 'string'
           || typeof value.tags !== 'string'
           || typeof value.updatedAt !== 'string'
           || !Array.isArray(value.revisions)
           || !['draft', 'published', 'published-with-changes', 'unpublished'].includes(String(value.publicationStatus))
+          || (parsedFormat === 'legacy' && typeof value.body !== 'string')
+          || (parsedFormat === 'tiptap-json' && (!value.content || typeof value.content !== 'object' || Array.isArray(value.content)))
         ) return null;
         return {
           ...(value as DraftState),
+          contentFormat: parsedFormat,
+          revision: Number.isInteger(value.revision) ? Number(value.revision) : 0,
+          contentSha256: typeof value.contentSha256 === 'string' ? value.contentSha256 : undefined,
+          sourceSha256: typeof value.sourceSha256 === 'string' ? value.sourceSha256 : undefined,
           publicationReleaseId: typeof value.publicationReleaseId === 'string' ? value.publicationReleaseId : '',
           publicationLiveUrl: typeof value.publicationLiveUrl === 'string' ? value.publicationLiveUrl : '',
           archivedAt: typeof value.archivedAt === 'string' ? value.archivedAt : undefined,
@@ -882,7 +1042,7 @@ const { Content } = await render(entry);
           card.className = 'studio-document';
           if (item.id === draftId) card.classList.add('is-active');
 
-          const editPath = item.id === 'open-the-ai' ? '/studio' : `/studio?draft=${encodeURIComponent(item.id)}`;
+          const editPath = `/studio?draft=${encodeURIComponent(item.id)}`;
           const itemTitle = document.createElement('a');
           itemTitle.className = 'studio-document-title';
           itemTitle.textContent = item.title;
@@ -931,6 +1091,10 @@ const { Content } = await render(entry);
           showToast('The cloud draft could not be duplicated');
           return;
         }
+        if (source.contentFormat === 'legacy') {
+          showToast('Convert this legacy draft before duplicating it.');
+          return;
+        }
         const duplicateId = window.crypto.randomUUID();
         const duplicateTitle = `Copy of ${item.title}`;
         const duplicate: DraftState = {
@@ -940,12 +1104,21 @@ const { Content } = await render(entry);
           publicationStatus: 'draft',
           publicationReleaseId: '',
           publicationLiveUrl: '',
-          updatedAt: new Date().toISOString(),
+          updatedAt: '1970-01-01T00:00:00.000Z',
+          contentFormat: 'tiptap-json',
+          revision: 0,
+          contentSha256: undefined,
+          sourceSha256: undefined,
           revisions: [],
         };
         try {
-          await studioBackend.saveDraft(duplicateId, duplicate);
-          draftRecords.set(duplicateId, duplicate);
+          const result = await studioBackend.saveDraft(duplicateId, duplicate);
+          draftRecords.set(duplicateId, {
+            ...duplicate,
+            updatedAt: result.updatedAt,
+            revision: result.revision,
+            contentSha256: result.contentSha256,
+          });
         } catch {
           showToast('The copy could not be saved to the cloud');
           return;
@@ -1075,7 +1248,7 @@ const { Content } = await render(entry);
 
           const editLink = document.createElement('a');
           editLink.className = 'studio-library-edit-link';
-          editLink.href = item.id === 'open-the-ai' ? '/studio' : `/studio?draft=${encodeURIComponent(item.id)}`;
+          editLink.href = `/studio?draft=${encodeURIComponent(item.id)}`;
           editLink.textContent = hasLiveVersion(item) ? 'Edit draft' : 'Edit';
           editLink.setAttribute('aria-label', `${hasLiveVersion(item) ? 'Edit draft for' : 'Edit'} ${item.title}`);
 
@@ -1103,7 +1276,7 @@ const { Content } = await render(entry);
 
           if (item.archivedAt) {
             addMenuButton('Restore draft', () => restoreDocument(item));
-          } else {
+          } else if (readDocumentState(item)?.contentFormat !== 'legacy') {
             addMenuButton('Duplicate', () => duplicateDocument(item));
           }
           if (item.archivedAt) {
@@ -1125,7 +1298,7 @@ const { Content } = await render(entry);
           } else if (item.publicationStatus === 'unpublished') {
             if (canPublish) {
               addMenuButton('Republish', () => {
-                void navigateAfterSave(item.id === 'open-the-ai' ? '/studio' : `/studio?draft=${encodeURIComponent(item.id)}`);
+                void navigateAfterSave(`/studio?draft=${encodeURIComponent(item.id)}`);
               });
             }
             addMenuButton('Archive draft', () => archiveDocument(item), true);
@@ -1168,7 +1341,7 @@ const { Content } = await render(entry);
       };
 
       const updateMetrics = () => {
-        const words = (editor.innerText.match(/\S+/g) ?? []).length;
+        const words = ((tiptapEditor?.getText() ?? editor.innerText).match(/\S+/g) ?? []).length;
         const minutes = Math.max(1, Math.ceil(words / 225));
         wordCount.textContent = `${words.toLocaleString()} words`;
         readTime.textContent = `${minutes} min read`;
@@ -1232,22 +1405,33 @@ const { Content } = await render(entry);
       const persist = async (checkpoint = false) => {
         const versionToSave = editVersion;
         const previousRevisions = revisions;
-        if (checkpoint) {
-          revisions = [...revisions, { savedAt: new Date().toISOString(), title: title.value.trim() }].slice(-20);
-        }
         const nextState = getState();
-        renderRevisions();
         const saved = await queueCloudMutation(async () => {
           const expectedUpdatedAt = draftRecords.get(draftId)?.updatedAt;
-          await studioBackend.saveDraft(draftId, nextState, expectedUpdatedAt);
+          const result = await studioBackend.saveDraft(draftId, nextState, expectedUpdatedAt, checkpoint);
+          nextState.updatedAt = result.updatedAt;
+          nextState.revision = result.revision;
+          nextState.contentSha256 = result.contentSha256;
+          nextState.contentFormat = 'tiptap-json';
+          if (checkpoint) {
+            nextState.revisions = [...previousRevisions, { savedAt: result.updatedAt, title: title.value.trim() }].slice(-20);
+          }
+          revisions = nextState.revisions;
+          currentRevision = result.revision;
+          currentContentSha256 = result.contentSha256;
+          contentFormat = 'tiptap-json';
           draftRecords.set(draftId, nextState);
-          lastKnownUpdatedAt = nextState.updatedAt;
+          lastKnownUpdatedAt = result.updatedAt;
+          publicationPreviewReceiptId = '';
+          lastPreviewError = '';
+          publishReadiness.textContent = 'Not ready: preview this saved revision before publishing.';
         });
         if (!saved) {
           revisions = previousRevisions;
           renderRevisions();
           return false;
         }
+        renderRevisions();
         savedVersion = Math.max(savedVersion, versionToSave);
         renderDocumentIndex();
         return true;
@@ -1281,10 +1465,197 @@ const { Content } = await render(entry);
         if (publicationStatus === 'published') publicationStatus = 'published-with-changes';
         editVersion += 1;
         publishIdempotencyKey = '';
+        publicationPreviewReceiptId = '';
+        lastPreviewError = '';
         renderStatus('Saving…');
         updateMetrics();
         window.clearTimeout(autosaveTimer);
         autosaveTimer = window.setTimeout(() => void persist(false), 700);
+      };
+
+      const toolbarButtons = [...toolbar.querySelectorAll<HTMLButtonElement>('[data-editor-action]')];
+      const visibleToolbarControls = () => [...toolbar.querySelectorAll<HTMLElement>('[data-toolbar-roving]')]
+        .filter((control) => control.getClientRects().length > 0 && !('disabled' in control && control.disabled));
+
+      const setToolbarTabStop = (preferred?: HTMLElement) => {
+        const controls = visibleToolbarControls();
+        const entry = preferred && controls.includes(preferred) ? preferred : controls[0];
+        toolbar.querySelectorAll<HTMLElement>('[data-toolbar-roving]').forEach((control) => {
+          control.tabIndex = control === entry ? 0 : -1;
+        });
+      };
+
+      const canRunEditorAction = (action: string) => {
+        if (!tiptapEditor?.isEditable) return false;
+        if (action === 'bold') return tiptapEditor.can().chain().toggleBold().run();
+        if (action === 'italic') return tiptapEditor.can().chain().toggleItalic().run();
+        if (action === 'bulletList') return tiptapEditor.can().chain().toggleBulletList().run();
+        if (action === 'orderedList') return tiptapEditor.can().chain().toggleOrderedList().run();
+        if (action === 'blockquote') return tiptapEditor.can().chain().toggleBlockquote().run();
+        if (action === 'liftListItem') return tiptapEditor.can().chain().liftListItem('listItem').run();
+        if (action === 'sinkListItem') return tiptapEditor.can().chain().sinkListItem('listItem').run();
+        if (action === 'horizontalRule') return tiptapEditor.can().chain().setHorizontalRule().run();
+        if (action === 'undo') return tiptapEditor.can().chain().undo().run();
+        if (action === 'redo') return tiptapEditor.can().chain().redo().run();
+        if (action === 'link') return !tiptapEditor.state.selection.empty || tiptapEditor.isActive('link');
+        return true;
+      };
+
+      const updateToolbarState = () => {
+        const hasEditor = Boolean(tiptapEditor?.isEditable);
+        imageTools.hidden = !tiptapEditor?.isActive('image');
+        textStyle.disabled = !hasEditor;
+        if (tiptapEditor) {
+          textStyle.value = tiptapEditor.isActive('heading', { level: 2 })
+            ? 'h2'
+            : tiptapEditor.isActive('heading', { level: 3 }) ? 'h3' : 'paragraph';
+        }
+        const activeActions = new Set<string>();
+        if (tiptapEditor?.isActive('bold')) activeActions.add('bold');
+        if (tiptapEditor?.isActive('italic')) activeActions.add('italic');
+        if (tiptapEditor?.isActive('bulletList')) activeActions.add('bulletList');
+        if (tiptapEditor?.isActive('orderedList')) activeActions.add('orderedList');
+        if (tiptapEditor?.isActive('blockquote')) activeActions.add('blockquote');
+        if (tiptapEditor?.isActive('link')) activeActions.add('link');
+        for (const button of toolbarButtons) {
+          const action = button.dataset.editorAction ?? '';
+          button.disabled = !canRunEditorAction(action);
+          if (button.hasAttribute('aria-pressed')) {
+            button.setAttribute('aria-pressed', String(activeActions.has(action)));
+          }
+        }
+        setToolbarTabStop(document.activeElement instanceof HTMLElement ? document.activeElement : undefined);
+      };
+
+      const normalizeLinkHref = (rawValue: string) => {
+        let value = rawValue.trim();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) value = `mailto:${value}`;
+        if (!/^[a-z][a-z0-9+.-]*:/i.test(value) && /^[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?(?:[/?#].*)?$/i.test(value)) {
+          value = `https://${value}`;
+        }
+        const candidate = new URL(value);
+        if (!['https:', 'http:', 'mailto:'].includes(candidate.protocol)) throw new Error('Unsupported link scheme');
+        if ((candidate.protocol === 'http:' || candidate.protocol === 'https:') && (!candidate.hostname || candidate.username || candidate.password)) {
+          throw new Error('Invalid web address');
+        }
+        if (candidate.protocol === 'mailto:' && !candidate.pathname.includes('@')) throw new Error('Invalid email address');
+        return candidate.toString();
+      };
+
+      const openLinkDialog = () => {
+        if (!tiptapEditor) return;
+        const hasLink = tiptapEditor.isActive('link');
+        if (tiptapEditor.state.selection.empty && !hasLink) {
+          showToast('Select the text you want to link, then choose Link');
+          tiptapEditor.commands.focus();
+          return;
+        }
+        linkUrl.value = hasLink ? String(tiptapEditor.getAttributes('link').href ?? '') : '';
+        removeLink.hidden = !hasLink;
+        linkDialog.showModal();
+        window.requestAnimationFrame(() => linkUrl.focus());
+      };
+
+      const setImageFormBusy = (busy: boolean) => {
+        imageFile.disabled = busy;
+        imageDecorative.disabled = busy;
+        imageCaption.disabled = busy;
+        imageAlt.disabled = busy || imageDecorative.checked;
+        submitImage.disabled = busy;
+      };
+
+      const openImageDialog = (mode: 'insert' | 'edit') => {
+        if (!tiptapEditor) return;
+        imageOperations.cancel();
+        setImageFormBusy(false);
+        const selected = mode === 'edit' && tiptapEditor.isActive('image')
+          ? tiptapEditor.getAttributes('image')
+          : null;
+        if (mode === 'edit' && !selected?.assetId) {
+          showToast('Select an image before editing it');
+          return;
+        }
+        editingImageAttrs = selected ? {
+          assetId: String(selected.assetId),
+          alt: String(selected.alt ?? ''),
+          decorative: selected.decorative === true,
+          caption: String(selected.caption ?? ''),
+        } : null;
+        imageForm.reset();
+        imageAlt.value = editingImageAttrs?.alt ?? '';
+        imageDecorative.checked = editingImageAttrs?.decorative ?? false;
+        imageAlt.disabled = imageDecorative.checked;
+        imageCaption.value = editingImageAttrs?.caption ?? '';
+        imageFile.required = mode === 'insert';
+        imageDialogTitle.textContent = mode === 'edit' ? 'Edit or replace image' : 'Insert image';
+        submitImage.textContent = mode === 'edit' ? 'Apply image changes' : 'Upload and insert';
+        imageStatus.textContent = mode === 'edit'
+          ? 'Choose a new file only if you want to replace the current image.'
+          : 'The article changes only after the upload succeeds.';
+        imageDialog.showModal();
+        window.requestAnimationFrame(() => (mode === 'insert' ? imageFile : imageAlt).focus());
+      };
+
+      const insertCallout = () => tiptapEditor?.chain().focus().insertContent([
+        {
+          type: 'callout',
+          content: [{
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'Key point', marks: [{ type: 'bold' }] },
+              { type: 'text', text: ' — Add the important context here.' },
+            ],
+          }],
+        },
+        { type: 'paragraph' },
+      ]).run() ?? false;
+
+      const runEditorAction = (action: string) => {
+        if (!tiptapEditor) return false;
+        if (action === 'link') {
+          openLinkDialog();
+          return true;
+        }
+        if (action === 'image') {
+          openImageDialog('insert');
+          return true;
+        }
+        if (action === 'bold') return tiptapEditor.chain().focus().toggleBold().run();
+        if (action === 'italic') return tiptapEditor.chain().focus().toggleItalic().run();
+        if (action === 'bulletList') return tiptapEditor.chain().focus().toggleBulletList().run();
+        if (action === 'orderedList') return tiptapEditor.chain().focus().toggleOrderedList().run();
+        if (action === 'blockquote') return tiptapEditor.chain().focus().toggleBlockquote().run();
+        if (action === 'liftListItem') return tiptapEditor.chain().focus().liftListItem('listItem').run();
+        if (action === 'sinkListItem') return tiptapEditor.chain().focus().sinkListItem('listItem').run();
+        if (action === 'callout') return insertCallout();
+        if (action === 'horizontalRule') return tiptapEditor.chain().focus().setHorizontalRule().run();
+        if (action === 'undo') return tiptapEditor.chain().focus().undo().run();
+        if (action === 'redo') return tiptapEditor.chain().focus().redo().run();
+        return false;
+      };
+
+      const normalizePastedHtml = (html: string) => {
+        const parsed = new DOMParser().parseFromString(html, 'text/html');
+        parsed.querySelectorAll('script, style, iframe, object, embed').forEach((node) => node.remove());
+        parsed.querySelectorAll('h1').forEach((heading) => {
+          const replacement = parsed.createElement('h2');
+          replacement.append(...heading.childNodes);
+          heading.replaceWith(replacement);
+        });
+        parsed.querySelectorAll<HTMLElement>('*').forEach((element) => {
+          const href = element.tagName === 'A' ? element.getAttribute('href') : null;
+          const isCallout = element.tagName === 'ASIDE' && element.classList.contains('studio-callout');
+          for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name);
+          if (isCallout) element.className = 'studio-callout';
+          if (href) {
+            try {
+              element.setAttribute('href', normalizeLinkHref(href));
+            } catch {
+              element.removeAttribute('href');
+            }
+          }
+        });
+        return parsed.body.innerHTML;
       };
 
       try {
@@ -1307,7 +1678,7 @@ const { Content } = await render(entry);
       }
       if (stored) {
         title.value = stored.title;
-        editor.innerHTML = stored.body;
+        if (stored.contentFormat === 'legacy') editor.innerHTML = stored.body ?? '';
         excerpt.value = stored.excerpt;
         slug.value = stored.slug;
         tags.value = stored.tags;
@@ -1316,13 +1687,100 @@ const { Content } = await render(entry);
         publicationLiveUrl = stored.publicationLiveUrl;
         revisions = stored.revisions;
         lastKnownUpdatedAt = stored.updatedAt;
+        contentFormat = stored.contentFormat;
+        currentRevision = stored.revision;
+        currentContentSha256 = stored.contentSha256;
+        currentSourceSha256 = stored.sourceSha256;
       } else if (isNewDraft) {
         title.value = '';
-        editor.innerHTML = '<p><br></p>';
         excerpt.value = '';
         slug.value = '';
         tags.value = '';
       }
+
+      if (isLibraryLanding) {
+        showContentLibrary('all');
+        editorActions.hidden = true;
+      } else if (stored?.contentFormat === 'legacy') {
+        migrateDraftButton.hidden = false;
+        title.disabled = true;
+        excerpt.disabled = true;
+        slug.disabled = true;
+        tags.disabled = true;
+        editor.contentEditable = 'false';
+        document.querySelector<HTMLButtonElement>('[data-save-draft]')?.setAttribute('disabled', '');
+        renderStatus('Legacy draft · convert before editing');
+      } else {
+        editor.replaceChildren();
+        tiptapEditor = new Editor({
+          element: editor,
+          extensions: studioTiptapExtensions,
+          content: stored?.content ?? { type: 'doc', content: [{ type: 'paragraph' }] },
+          onUpdate: () => {
+            markChanged();
+            updateToolbarState();
+          },
+          onSelectionUpdate: () => updateToolbarState(),
+          onTransaction: () => updateToolbarState(),
+          onFocus: () => updateToolbarState(),
+          onBlur: () => updateToolbarState(),
+          editorProps: {
+            attributes: {
+              'aria-label': 'Article body',
+              'aria-multiline': 'true',
+              role: 'textbox',
+            },
+            transformPastedHTML: normalizePastedHtml,
+            transformPastedText: (text) => text.replace(/\r\n?/g, '\n'),
+            handlePaste: (_view, event) => {
+              const clipboard = event.clipboardData;
+              const result = evaluateStudioClipboardPaste({
+                html: clipboard?.getData('text/html') ?? '',
+                items: clipboard ? [...clipboard.items].map(({ kind, type }) => ({ kind, type })) : [],
+                files: clipboard ? [...clipboard.files].map(({ type }) => ({ type })) : [],
+              });
+              if (result.accepted) return false;
+              event.preventDefault();
+              showToast(result.message);
+              return true;
+            },
+            handleKeyDown: (_view, event) => {
+              if (event.altKey && event.key === 'F10') {
+                const firstControl = visibleToolbarControls()[0];
+                firstControl?.focus();
+                return Boolean(firstControl);
+              }
+              if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                openLinkDialog();
+                return true;
+              }
+              return false;
+            },
+          },
+        });
+      }
+
+      updateToolbarState();
+
+      migrateDraftButton.addEventListener('click', async () => {
+        const legacy = draftRecords.get(draftId);
+        if (!legacy || legacy.contentFormat !== 'legacy' || !legacy.sourceSha256) {
+          showToast('The legacy source could not be verified. Reload and try again.');
+          return;
+        }
+        const confirmed = window.confirm('Convert this draft to the professional editor? The exact original HTML will be preserved for recovery.');
+        if (!confirmed) return;
+        migrateDraftButton.disabled = true;
+        renderStatus('Converting to the professional editor…');
+        try {
+          await studioBackend.migrateDraft(draftId, legacy.updatedAt, legacy.revision, legacy.sourceSha256);
+          window.location.reload();
+        } catch (error) {
+          migrateDraftButton.disabled = false;
+          renderStatus('Conversion failed · original preserved; nothing saved');
+          showToast(error instanceof Error ? error.message : 'The draft could not be converted.');
+        }
+      });
 
       if (!isNewDraft && publicationStatus === 'draft') publicationStatus = 'published';
 
@@ -1336,6 +1794,9 @@ const { Content } = await render(entry);
       document.addEventListener('click', (event) => {
         const target = event.target;
         for (const openMenu of document.querySelectorAll<HTMLDetailsElement>('.studio-row-menu[open]')) {
+          if (!(target instanceof Node) || !openMenu.contains(target)) openMenu.open = false;
+        }
+        for (const openMenu of document.querySelectorAll<HTMLDetailsElement>('[data-toolbar-menu][open]')) {
           if (!(target instanceof Node) || !openMenu.contains(target)) openMenu.open = false;
         }
       });
@@ -1370,7 +1831,7 @@ const { Content } = await render(entry);
         });
       });
 
-      for (const field of [title, editor, excerpt, tags]) {
+      for (const field of [title, excerpt, tags]) {
         field.addEventListener('input', () => {
           if (field === title && !slugEdited) slug.value = normalizeSlug(title.value);
           markChanged();
@@ -1383,69 +1844,268 @@ const { Content } = await render(entry);
         markChanged();
       });
 
-      document.querySelectorAll<HTMLButtonElement>('[data-command]').forEach((button) => {
+      textStyle.addEventListener('change', () => {
+        if (!tiptapEditor) return;
+        if (textStyle.value === 'h2') tiptapEditor.chain().focus().setHeading({ level: 2 }).run();
+        else if (textStyle.value === 'h3') tiptapEditor.chain().focus().setHeading({ level: 3 }).run();
+        else tiptapEditor.chain().focus().setParagraph().run();
+        updateToolbarState();
+      });
+
+      toolbarButtons.forEach((button) => {
         button.addEventListener('click', () => {
-          editor.focus();
-          document.execCommand(button.dataset.command ?? '', false);
-          markChanged();
+          const action = button.dataset.editorAction ?? '';
+          const ran = runEditorAction(action);
+          if (ran) closeToolbarMenuAndFocusSummary(button);
+          updateToolbarState();
         });
       });
 
-      document.querySelectorAll<HTMLButtonElement>('[data-block]').forEach((button) => {
-        button.addEventListener('click', () => {
-          editor.focus();
-          document.execCommand('formatBlock', false, button.dataset.block ?? 'p');
-          markChanged();
-        });
+      toolbar.addEventListener('focusin', (event) => {
+        if (event.target instanceof HTMLElement && event.target.matches('[data-toolbar-roving]')) {
+          setToolbarTabStop(event.target);
+        }
       });
 
-      document.querySelector<HTMLButtonElement>('[data-link]')?.addEventListener('click', () => {
-        const input = window.prompt('Link URL (https://, http:// or mailto:)', 'https://');
-        if (!input) return;
-        let href = '';
-        try {
-          const candidate = new URL(input);
-          if (!['https:', 'http:', 'mailto:'].includes(candidate.protocol)) throw new Error('Unsupported link scheme');
-          href = candidate.toString();
-        } catch {
-          showToast('Use a complete http, https or mailto link');
+      toolbar.addEventListener('keydown', (event) => {
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target) return;
+        if (event.key === 'Escape') {
+          const menu = target.closest<HTMLDetailsElement>('[data-toolbar-menu][open]');
+          if (menu) {
+            event.preventDefault();
+            menu.open = false;
+            menu.querySelector<HTMLElement>('summary')?.focus();
+          }
           return;
         }
-        editor.focus();
-        document.execCommand('createLink', false, href);
-        markChanged();
+        if (!target.matches('[data-toolbar-roving]')) return;
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const controls = visibleToolbarControls();
+        const currentIndex = controls.indexOf(target);
+        if (currentIndex < 0) return;
+        event.preventDefault();
+        const nextIndex = nextToolbarControlIndex(event.key, currentIndex, controls.length);
+        controls[nextIndex]?.focus();
       });
 
-      document.querySelector<HTMLButtonElement>('[data-callout]')?.addEventListener('click', () => {
-        editor.focus();
-        document.execCommand('insertHTML', false, '<aside class="studio-callout"><strong>Key point</strong><p>Add the important context here.</p></aside><p><br></p>');
-        markChanged();
+      linkForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!tiptapEditor) return;
+        try {
+          const href = normalizeLinkHref(linkUrl.value);
+          tiptapEditor.chain().extendMarkRange('link').setLink({ href }).run();
+          linkDialog.close();
+          updateToolbarState();
+        } catch {
+          showToast('Enter a valid web address, email address, or domain');
+          linkUrl.focus();
+        }
       });
+
+      document.querySelectorAll<HTMLButtonElement>('[data-close-link]').forEach((button) => {
+        button.addEventListener('click', () => linkDialog.close());
+      });
+      removeLink.addEventListener('click', () => {
+        tiptapEditor?.chain().extendMarkRange('link').unsetLink().run();
+        linkDialog.close();
+        updateToolbarState();
+      });
+      linkDialog.addEventListener('close', () => tiptapEditor?.commands.focus());
+
+      imageDecorative.addEventListener('change', () => {
+        imageAlt.disabled = imageDecorative.checked;
+        if (!imageDecorative.checked) imageAlt.focus();
+      });
+      document.querySelectorAll<HTMLButtonElement>('[data-close-image]').forEach((button) => {
+        button.addEventListener('click', () => {
+          imageOperations.cancel();
+          imageDialog.close();
+        });
+      });
+      imageDialog.addEventListener('cancel', () => imageOperations.cancel());
+      imageDialog.addEventListener('close', () => {
+        imageOperations.cancel();
+        tiptapEditor?.commands.focus();
+      });
+      editImage.addEventListener('click', () => openImageDialog('edit'));
+      removeImage.addEventListener('click', () => {
+        if (!tiptapEditor?.isActive('image')) return;
+        if (tiptapEditor.chain().focus().deleteSelection().run()) {
+          showToast('Image removed · Undo is available');
+          updateToolbarState();
+        }
+      });
+      imageForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!tiptapEditor || submitImage.disabled) return;
+        const replacement = imageFile.files?.[0] ?? null;
+        const description = Object.freeze({
+          alt: imageDecorative.checked ? '' : imageAlt.value.trim(),
+          decorative: imageDecorative.checked,
+          caption: imageCaption.value.trim(),
+        });
+        if (!editingImageAttrs && !replacement) {
+          imageStatus.textContent = 'Choose an image file.';
+          imageFile.focus();
+          return;
+        }
+        if (!description.decorative && !description.alt) {
+          imageStatus.textContent = 'Add alternative text or mark the image as decorative.';
+          imageAlt.focus();
+          return;
+        }
+        if (replacement && (!['image/png', 'image/jpeg', 'image/webp'].includes(replacement.type) || replacement.size > 5 * 1024 * 1024)) {
+          imageStatus.textContent = 'Use a PNG, JPEG, or WebP image that is 5 MB or smaller.';
+          imageFile.focus();
+          return;
+        }
+        const sourceImage = editingImageAttrs ? { ...editingImageAttrs } : null;
+        const targetPosition = sourceImage ? tiptapEditor.state.selection.from : null;
+        const operation = imageOperations.begin({
+          mode: sourceImage ? 'edit' : 'insert',
+          targetPosition,
+          targetAssetId: sourceImage?.assetId ?? '',
+        });
+        setImageFormBusy(true);
+        try {
+          let assetId = sourceImage?.assetId ?? '';
+          if (replacement) {
+            imageStatus.textContent = 'Saving the current draft before upload…';
+            if (!await persist(false)) {
+              imageStatus.textContent = 'The cloud draft could not be saved. The image was not uploaded.';
+              return;
+            }
+            if (!imageOperations.isActive(operation)) return;
+            imageStatus.textContent = 'Uploading and validating the image…';
+            const uploaded = await studioBackend.uploadImage(draftId, replacement, description, operation.controller.signal);
+            assetId = uploaded.assetId;
+          }
+          const attrs = { assetId, ...description };
+          const changed = imageOperations.complete(operation, ({ mode, targetPosition: position, targetAssetId }) => {
+            if (mode === 'edit') {
+              const target = typeof position === 'number' ? tiptapEditor.state.doc.nodeAt(position) : null;
+              if (target?.type.name !== 'image' || target.attrs.assetId !== targetAssetId) return false;
+              return tiptapEditor.chain().focus().setNodeSelection(position).updateAttributes('image', attrs).run();
+            }
+            return tiptapEditor.chain().focus().insertContent({ type: 'image', attrs }).run();
+          });
+          if (!changed) throw new Error('The image target changed. Reopen the image dialog and try again; your article was not changed.');
+          imageDialog.close();
+          showToast(sourceImage ? 'Image updated · Undo is available' : 'Image inserted · saving to cloud');
+          updateToolbarState();
+        } catch (error) {
+          if (imageOperations.isActive(operation)) {
+            imageStatus.textContent = error instanceof Error && error.name !== 'AbortError'
+              ? error.message
+              : 'The image change was cancelled. Your article was not changed.';
+          }
+        } finally {
+          if (imageOperations.isActive(operation)) {
+            imageOperations.finish(operation);
+            setImageFormBusy(false);
+          }
+        }
+      });
+      window.addEventListener('resize', () => setToolbarTabStop());
 
       document.querySelector<HTMLButtonElement>('[data-save-draft]')?.addEventListener('click', async () => {
         const saved = await persist(true);
-        saveMenu.open = false;
         if (saved) showToast('Draft checkpoint saved to the cloud');
       });
 
+      const previewImageUrls = new Set<string>();
+      const clearPreviewImageUrls = () => {
+        previewImageUrls.forEach((url) => URL.revokeObjectURL(url));
+        previewImageUrls.clear();
+      };
+      const previewButton = document.querySelector<HTMLButtonElement>('[data-preview]');
+      const setPublicationFailure = (message: string) => {
+        publicationFixTarget = /title/i.test(message)
+          ? 'title'
+          : /slug|URL/i.test(message) ? 'slug' : 'preview';
+        publishErrorText.textContent = message;
+        publicationFix.textContent = publicationFixTarget === 'title'
+          ? 'Return to article title'
+          : publicationFixTarget === 'slug' ? 'Return to URL slug' : 'Preview latest revision';
+        publishError.hidden = false;
+        window.requestAnimationFrame(() => publishError.focus());
+      };
+      const clearPublicationFailure = () => {
+        publishError.hidden = true;
+        publishErrorText.textContent = '';
+      };
+      const hydratePrivatePreviewImages = async (html: string) => {
+        clearPreviewImageUrls();
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const images = [...document.querySelectorAll<HTMLImageElement>('img[src^="/content-assets/"]')];
+        try {
+          await Promise.all(images.map(async (image) => {
+            const source = image.getAttribute('src') ?? '';
+            const assetId = decodeURIComponent(source.slice('/content-assets/'.length));
+            if (!/^[a-f0-9-]{36}$/.test(assetId)) throw new Error('The preview contains an invalid image reference.');
+            const objectUrl = URL.createObjectURL(await studioBackend.loadImage(assetId));
+            image.src = objectUrl;
+            try {
+              await image.decode();
+            } catch (error) {
+              URL.revokeObjectURL(objectUrl);
+              throw error;
+            }
+            previewImageUrls.add(objectUrl);
+          }));
+          return `<!doctype html>${document.documentElement.outerHTML}`;
+        } catch {
+          clearPreviewImageUrls();
+          throw new Error('An article image could not be displayed in the preview. Replace it and try again.');
+        }
+      };
       const refreshPreview = async () => {
-        previewFrame.srcdoc = await studioBackend.previewDocument(draftId, getState());
+        if (!await persist(true)) throw new Error('The cloud draft could not be saved for preview.');
+        if (hasUnsavedChanges()) throw new Error('The article changed while it was saving. Save and preview the latest revision again.');
+        const previewStart = captureStudioPreviewState({
+          editVersion,
+          updatedAt: lastKnownUpdatedAt,
+          revision: currentRevision,
+          contentSha256: currentContentSha256,
+        });
+        const preview = await studioBackend.previewDocument(draftId);
+        const hydrated = await hydratePrivatePreviewImages(preview.html);
+        if (!isStudioPreviewStateCurrent(previewStart, {
+          editVersion,
+          updatedAt: lastKnownUpdatedAt,
+          revision: currentRevision,
+          contentSha256: currentContentSha256,
+          hasUnsavedChanges: hasUnsavedChanges(),
+        })) {
+          clearPreviewImageUrls();
+          throw new Error('The article changed while preview was loading. Preview the latest revision again.');
+        }
+        previewFrame.srcdoc = hydrated;
+        publicationPreviewReceiptId = preview.receiptId;
+        lastPreviewError = '';
+        return preview;
       };
 
-      document.querySelector<HTMLButtonElement>('[data-preview]')?.addEventListener('click', async (event) => {
-        const previewButton = event.currentTarget as HTMLButtonElement;
-        previewButton.disabled = true;
+      previewButton?.addEventListener('click', async (event) => {
+        const button = event.currentTarget as HTMLButtonElement;
+        button.disabled = true;
         try {
           await refreshPreview();
           previewDialog.showModal();
         } catch (error) {
-          showToast(error instanceof Error ? error.message : 'The safe preview could not be rendered');
+          publicationPreviewReceiptId = '';
+          lastPreviewError = error instanceof Error ? error.message : 'The safe preview could not be rendered';
+          showToast(lastPreviewError);
         } finally {
-          previewButton.disabled = false;
+          button.disabled = false;
         }
       });
 
-      document.querySelector<HTMLButtonElement>('[data-close-preview]')?.addEventListener('click', () => previewDialog.close());
+      document.querySelector<HTMLButtonElement>('[data-close-preview]')?.addEventListener('click', () => {
+        previewDialog.close();
+        clearPreviewImageUrls();
+      });
 
       document.querySelectorAll<HTMLButtonElement>('[data-device]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -1455,13 +2115,28 @@ const { Content } = await render(entry);
         });
       });
 
-      document.querySelector<HTMLButtonElement>('[data-open-publish]')?.addEventListener('click', async () => {
-        if (!await persist(true)) return;
-        saveMenu.open = false;
+      publicationFix.addEventListener('click', () => {
+        publishDialog.close();
+        if (publicationFixTarget === 'title') title.focus();
+        else if (publicationFixTarget === 'slug') slug.focus();
+        else previewButton?.click();
+      });
+
+      document.querySelector<HTMLButtonElement>('[data-open-publish]')?.addEventListener('click', () => {
         const reviewTitle = document.querySelector<HTMLElement>('[data-review-title]');
         const reviewSlug = document.querySelector<HTMLElement>('[data-review-slug]');
-        if (reviewTitle) reviewTitle.textContent = title.value.trim() || 'Untitled article';
-        if (reviewSlug) reviewSlug.textContent = normalizeSlug(slug.value) || 'untitled';
+        const reviewedTitle = title.value.trim();
+        const reviewedSlug = normalizeSlug(slug.value);
+        if (reviewTitle) reviewTitle.textContent = reviewedTitle || 'Missing title';
+        if (reviewSlug) reviewSlug.textContent = reviewedSlug || 'missing-url';
+        clearPublicationFailure();
+        if (!reviewedTitle) setPublicationFailure('Add an article title, then save and preview again.');
+        else if (!reviewedSlug || reviewedSlug !== slug.value) setPublicationFailure('Choose a valid URL slug, then save and preview again.');
+        else if (lastPreviewError) setPublicationFailure(lastPreviewError);
+        else if (!publicationPreviewReceiptId) setPublicationFailure('Preview this saved revision before publishing.');
+        publishReadiness.textContent = publicationPreviewReceiptId
+          ? 'Ready: the preview is verified against this exact cloud revision.'
+          : 'Not ready: a verified preview is required.';
         publishDialog.showModal();
       });
 
@@ -1471,9 +2146,16 @@ const { Content } = await render(entry);
         publishButton.textContent = 'Publishing…';
         renderStatus('Publishing to AI Spanda…');
         try {
+          clearPublicationFailure();
+          if (!publicationPreviewReceiptId) throw new Error('Preview this saved revision before publishing.');
           await cloudMutationQueue;
           publishIdempotencyKey ||= window.crypto.randomUUID();
-          const result = await studioBackend.publishDraft(draftId, lastKnownUpdatedAt, publishIdempotencyKey);
+          const result = await studioBackend.publishDraft(
+            draftId,
+            lastKnownUpdatedAt,
+            publishIdempotencyKey,
+            publicationPreviewReceiptId,
+          );
           publicationStatus = 'published';
           publicationReleaseId = result.releaseId;
           publicationLiveUrl = result.liveUrl;
@@ -1487,10 +2169,16 @@ const { Content } = await render(entry);
           renderStatus();
           renderDocumentIndex();
           publishIdempotencyKey = '';
+          publicationPreviewReceiptId = '';
+          lastPreviewError = '';
           showToast('Published · the release receipt is shown below');
         } catch (error) {
           renderStatus('Publish failed · cloud draft preserved');
-          showToast(error instanceof Error ? error.message : 'The article could not be published');
+          const message = error instanceof Error ? error.message : 'The article could not be published';
+          publicationPreviewReceiptId = '';
+          lastPreviewError = message;
+          publishReadiness.textContent = 'Not ready: preview the corrected, saved revision again.';
+          setPublicationFailure(message);
         } finally {
           publishButton.disabled = false;
           publishButton.textContent = 'Publish to AI Spanda';
@@ -1600,13 +2288,6 @@ const { Content } = await render(entry);
   .studio-actions { display: flex; align-items: center; gap: .65rem; }
   .studio-button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 42px; padding: .65rem 1rem; border: 1px solid var(--ink); border-radius: .7rem; background: var(--ink); color: white; font-weight: 750; cursor: pointer; }
   .studio-button-secondary { border-color: var(--line); background: white; color: var(--ink); }
-  .studio-save-menu { position: relative; }
-  .studio-save-menu summary { list-style: none; }
-  .studio-save-menu summary::-webkit-details-marker { display: none; }
-  .studio-save-options { position: absolute; top: calc(100% + .5rem); right: 0; display: grid; width: 250px; padding: .4rem; border: 1px solid var(--line); border-radius: .85rem; background: white; box-shadow: var(--shadow); }
-  .studio-save-options button { display: grid; gap: .15rem; padding: .75rem; border: 0; border-radius: .6rem; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-  .studio-save-options button:hover { background: var(--soft-solar); }
-  .studio-save-options span { color: var(--muted); font-size: .77rem; }
   .studio-grid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; height: calc(100vh - 74px); }
   .studio-grid[hidden], .studio-content-library[hidden], .studio-actions[hidden] { display: none; }
   .studio-content-library { height: calc(100vh - 74px); box-sizing: border-box; overflow: auto; padding: clamp(1.5rem, 4vw, 3.5rem); background: #f3f1ea; }
@@ -1642,16 +2323,41 @@ const { Content } = await render(entry);
   :global(.studio-library-empty h2) { margin: 0; }
   :global(.studio-library-empty p) { color: var(--muted); }
   .studio-editor-column { min-width: 0; overflow: auto; background: #e9e7df; }
-  .studio-toolbar { position: sticky; z-index: 10; top: 0; display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; min-height: 52px; padding: .55rem max(1rem, calc((100% - 790px) / 2)); border-bottom: 1px solid var(--line); background: rgba(247,246,241,.96); backdrop-filter: blur(12px); }
-  .studio-toolbar button { min-width: 35px; min-height: 35px; padding: .35rem .55rem; border: 0; border-radius: .45rem; background: transparent; color: var(--ink); font-size: .8rem; cursor: pointer; }
-  .studio-toolbar button:hover { background: white; box-shadow: inset 0 0 0 1px var(--line); }
-  .studio-toolbar > span { width: 1px; height: 24px; margin: 0 .2rem; background: var(--line); }
+  .studio-toolbar { position: sticky; z-index: 10; top: 0; display: flex; align-items: center; flex-wrap: wrap; gap: .3rem; min-height: 58px; padding: .55rem max(1rem, calc((100% - 890px) / 2)); border-bottom: 1px solid var(--line); background: rgba(247,246,241,.97); backdrop-filter: blur(12px); }
+  .studio-toolbar button, .studio-toolbar summary { display: inline-flex; align-items: center; justify-content: center; gap: .38rem; min-height: 40px; box-sizing: border-box; padding: .45rem .62rem; border: 1px solid transparent; border-radius: .55rem; background: transparent; color: var(--ink); font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; user-select: none; }
+  .studio-toolbar button:hover:not(:disabled), .studio-toolbar summary:hover { border-color: var(--line); background: white; }
+  .studio-toolbar button:focus-visible, .studio-toolbar summary:focus-visible, .studio-toolbar select:focus-visible { outline: 3px solid color-mix(in srgb, var(--clarity) 42%, transparent); outline-offset: 2px; }
+  .studio-toolbar button[aria-pressed="true"] { border-color: color-mix(in srgb, var(--clarity) 38%, var(--line)); background: var(--soft-clarity); color: #244e9d; }
+  .studio-toolbar button:disabled { color: #9a9da3; cursor: not-allowed; opacity: .62; }
+  .studio-toolbar-style { display: inline-flex; align-items: center; gap: .42rem; min-height: 40px; padding: 0 .25rem 0 .55rem; border: 1px solid var(--line); border-radius: .55rem; background: white; color: var(--muted); font-size: .72rem; font-weight: 800; }
+  .studio-toolbar-style select { min-height: 38px; max-width: 112px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
+  .studio-toolbar-style select:disabled { cursor: not-allowed; opacity: .6; }
+  .studio-toolbar-icon-only { min-width: 40px; padding-inline: .4rem !important; font-size: 1.05rem !important; }
+  .studio-toolbar-separator { width: 1px; height: 26px; margin: 0 .15rem; background: var(--line); }
+  .studio-toolbar-menu { position: relative; }
+  .studio-toolbar-menu summary { list-style: none; }
+  .studio-toolbar-menu summary::-webkit-details-marker { display: none; }
+  .studio-toolbar-menu[open] > summary { border-color: var(--clarity); background: white; color: var(--clarity); }
+  .studio-toolbar-menu-items { position: absolute; z-index: 30; top: calc(100% + .4rem); left: 0; display: grid; min-width: 230px; padding: .35rem; border: 1px solid var(--line); border-radius: .7rem; background: white; box-shadow: var(--shadow); }
+  .studio-toolbar-menu-items button { justify-content: flex-start; width: 100%; min-height: 44px; padding: .55rem .65rem; text-align: left; }
+  .studio-toolbar-menu-items button > span:last-child { display: grid; gap: .12rem; }
+  .studio-toolbar-menu-items small { color: var(--muted); font-size: .68rem; font-weight: 500; }
+  .studio-toolbar-more { display: none; }
+  .studio-image-context { display: flex; align-items: center; justify-content: center; gap: .45rem; padding: .45rem .75rem; border-bottom: 1px solid var(--line); background: var(--soft-clarity); color: #244e9d; font-size: .76rem; }
+  .studio-image-context[hidden] { display: none; }
+  .studio-image-context button { min-height: 34px; padding: .35rem .6rem; border: 1px solid color-mix(in srgb, var(--clarity) 32%, var(--line)); border-radius: .5rem; background: white; color: var(--ink); font: inherit; font-weight: 750; cursor: pointer; }
   .studio-paper { width: min(790px, calc(100% - 2rem)); min-height: calc(100vh - 180px); margin: 1.25rem auto; padding: clamp(1.5rem, 5vw, 4rem); border: 1px solid var(--line); border-radius: .4rem; background: white; box-shadow: 0 16px 40px rgba(18,20,26,.08); }
   .studio-title { display: block; width: 100%; padding: 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font-family: var(--font-display); font-size: clamp(2.15rem, 4.8vw, 3.9rem); font-weight: 700; letter-spacing: -.05em; line-height: 1.03; }
   .studio-byline { margin: 1rem 0 2.5rem; color: var(--clarity); font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   .studio-byline span { margin-inline: .3rem; }
   .studio-prose { min-height: 50vh; outline: 0; }
-  .studio-prose:focus { box-shadow: inset 3px 0 0 var(--soft-clarity); }
+  .studio-prose :global(.ProseMirror) { min-height: 50vh; outline: 0; }
+  .studio-prose:focus-within { box-shadow: inset 3px 0 0 var(--soft-clarity); }
+  .studio-prose :global(figure[data-studio-image]) { margin: 2rem 0; padding: .35rem; border: 2px solid transparent; border-radius: .75rem; }
+  .studio-prose :global(figure[data-studio-image].ProseMirror-selectednode) { border-color: var(--clarity); background: var(--soft-clarity); }
+  .studio-prose :global(figure[data-studio-image] img) { display: block; width: 100%; height: auto; max-height: 780px; border-radius: .55rem; object-fit: contain; }
+  .studio-prose :global(figure[data-studio-image] .studio-image-status) { display: block; min-height: 1.25rem; margin: .5rem 0 0; color: var(--muted); font-size: .78rem; text-align: center; }
+  .studio-prose :global(figure[data-studio-image] figcaption) { margin-top: .6rem; color: var(--muted); font-size: .82rem; line-height: 1.5; text-align: center; }
   :global(.studio-callout) { margin: 1.5rem 0; padding: 1.1rem 1.2rem; border-left: 4px solid var(--clarity); border-radius: 0 .8rem .8rem 0; background: var(--soft-clarity); }
   :global(.studio-callout p:last-child) { margin-bottom: 0; }
   .studio-editor-footer { display: flex; justify-content: space-between; width: min(790px, calc(100% - 2rem)); margin: -1rem auto 1.5rem; color: var(--muted); font-size: .78rem; }
@@ -1685,12 +2391,40 @@ const { Content } = await render(entry);
   .studio-publish-summary span { color: var(--muted); font-size: .8rem; }
   .studio-publish-summary strong { overflow-wrap: anywhere; }
   .studio-publication-warning { margin: 0 1.25rem; padding: .85rem; border: 1px solid #e3c57d; border-radius: .7rem; background: var(--soft-solar); color: #684305; font-size: .85rem; }
+  .studio-publication-readiness { margin: .85rem 1.25rem 0; color: var(--muted); font-size: .82rem; font-weight: 700; }
+  .studio-publication-error { display: grid; gap: .7rem; margin: .85rem 1.25rem 0; padding: .85rem; border: 1px solid #bf4d45; border-radius: .7rem; background: #fff2f0; color: #792f29; }
+  .studio-publication-error p { margin: 0; line-height: 1.45; }
+  .studio-publication-error button { justify-self: start; }
+  .studio-publication-error:focus-visible { outline: 3px solid color-mix(in srgb, #bf4d45 35%, transparent); outline-offset: 2px; }
   .studio-publication-receipt { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0 1.15rem 1rem; padding: 1rem 1.1rem; border: 1px solid color-mix(in srgb, var(--teal) 38%, var(--line)); border-radius: .8rem; background: color-mix(in srgb, var(--teal) 8%, white); }
   .studio-publication-receipt > div { display: grid; gap: .25rem; min-width: 0; }
   .studio-publication-receipt a { color: var(--teal); font-weight: 700; overflow-wrap: anywhere; }
   .studio-publication-receipt small { color: var(--muted); }
   .studio-publication-receipt code { color: var(--ink); }
   .studio-publish-actions { display: flex; justify-content: flex-end; gap: .65rem; padding: 1.25rem; }
+  .studio-link-dialog { width: min(560px, calc(100vw - 2rem)); }
+  .studio-link-dialog form { margin: 0; }
+  .studio-link-content { display: grid; gap: .7rem; padding: 1.25rem; }
+  .studio-link-content label { display: grid; gap: .45rem; color: var(--ink); font-size: .82rem; font-weight: 800; }
+  .studio-link-content input { min-height: 44px; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: .6rem; background: white; color: var(--ink); font: inherit; }
+  .studio-link-content input:focus-visible { outline: 3px solid color-mix(in srgb, var(--clarity) 35%, transparent); outline-offset: 1px; }
+  .studio-link-content p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+  .studio-link-actions { display: flex; align-items: center; gap: .55rem; padding: 1rem 1.25rem; border-top: 1px solid var(--line); background: white; }
+  .studio-link-actions > span { flex: 1; }
+  .studio-image-dialog { width: min(620px, calc(100vw - 2rem)); }
+  .studio-image-dialog form { margin: 0; }
+  .studio-image-content { display: grid; gap: 1rem; padding: 1.25rem; }
+  .studio-image-content > label:not(.studio-image-decorative) { display: grid; gap: .45rem; color: var(--ink); font-size: .82rem; font-weight: 800; }
+  .studio-image-content label > span { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+  .studio-image-content label small { color: var(--muted); font-size: .7rem; font-weight: 500; }
+  .studio-image-content input[type="text"], .studio-image-content input[type="file"], .studio-image-content textarea { width: 100%; box-sizing: border-box; min-height: 44px; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: .6rem; background: white; color: var(--ink); font: inherit; }
+  .studio-image-content input:focus-visible, .studio-image-content textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--clarity) 35%, transparent); outline-offset: 1px; }
+  .studio-image-content input:disabled { background: #ecebe6; color: var(--muted); }
+  .studio-image-decorative { display: flex; align-items: start; gap: .65rem; padding: .8rem; border: 1px solid var(--line); border-radius: .65rem; background: white; cursor: pointer; }
+  .studio-image-decorative input { width: 20px; height: 20px; margin: .1rem 0 0; }
+  .studio-image-decorative > span { display: grid !important; gap: .2rem; }
+  .studio-image-status { min-height: 1.25rem; margin: 0; color: var(--muted); font-size: .8rem; }
+  .studio-image-actions { display: flex; justify-content: flex-end; gap: .55rem; padding: 1rem 1.25rem; border-top: 1px solid var(--line); background: white; }
   .studio-ai-dialog { width: min(760px, calc(100vw - 2rem)); }
   .studio-ai-content { display: grid; gap: 1rem; max-height: min(66vh, 680px); overflow: auto; padding: 1.2rem; }
   .studio-ai-privacy { margin: 0; padding: .85rem 1rem; border: 1px solid #b8d4c0; border-radius: .7rem; background: #edf7f0; color: #31543a; font-size: .88rem; }
@@ -1747,9 +2481,10 @@ const { Content } = await render(entry);
     .studio { display: block; }
     .studio-sidebar { display: none; }
     .studio-workspace { height: auto; min-height: 100vh; }
-    .studio-topbar { position: sticky; top: 0; padding: .65rem .8rem; }
+    .studio-topbar { position: sticky; top: 0; flex-wrap: wrap; gap: .55rem; padding: .65rem .8rem; }
     .studio-mobile-nav { display: block; flex: 0 0 auto; }
     .studio-topbar > div:not(.studio-actions) { flex: 1; min-width: 0; padding-left: .55rem; }
+    .studio-actions { display: grid; flex: 0 0 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
     .studio-grid { display: block; height: auto; }
     .studio-grid[hidden] { display: none; }
     .studio-content-library { height: auto; min-height: calc(100vh - 67px); padding: 1.25rem .8rem; }
@@ -1759,15 +2494,28 @@ const { Content } = await render(entry);
     :global(.studio-library-row time) { grid-column: 1; }
     :global(.studio-library-actions) { grid-column: 2; grid-row: 2; }
     .studio-editor-column { overflow: visible; }
-    .studio-toolbar { top: 67px; padding: .45rem .65rem; overflow-x: auto; flex-wrap: nowrap; }
+    .studio-toolbar { position: static; top: auto; display: grid; grid-template-columns: minmax(100px, 1fr) repeat(4, 40px); gap: .3rem; min-height: auto; padding: .45rem .55rem; }
+    .studio-toolbar-wide { display: none !important; }
+    .studio-toolbar-more { display: block; min-width: 0; }
+    .studio-toolbar-more > summary { width: 40px; padding-inline: .25rem; }
+    .studio-toolbar-more-label, .studio-toolbar-primary-link .studio-toolbar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+    .studio-toolbar-primary-link { min-width: 40px; padding-inline: .25rem !important; }
+    .studio-toolbar-style { min-width: 0; padding-left: .45rem; }
+    .studio-toolbar-style > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+    .studio-toolbar-style select { width: 100%; max-width: none; }
+    .studio-toolbar-menu-items { right: 0; left: auto; width: min(270px, calc(100vw - 1rem)); }
     .studio-paper { width: auto; min-height: 70vh; margin: .75rem; padding: 1.25rem; }
     .studio-title { font-size: 2.15rem; }
     .studio-inspector { border-top: 1px solid var(--line); border-left: 0; }
     .studio-editor-footer { width: auto; margin: 0 .75rem 1rem; }
     .studio-button { min-height: 40px; padding: .55rem .8rem; }
-    .studio-save-options { right: 0; }
     .studio-preview-stage { padding: .65rem; }
     .studio-publish-actions { flex-direction: column-reverse; }
+    .studio-link-actions { flex-wrap: wrap; }
+    .studio-link-actions > span { display: none; }
+    .studio-link-actions .studio-button { flex: 1 1 130px; }
+    .studio-image-context { justify-content: flex-start; overflow-x: auto; }
+    .studio-image-actions { flex-direction: column-reverse; }
     .studio-ai-actions { flex-direction: column-reverse; }
     .studio-ai-connection-heading, .studio-ai-connection-actions { align-items: stretch; flex-direction: column; }
     .studio-ai-key-option > div { grid-template-columns: 1fr; }

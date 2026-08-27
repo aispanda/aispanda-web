@@ -15,7 +15,6 @@ import {
   getDocs,
   getFirestore,
   query,
-  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -29,15 +28,37 @@ import {
   type MemberProfileChoices,
 } from '../data/member-profile';
 import { getFirebaseClientApp, googleClientId, isFirebaseConfigured } from './firebase-client';
+import {
+  STUDIO_CONTENT_FORMAT,
+  STUDIO_REGISTRY_VERSION,
+  STUDIO_SCHEMA_VERSION,
+} from './studio-tiptap-schema.mjs';
 
 export type StudioDraftRecord = Record<string, unknown> & { updatedAt?: string; archivedAt?: string };
 export type PublicationPreview = {
-  title: string;
-  bodyHtml: string;
-  excerpt: string;
-  slug: string;
-  tags: string[];
-  readMinutes: number;
+  mode: 'preview';
+  receiptId: string;
+  snapshotSha256: string;
+  renderedPageSha256: string;
+  html: string;
+  article: {
+    title: string;
+    slug: string;
+    sourceUpdatedAt: string;
+    sourceRevision: number;
+    contentSha256: string;
+  };
+};
+export type StudioImageAsset = {
+  assetId: string;
+  url: string;
+  alt: string;
+  decorative: boolean;
+  caption: string;
+  contentType: string;
+  size: number;
+  width: number;
+  height: number;
 };
 export type StudioRole = 'administrator' | 'publisher' | 'author' | 'commenter' | 'viewer';
 export type EditorialRole = Extract<StudioRole, 'administrator' | 'publisher' | 'author'>;
@@ -58,18 +79,33 @@ export type StudioBackend = {
   role: StudioRole;
   accountEmail?: string;
   listDrafts: () => Promise<Record<string, StudioDraftRecord>>;
-  saveDraft: (id: string, draft: StudioDraftRecord, expectedUpdatedAt?: string) => Promise<void>;
+  saveDraft: (id: string, draft: StudioDraftRecord, expectedUpdatedAt?: string, checkpoint?: boolean) => Promise<{
+    updatedAt: string;
+    revision: number;
+    contentSha256: string;
+  }>;
+  migrateDraft: (id: string, expectedUpdatedAt: string, expectedRevision: number, expectedSourceSha256: string) => Promise<{
+    updatedAt: string;
+    revision: number;
+    contentSha256: string;
+  }>;
   archiveDraft: (id: string, expectedUpdatedAt: string) => Promise<{ archivedAt: string }>;
   restoreDraft: (id: string, expectedUpdatedAt: string) => Promise<{ restoredAt: string; updatedAt: string }>;
-  previewDraft: (id: string, draft: StudioDraftRecord) => Promise<PublicationPreview>;
-  previewDocument: (id: string, draft: StudioDraftRecord) => Promise<string>;
-  publishDraft: (id: string, expectedUpdatedAt: string, idempotencyKey: string) => Promise<{
+  previewDraft: (id: string) => Promise<PublicationPreview>;
+  previewDocument: (id: string) => Promise<PublicationPreview>;
+  publishDraft: (id: string, expectedUpdatedAt: string, idempotencyKey: string, previewReceiptId: string) => Promise<{
     releaseId: string;
     liveUrl: string;
     slug: string;
     updatedAt: string;
+    revision: number;
+    contentSha256: string;
+    snapshotSha256: string;
+    renderedPageSha256: string;
   }>;
   unpublishDraft: (id: string, expectedUpdatedAt: string) => Promise<{ slug: string; updatedAt: string }>;
+  uploadImage: (id: string, file: File, description: { alt: string; decorative: boolean; caption: string }, signal?: AbortSignal) => Promise<StudioImageAsset>;
+  loadImage: (assetId: string) => Promise<Blob>;
   listRoleRequests: () => Promise<RoleRequest[]>;
   reviewRoleRequest: (request: RoleRequest, decision: 'approved' | 'denied') => Promise<void>;
 };
@@ -224,9 +260,46 @@ const recordAuthorizedProfile = async (user: User) => {
 
 const createCloudBackend = (user: User, role: EditorialRole) => {
   const db = getFirestore();
+  type DraftVersion = {
+    format: 'legacy' | 'tiptap-json';
+    updatedAt: string;
+    revision: number;
+    contentSha256?: string;
+    sourceSha256?: string;
+    legacyDraft?: StudioDraftRecord;
+  };
+  const draftVersions = new Map<string, DraftVersion>();
+  const sha256 = async (value: string) => {
+    const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  };
+  const contentDocument = (content: unknown) => ({
+    format: STUDIO_CONTENT_FORMAT,
+    schemaVersion: STUDIO_SCHEMA_VERSION,
+    registryVersion: STUDIO_REGISTRY_VERSION,
+    content,
+  });
+  const canonicalDraftPayload = (draft: StudioDraftRecord) => ({
+    title: String(draft.title ?? '').trim(),
+    excerpt: String(draft.excerpt ?? '').trim(),
+    slug: String(draft.slug ?? ''),
+    tags: String(draft.tags ?? '').trim(),
+    ...contentDocument(draft.content),
+  });
+  const publicationRevision = (id: string) => {
+    const current = draftVersions.get(id);
+    if (!current || current.format !== 'tiptap-json' || !current.contentSha256) {
+      throw new Error('Save or convert this article before previewing it.');
+    }
+    return {
+      expectedUpdatedAt: current.updatedAt,
+      expectedRevision: current.revision,
+      expectedContentSha256: current.contentSha256,
+    };
+  };
   const contentRequest = async <T>(
     id: string,
-    action: 'publish' | 'unpublish' | 'preview' | 'archive' | 'restore',
+    action: 'save' | 'migrate' | 'publish' | 'unpublish' | 'preview' | 'archive' | 'restore',
     body: Record<string, unknown>,
   ): Promise<T> => {
     const response = await fetch(`/api/content/drafts/${encodeURIComponent(id)}/${action}`, {
@@ -237,24 +310,27 @@ const createCloudBackend = (user: User, role: EditorialRole) => {
       },
       body: JSON.stringify(body),
     });
-    const payload = await response.json().catch(() => ({})) as { error?: string } & T;
-    if (!response.ok) throw new Error(payload.error ?? 'The publication request failed.');
+    const payload = await response.json().catch(() => ({})) as { error?: string; position?: number } & T;
+    if (!response.ok) {
+      const location = Number.isInteger(payload.position) && Number(payload.position) >= 0
+        ? ` (near character ${Number(payload.position) + 1})`
+        : '';
+      throw new Error(`${payload.error ?? 'The publication request failed.'}${location}`);
+    }
     return payload;
   };
-  const previewDocumentRequest = async (id: string, draft: StudioDraftRecord) => {
+  const previewDocumentRequest = async (id: string) => {
     const response = await fetch(`/api/content/drafts/${encodeURIComponent(id)}/preview-document`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${await user.getIdToken()}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ draft }),
+      body: JSON.stringify(publicationRevision(id)),
     });
-    const payload = await response.text();
+    const payload = await response.json().catch(() => ({})) as { error?: string } & PublicationPreview;
     if (!response.ok) {
-      let message = 'The production-style preview could not be rendered.';
-      try { message = JSON.parse(payload).error ?? message; } catch { /* Keep the bounded fallback. */ }
-      throw new Error(message);
+      throw new Error(payload.error ?? 'The production-style preview could not be rendered.');
     }
     return payload;
   };
@@ -269,34 +345,124 @@ const createCloudBackend = (user: User, role: EditorialRole) => {
           ? drafts
           : query(drafts, where('ownerUid', '==', user.uid)),
       );
-      return Object.fromEntries(snapshot.docs.map((draft) => [draft.id, draft.data() as StudioDraftRecord]));
-    },
-    saveDraft: async (id: string, draft: StudioDraftRecord, expectedUpdatedAt?: string) => {
-      const draftRef = doc(db, 'contentDrafts', id);
-      await runTransaction(db, async (transaction) => {
-        const current = await transaction.get(draftRef);
-        const currentData = current.exists() ? current.data() : undefined;
-        if (currentData?.archivedAt) {
-          throw new Error('This draft is archived and must be restored before it can be edited.');
+      const entries = await Promise.all(snapshot.docs.map(async (snapshotDraft) => {
+        const record = snapshotDraft.data() as StudioDraftRecord;
+        if (record.format === STUDIO_CONTENT_FORMAT) {
+          const revision = Number(record.revision);
+          const contentSha256 = String(record.contentSha256 ?? '');
+          draftVersions.set(snapshotDraft.id, {
+            format: 'tiptap-json',
+            updatedAt: String(record.updatedAt ?? ''),
+            revision,
+            contentSha256,
+          });
+          return [snapshotDraft.id, {
+            ...record,
+            contentFormat: 'tiptap-json',
+          }] as const;
         }
-        if (currentData && expectedUpdatedAt && currentData.updatedAt !== expectedUpdatedAt) {
-          throw new Error('This draft changed in another session. Reload before saving.');
-        }
-        transaction.set(draftRef, {
-          ...draft,
-          ownerUid: currentData?.ownerUid ?? user.uid,
-          ownerEmail: currentData?.ownerEmail ?? user.email,
+        const source = String(record.body ?? '');
+        const sourceSha256 = await sha256(source);
+        draftVersions.set(snapshotDraft.id, {
+          format: 'legacy',
+          updatedAt: String(record.updatedAt ?? ''),
+          revision: Number.isInteger(record.revision) ? Number(record.revision) : 0,
+          sourceSha256,
+          legacyDraft: record,
         });
+        return [snapshotDraft.id, {
+          ...record,
+          contentFormat: 'legacy',
+          revision: Number.isInteger(record.revision) ? Number(record.revision) : 0,
+          sourceSha256,
+        }] as const;
+      }));
+      return Object.fromEntries(entries);
+    },
+    saveDraft: async (id: string, draft: StudioDraftRecord, expectedUpdatedAt?: string, checkpoint = false) => {
+      const current = draftVersions.get(id);
+      if (current?.format === 'legacy') {
+        throw new Error('Convert this legacy draft to the professional editor before saving changes.');
+      }
+      const result = await contentRequest<{ updatedAt: string; revision: number; contentSha256: string }>(id, 'save', {
+        draft: canonicalDraftPayload(draft),
+        expectedUpdatedAt: current ? expectedUpdatedAt : undefined,
+        expectedRevision: current?.revision ?? 0,
+        expectedContentSha256: current?.contentSha256,
+        checkpoint,
       });
+      draftVersions.set(id, {
+        format: 'tiptap-json',
+        updatedAt: result.updatedAt,
+        revision: result.revision,
+        contentSha256: result.contentSha256,
+      });
+      return result;
+    },
+    migrateDraft: async (id: string, expectedUpdatedAt: string, expectedRevision: number, expectedSourceSha256: string) => {
+      const result = await contentRequest<{ updatedAt: string; revision: number; contentSha256: string }>(id, 'migrate', {
+        expectedUpdatedAt,
+        expectedRevision,
+        expectedSourceSha256,
+      });
+      draftVersions.set(id, {
+        format: 'tiptap-json',
+        updatedAt: result.updatedAt,
+        revision: result.revision,
+        contentSha256: result.contentSha256,
+      });
+      return result;
     },
     archiveDraft: (id: string, expectedUpdatedAt: string) => contentRequest(id, 'archive', { expectedUpdatedAt }),
     restoreDraft: (id: string, expectedUpdatedAt: string) => contentRequest(id, 'restore', { expectedUpdatedAt }),
-    previewDraft: (id: string, draft: StudioDraftRecord) => contentRequest(id, 'preview', { draft }),
-    previewDocument: previewDocumentRequest,
-    publishDraft: (id: string, expectedUpdatedAt: string, idempotencyKey: string) =>
-      contentRequest(id, 'publish', { expectedUpdatedAt, idempotencyKey }),
+    previewDraft: async (id: string) => contentRequest(id, 'preview', publicationRevision(id)),
+    previewDocument: async (id: string) => previewDocumentRequest(id),
+    publishDraft: async (id: string, expectedUpdatedAt: string, idempotencyKey: string, previewReceiptId: string) => {
+      const revision = publicationRevision(id);
+      const result = await contentRequest<{
+        releaseId: string;
+        liveUrl: string;
+        slug: string;
+        updatedAt: string;
+        revision: number;
+        contentSha256: string;
+        snapshotSha256: string;
+        renderedPageSha256: string;
+      }>(id, 'publish', { ...revision, expectedUpdatedAt, idempotencyKey, previewReceiptId });
+      draftVersions.set(id, {
+        format: 'tiptap-json',
+        updatedAt: result.updatedAt,
+        revision: result.revision,
+        contentSha256: result.contentSha256,
+      });
+      return result;
+    },
     unpublishDraft: (id: string, expectedUpdatedAt: string) =>
       contentRequest(id, 'unpublish', { expectedUpdatedAt }),
+    uploadImage: async (id, file, description, signal) => {
+      const form = new FormData();
+      form.set('file', file);
+      form.set('alt', description.alt);
+      form.set('decorative', String(description.decorative));
+      form.set('caption', description.caption);
+      const response = await fetch(`/api/content/drafts/${encodeURIComponent(id)}/images`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+        body: form,
+        signal,
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string } & StudioImageAsset;
+      if (!response.ok) throw new Error(payload.error ?? 'The image upload failed. Your article was not changed.');
+      return payload;
+    },
+    loadImage: async (assetId) => {
+      const response = await fetch(`/content-assets/${encodeURIComponent(assetId)}`, {
+        headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('This private draft image could not be loaded.');
+      return response.blob();
+    },
     listRoleRequests: async () => {
       if (role !== 'administrator') return [];
       const snapshot = await getDocs(query(collection(db, 'roleRequests'), where('status', '==', 'pending')));

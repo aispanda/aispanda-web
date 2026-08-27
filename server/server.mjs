@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import {
   SUPPORTED_AI_PROVIDERS,
   decodeVaultKey,
@@ -18,26 +19,30 @@ import {
 } from './ai-vault-core.mjs';
 import {
   appendPublishedUrlsToSitemap,
+  assertContentMutationRequest,
   archiveDraft,
   listPublishedArticles,
   loadPublishedArticle,
+  migrateLegacyDraft,
   previewDraft,
   publishDraft,
-  renderPublishedArticle,
-  renderPublishedPreview,
   renderPublishedInsightRows,
   restoreDraft,
+  saveCanonicalDraft,
   unpublishDraft,
   withContentFailureAudit,
 } from './content-publishing.mjs';
 import { isInternalArticleShellFile } from './static-routing.mjs';
-import { buildRuntimePublicConfig, injectRuntimePublicConfig } from './runtime-config.mjs';
+import { publicStudioContentErrorDetails } from './studio-content-document.mjs';
+import { createStudioImageAsset, resolveStudioContentAsset } from './studio-content-assets.mjs';
+import { buildRuntimePublicConfig, injectRuntimePublicConfig, prepareServedText } from './runtime-config.mjs';
 
 const PORT = Number(process.env.PORT) || 8080;
 const DIST_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const VAULT_KEY = decodeVaultKey(process.env.AI_VAULT_KEY_B64);
 const JSON_LIMIT = 64 * 1024;
 const CONTENT_JSON_LIMIT = 600 * 1024;
+const IMAGE_UPLOAD_LIMIT = 6 * 1024 * 1024;
 const SITE_ORIGIN = new URL(process.env.PUBLIC_SITE_ORIGIN ?? 'https://aispanda.com').origin;
 const RUNTIME_PUBLIC_CONFIG = buildRuntimePublicConfig(process.env);
 const FIREBASE_AUTH_ORIGIN = new URL(`https://${RUNTIME_PUBLIC_CONFIG?.firebase.authDomain ?? 'aispanda.firebaseapp.com'}`);
@@ -54,6 +59,7 @@ const auth = getAuth(app);
 // browser is still denied vault access by rules; the dedicated Cloud Run
 // identity is the only server principal intended to access this collection.
 const db = getFirestore(app);
+const bucket = getStorage(app).bucket(RUNTIME_PUBLIC_CONFIG?.firebase.storageBucket);
 
 const securityHeaders = {
   'X-Content-Type-Options': 'nosniff',
@@ -82,6 +88,17 @@ const readJson = async (request, limit = JSON_LIMIT) => {
   } catch {
     throw Object.assign(new Error('Request body must be valid JSON.'), { statusCode: 400 });
   }
+};
+
+const readBody = async (request, limit) => {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > limit) throw Object.assign(new Error('Request is too large.'), { statusCode: 413 });
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 };
 
 const requestOrigin = (request) => {
@@ -166,7 +183,7 @@ const providerFromPath = (pathname) => {
 };
 
 const contentRouteFromPath = (pathname) => {
-  const match = pathname.match(/^\/api\/content\/drafts\/([^/]+)\/(publish|unpublish|preview|preview-document|archive|restore)$/);
+  const match = pathname.match(/^\/api\/content\/drafts\/([^/]+)\/(save|migrate|publish|unpublish|preview|preview-document|archive|restore)$/);
   if (!match) return null;
   try {
     const draftId = decodeURIComponent(match[1]);
@@ -176,15 +193,60 @@ const contentRouteFromPath = (pathname) => {
   }
 };
 
+const contentImageUploadFromPath = (pathname) => {
+  const match = pathname.match(/^\/api\/content\/drafts\/([^/]+)\/images$/);
+  if (!match) return null;
+  try {
+    const draftId = decodeURIComponent(match[1]);
+    return /^[a-zA-Z0-9-]{1,128}$/.test(draftId) ? draftId : null;
+  } catch {
+    return null;
+  }
+};
+
 const handleApi = async (request, response, url) => {
   requireSameOrigin(request);
   const user = await requireUser(request);
+  const imageDraftId = contentImageUploadFromPath(url.pathname);
+  if (imageDraftId) {
+    if (request.method !== 'POST') throw Object.assign(new Error('Method not allowed.'), { statusCode: 405 });
+    enforceContentRateLimit(user.uid);
+    const contentType = String(request.headers['content-type'] ?? '');
+    if (!contentType.toLowerCase().startsWith('multipart/form-data;')) {
+      throw Object.assign(new Error('Image uploads require multipart form data.'), { statusCode: 400 });
+    }
+    const form = await new Response(await readBody(request, IMAGE_UPLOAD_LIMIT), {
+      headers: { 'Content-Type': contentType },
+    }).formData();
+    const file = form.get('file');
+    if (!file || typeof file === 'string' || typeof file.arrayBuffer !== 'function') {
+      throw Object.assign(new Error('Choose an image file to upload.'), { statusCode: 400 });
+    }
+    const result = await createStudioImageAsset({
+      db,
+      bucket,
+      draftId: imageDraftId,
+      publisherUid: user.uid,
+      bytes: Buffer.from(await file.arrayBuffer()),
+      mimeType: file.type,
+      alt: form.get('alt'),
+      decorative: form.get('decorative') === 'true',
+      caption: form.get('caption'),
+    });
+    json(response, 201, result);
+    return;
+  }
   const contentRoute = contentRouteFromPath(url.pathname);
   if (contentRoute) {
     const preflight = async () => {
       if (request.method !== 'POST') throw Object.assign(new Error('Method not allowed.'), { statusCode: 405 });
       enforceContentRateLimit(user.uid);
-      return readJson(request, contentRoute.action.startsWith('preview') ? CONTENT_JSON_LIMIT : JSON_LIMIT);
+      const usesContentPayload = contentRoute.action.startsWith('preview') || contentRoute.action === 'save' || contentRoute.action === 'migrate';
+      const body = await readJson(request, usesContentPayload ? CONTENT_JSON_LIMIT : JSON_LIMIT);
+      if (contentRoute.action === 'save' || contentRoute.action === 'migrate') {
+        assertContentMutationRequest(contentRoute.action, body);
+      }
+      return body;
     };
     const body = contentRoute.action.startsWith('preview')
       ? await preflight()
@@ -196,17 +258,47 @@ const handleApi = async (request, response, url) => {
         occurredAt: new Date().toISOString(),
       }, preflight);
     const common = { db, draftId: contentRoute.draftId, publisherUid: user.uid };
+    const articleTemplate = contentRoute.action.startsWith('preview') || contentRoute.action === 'publish'
+      ? injectRuntimePublicConfig(await loadArticleShell(), RUNTIME_PUBLIC_CONFIG)
+      : undefined;
     if (contentRoute.action === 'preview-document') {
-      const [preview, template] = await Promise.all([
-        previewDraft({ db, draft: body.draft, publisherUid: user.uid }),
-        loadArticleShell(),
-      ]);
-      const html = renderPublishedPreview(template, { ...preview, draftId: contentRoute.draftId }, SITE_ORIGIN);
-      serveText(request, response, html, 'text/html; charset=utf-8', 200, 'no-store');
+      const preview = await previewDraft({
+        ...common,
+        expectedUpdatedAt: body.expectedUpdatedAt,
+        expectedRevision: body.expectedRevision,
+        expectedContentSha256: body.expectedContentSha256,
+        articleTemplate,
+        origin: SITE_ORIGIN,
+      });
+      json(response, 200, preview);
       return;
     }
     const result = contentRoute.action === 'preview'
-      ? await previewDraft({ db, draft: body.draft, publisherUid: user.uid })
+      ? await previewDraft({
+        ...common,
+        expectedUpdatedAt: body.expectedUpdatedAt,
+        expectedRevision: body.expectedRevision,
+        expectedContentSha256: body.expectedContentSha256,
+        articleTemplate,
+        origin: SITE_ORIGIN,
+      })
+      : contentRoute.action === 'save'
+        ? await saveCanonicalDraft({
+          ...common,
+          publisherEmail: user.email,
+          draft: body.draft,
+          expectedUpdatedAt: body.expectedUpdatedAt,
+          expectedRevision: body.expectedRevision,
+          expectedContentSha256: body.expectedContentSha256,
+          checkpoint: body.checkpoint,
+        })
+        : contentRoute.action === 'migrate'
+          ? await migrateLegacyDraft({
+            ...common,
+            expectedUpdatedAt: body.expectedUpdatedAt,
+            expectedRevision: body.expectedRevision,
+            expectedSourceSha256: body.expectedSourceSha256,
+          })
       : contentRoute.action === 'archive'
         ? await archiveDraft({ ...common, expectedUpdatedAt: body.expectedUpdatedAt })
         : contentRoute.action === 'restore'
@@ -215,8 +307,12 @@ const handleApi = async (request, response, url) => {
           ? await publishDraft({
             ...common,
             expectedUpdatedAt: body.expectedUpdatedAt,
+            expectedRevision: body.expectedRevision,
+            expectedContentSha256: body.expectedContentSha256,
+            previewReceiptId: body.previewReceiptId,
             idempotencyKey: body.idempotencyKey,
             origin: SITE_ORIGIN,
+            articleTemplate,
           })
           : await unpublishDraft({ ...common, expectedUpdatedAt: body.expectedUpdatedAt });
     json(response, 200, result);
@@ -346,10 +442,14 @@ const serveText = (
   contentType,
   status = 200,
   cacheControl = 'public, max-age=0, must-revalidate',
+  { preserveExactBytes = false } = {},
 ) => {
-  const renderedBody = contentType.startsWith('text/html')
-    ? injectRuntimePublicConfig(body, RUNTIME_PUBLIC_CONFIG)
-    : body;
+  const renderedBody = prepareServedText({
+    body,
+    contentType,
+    runtimeConfig: RUNTIME_PUBLIC_CONFIG,
+    preserveExactBytes,
+  });
   response.writeHead(status, {
     ...securityHeaders,
     'Cache-Control': cacheControl,
@@ -365,6 +465,29 @@ const loadPublishedArticlesSafely = async () => {
     console.error('Published-content discovery is temporarily unavailable.', error);
     return [];
   }
+};
+
+const optionalUser = async (request) => {
+  if (!String(request.headers.authorization ?? '').startsWith('Bearer ')) return null;
+  return requireUser(request);
+};
+
+const serveContentAsset = async (request, response, assetId) => {
+  const { asset, file } = await resolveStudioContentAsset({
+    db,
+    bucket,
+    assetId,
+    user: await optionalUser(request),
+  });
+  response.writeHead(200, {
+    ...securityHeaders,
+    'Cache-Control': 'no-store',
+    'Vary': 'Authorization',
+    'Content-Type': asset.contentType,
+    'Content-Length': String(asset.size),
+  });
+  if (request.method === 'HEAD') response.end();
+  else file.createReadStream({ validation: true }).pipe(response);
 };
 
 const serveStatic = async (request, response, url) => {
@@ -391,9 +514,15 @@ const serveStatic = async (request, response, url) => {
   if (pathSegments.length === 1) {
     const article = await loadPublishedArticle(db, pathSegments[0]);
     if (article) {
-      const template = await loadArticleShell();
-      const html = renderPublishedArticle(template, article, SITE_ORIGIN);
-      serveText(request, response, html, 'text/html; charset=utf-8');
+      serveText(
+        request,
+        response,
+        article.renderedPageHtml,
+        'text/html; charset=utf-8',
+        200,
+        'public, max-age=0, must-revalidate',
+        { preserveExactBytes: true },
+      );
       return;
     }
   }
@@ -408,12 +537,19 @@ const server = createServer(async (request, response) => {
   try {
     if (url.pathname.startsWith('/api/')) await handleApi(request, response, url);
     else if (url.pathname.startsWith('/__/auth')) await proxyFirebaseAuth(request, response, url);
+    else if ((request.method === 'GET' || request.method === 'HEAD') && /^\/content-assets\/[a-f0-9-]+$/.test(url.pathname)) {
+      await serveContentAsset(request, response, url.pathname.slice('/content-assets/'.length));
+    }
     else if (request.method === 'GET' || request.method === 'HEAD') await serveStatic(request, response, url);
     else json(response, 405, { error: 'Method not allowed.' });
   } catch (error) {
     const status = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
     if (status >= 500) console.error('Request failed', { path: url.pathname, status, name: error?.name });
-    json(response, status, { error: status >= 500 ? 'The service could not complete this request.' : error.message });
+    const details = status < 500 ? publicStudioContentErrorDetails(error) : null;
+    json(response, status, {
+      error: status >= 500 ? 'The service could not complete this request.' : error.message,
+      ...(details ?? {}),
+    });
   }
 });
 

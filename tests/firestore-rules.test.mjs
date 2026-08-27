@@ -74,12 +74,17 @@ after(async () => {
 });
 
 describe('content draft boundary', () => {
-  test('administrator can create and read a valid draft', async () => {
+  test('administrator can read a server-created draft but cannot write it from the browser', async () => {
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'contentDrafts', 'draft-1'), draft());
+    });
     const database = contextFor(adminUid).firestore();
     const reference = doc(database, 'contentDrafts', 'draft-1');
 
-    await assertSucceeds(setDoc(reference, draft()));
     await assertSucceeds(getDoc(reference));
+    await assertFails(updateDoc(reference, { title: 'Browser rewrite' }));
+    await assertFails(deleteDoc(reference));
+    await assertFails(setDoc(doc(database, 'contentDrafts', 'new-draft'), draft()));
   });
 
   test('author cannot read or update another author\'s draft', async () => {
@@ -101,8 +106,10 @@ describe('content draft boundary', () => {
       publicationLiveUrl: 'https://aispanda.com/forged',
     }));
 
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'contentDrafts', 'draft-3'), draft());
+    });
     const reference = doc(database, 'contentDrafts', 'draft-3');
-    await assertSucceeds(setDoc(reference, draft()));
     await assertFails(updateDoc(reference, {
       publicationReleaseId: 'release-forged',
       publicationLiveUrl: 'https://aispanda.com/forged',
@@ -132,8 +139,12 @@ describe('server-owned publication boundary', () => {
         setDoc(doc(context.firestore(), 'publishedContent', 'private-release'), { title: 'Private' }),
         setDoc(doc(context.firestore(), 'contentPublicationIndex', 'draft-1'), { slug: 'private-release' }),
         setDoc(doc(context.firestore(), 'contentPublicationRequests', 'request-1'), { status: 'complete' }),
+        setDoc(doc(context.firestore(), 'contentPreviewReceipts', 'receipt-1'), { status: 'ready' }),
         setDoc(doc(context.firestore(), 'contentReleases', 'release-1'), { slug: 'private-release' }),
+        setDoc(doc(context.firestore(), 'contentReleasePayloads', 'release-1_page'), { kind: 'page' }),
         setDoc(doc(context.firestore(), 'contentAuditEvents', 'event-1'), { action: 'publish' }),
+        setDoc(doc(context.firestore(), 'contentAssets', 'asset-1'), { status: 'ready' }),
+        setDoc(doc(context.firestore(), 'contentAssetPublicRefs', 'asset-1'), { active: true }),
       ]);
     });
 
@@ -142,8 +153,12 @@ describe('server-owned publication boundary', () => {
       ['publishedContent', 'private-release'],
       ['contentPublicationIndex', 'draft-1'],
       ['contentPublicationRequests', 'request-1'],
+      ['contentPreviewReceipts', 'receipt-1'],
       ['contentReleases', 'release-1'],
+      ['contentReleasePayloads', 'release-1_page'],
       ['contentAuditEvents', 'event-1'],
+      ['contentAssets', 'asset-1'],
+      ['contentAssetPublicRefs', 'asset-1'],
     ]) {
       const reference = doc(database, collection, id);
       await assertFails(getDoc(reference));

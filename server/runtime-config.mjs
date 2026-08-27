@@ -69,3 +69,9 @@ export const injectRuntimePublicConfig = (html, runtimeConfig) => {
   if (html.startsWith(script, insertionPoint)) return html;
   return `${html.slice(0, insertionPoint)}${script}${html.slice(insertionPoint)}`;
 };
+
+export const prepareServedText = ({ body, contentType, runtimeConfig, preserveExactBytes = false }) => (
+  preserveExactBytes || !contentType.startsWith('text/html')
+    ? body
+    : injectRuntimePublicConfig(body, runtimeConfig)
+);

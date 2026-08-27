@@ -343,30 +343,7 @@ service cloud.firestore {
     match /contentDrafts/{draftId} {
       allow read: if isAdministrator() || isPublisher()
         || (isAuthor() && resource.data.ownerUid == request.auth.uid);
-      allow create: if validDraft()
-        && (isAdministrator() || isPublisher()
-          || (isAuthor() && request.resource.data.ownerUid == request.auth.uid))
-        && request.resource.data.publicationStatus == 'draft'
-        && request.resource.data.get('publicationReleaseId', '') == ''
-        && request.resource.data.get('publicationLiveUrl', '') == '';
-      allow update: if validDraft()
-        && resource.data.get('archivedAt', '') == ''
-        && (isAdministrator() || isPublisher()
-          || (isAuthor()
-            && resource.data.ownerUid == request.auth.uid
-            && request.resource.data.ownerUid == request.auth.uid))
-        && request.resource.data.get('publicationReleaseId', '')
-          == resource.data.get('publicationReleaseId', '')
-        && request.resource.data.get('publicationLiveUrl', '')
-          == resource.data.get('publicationLiveUrl', '')
-        && (
-          request.resource.data.publicationStatus == resource.data.publicationStatus
-          || (
-            resource.data.publicationStatus == 'published'
-            && request.resource.data.publicationStatus == 'published-with-changes'
-          )
-        );
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /publishedContent/{slug} {
@@ -381,11 +358,27 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /contentPreviewReceipts/{receiptId} {
+      allow read, write: if false;
+    }
+
     match /contentReleases/{releaseId} {
       allow read, write: if false;
     }
 
+    match /contentReleasePayloads/{payloadId} {
+      allow read, write: if false;
+    }
+
     match /contentAuditEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /contentAssets/{assetId} {
+      allow read, write: if false;
+    }
+
+    match /contentAssetPublicRefs/{assetId} {
       allow read, write: if false;
     }
 

@@ -5,19 +5,33 @@ import test from 'node:test';
 import {
   appendPublishedUrlsToSitemap,
   archiveDraft,
+  assertContentMutationRequest,
+  buildPublicationSnapshot,
+  loadPublishedArticle,
+  migrateLegacyDraft,
   previewDraft,
   publishDraft,
   renderPublishedArticle,
   renderPublishedPreview,
   renderPublishedInsightRows,
   restoreDraft,
+  saveCanonicalDraft,
   sanitizeArticleBody,
+  SUPPORTED_PUBLICATION_VERSION_TUPLES,
+  supportsPublicationVersion,
   unpublishDraft,
   validateDraftForPublication,
   validateDraftForPreview,
   withContentFailureAudit,
 } from '../server/content-publishing.mjs';
 import { isInternalArticleShellFile } from '../server/static-routing.mjs';
+import {
+  canonicalContentFields,
+  createContentDocument,
+  publicStudioContentErrorDetails,
+  resolveStoredDraftContent,
+  sha256,
+} from '../server/studio-content-document.mjs';
 
 test('encoded URLs cannot expose the internal article shell', () => {
   const distRoot = resolve('dist');
@@ -100,6 +114,99 @@ const draft = (overrides = {}) => ({
   ...overrides,
 });
 
+const contentDocument = (text = 'Useful article.') => createContentDocument({
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+});
+
+const imageAssetId = '11111111-2222-4333-8444-555555555555';
+const imageContentDocument = (assetId = imageAssetId) => createContentDocument({
+  type: 'doc',
+  content: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'Useful article.' }] },
+    { type: 'image', attrs: { assetId, alt: 'Consulting workflow diagram', decorative: false, caption: 'A governed image' } },
+  ],
+});
+
+const canonicalDraft = (overrides = {}) => ({
+  title: 'Consulting Rewired',
+  ...canonicalContentFields(contentDocument()),
+  excerpt: 'How AI changes consulting.',
+  slug: 'consulting-rewired',
+  tags: 'AI, Consulting',
+  publicationStatus: 'draft',
+  publicationReleaseId: '',
+  publicationLiveUrl: '',
+  updatedAt: '2026-08-26T14:00:00.000Z',
+  revision: 1,
+  revisions: [],
+  ownerUid: 'author-1',
+  ownerEmail: 'author@example.com',
+  ...overrides,
+});
+
+const canonicalSavePayload = (record, document = contentDocument()) => ({
+  title: record.title,
+  excerpt: record.excerpt,
+  slug: record.slug,
+  tags: record.tags,
+  ...document,
+});
+
+const articleTemplateV1 = '<!doctype html><html><head><title>@@AISPANDA_ARTICLE_TITLE@@</title><link rel="canonical" href="https://aispanda.com/article-shell-internal"></head><body><main><h1>@@AISPANDA_ARTICLE_TITLE@@</h1><p>@@AISPANDA_ARTICLE_DESCRIPTION@@</p><article>@@AISPANDA_ARTICLE_BODY@@</article><small>@@AISPANDA_ARTICLE_READ_TIME@@</small></main></body></html>';
+const articleTemplateV2 = articleTemplateV1.replace('<main>', '<main data-template="v2">');
+
+const previewCurrent = ({
+  db,
+  record,
+  draftId = 'draft-1',
+  publisherUid = 'publisher-1',
+  articleTemplate = articleTemplateV1,
+  now = new Date('2026-08-26T14:30:00.000Z'),
+}) => previewDraft({
+  db,
+  draftId,
+  expectedUpdatedAt: record.updatedAt,
+  expectedRevision: record.revision,
+  expectedContentSha256: record.contentSha256,
+  publisherUid,
+  articleTemplate,
+  origin: 'https://aispanda.com',
+  now,
+});
+
+const publishCurrent = async ({
+  db,
+  record,
+  draftId = 'draft-1',
+  publisherUid = 'publisher-1',
+  articleTemplate = articleTemplateV1,
+  idempotencyKey = 'request-0000000001',
+  now = new Date('2026-08-26T15:00:00.000Z'),
+}) => {
+  const preview = await previewCurrent({
+    db,
+    record,
+    draftId,
+    publisherUid,
+    articleTemplate,
+    now: new Date(now.getTime() - (5 * 60 * 1000)),
+  });
+  return publishDraft({
+    db,
+    draftId,
+    expectedUpdatedAt: record.updatedAt,
+    expectedRevision: record.revision,
+    expectedContentSha256: record.contentSha256,
+    previewReceiptId: preview.receiptId,
+    idempotencyKey,
+    publisherUid,
+    origin: 'https://aispanda.com',
+    articleTemplate,
+    now,
+  });
+};
+
 test('server sanitization removes executable markup and unsafe attributes', () => {
   const html = sanitizeArticleBody(
     '<p onclick="alert(1)">Safe<script>alert(1)</script><a href="javascript:alert(1)" style="color:red">unsafe</a><a href="https://example.com">safe</a></p>',
@@ -113,85 +220,728 @@ test('server sanitization removes executable markup and unsafe attributes', () =
   assert.match(html, /href="https:\/\/example.com"/);
 });
 
-test('safe preview permits incomplete drafts without relaxing publication validation', () => {
-  const incomplete = draft({ title: '', slug: '', body: '<p>Work in progress<script>alert(1)</script></p>' });
-  const preview = validateDraftForPreview(incomplete);
-  assert.equal(preview.title, 'Untitled article');
-  assert.equal(preview.slug, 'preview');
-  assert.equal(preview.bodyHtml.includes('<script'), false);
+test('production preview enforces the same publication readiness contract', () => {
+  const incomplete = canonicalDraft({ title: '', slug: '' });
+  assert.throws(() => validateDraftForPreview(incomplete), /article title/);
   assert.throws(() => validateDraftForPublication(incomplete), /article title/);
+  assert.throws(() => validateDraftForPreview(canonicalDraft({ slug: 'studio' })), /reserved/);
+});
+
+test('the frozen v1 reader remains registered independently of future writer versions', () => {
+  const [v1] = SUPPORTED_PUBLICATION_VERSION_TUPLES;
+  assert.equal(supportsPublicationVersion(v1), true);
+  assert.equal(supportsPublicationVersion({
+    snapshotVersion: 'ai-91-publication-v2',
+    rendererVersion: 'future-renderer-v2',
+    sanitizerVersion: 'future-sanitizer-v2',
+    templateVersion: 'future-template-v2',
+  }), false);
+  assert.equal(Object.isFrozen(SUPPORTED_PUBLICATION_VERSION_TUPLES), true);
+  assert.equal(Object.isFrozen(v1), true);
 });
 
 test('publication validation produces a stable safe snapshot and rejects reserved slugs', () => {
-  const article = validateDraftForPublication(draft());
+  const article = validateDraftForPublication(canonicalDraft());
   assert.equal(article.slug, 'consulting-rewired');
-  assert.equal(article.bodyHtml, '<p>Useful <strong>article</strong>.</p>');
+  assert.equal(article.bodyHtml, '<p>Useful article.</p>');
   assert.deepEqual(article.tags, ['AI', 'Consulting']);
-  assert.match(validateDraftForPublication(draft({
-    body: '<table><thead><tr><th scope="col">Area</th></tr></thead><tbody><tr><td>Advisory</td></tr></tbody></table>',
-  })).bodyHtml, /<table><thead><tr><th scope="col">Area<\/th><\/tr><\/thead><tbody><tr><td>Advisory<\/td><\/tr><\/tbody><\/table>/);
-  assert.throws(() => validateDraftForPublication(draft({ slug: 'studio' })), /reserved/);
-  assert.throws(() => validateDraftForPublication(draft({ slug: 'article-shell-internal' })), /reserved/);
+  assert.equal(validateDraftForPublication(canonicalDraft()).bodyHtml, '<p>Useful article.</p>');
+  assert.throws(() => validateDraftForPublication(draft()), /Convert this legacy draft/);
+  assert.throws(() => validateDraftForPublication(canonicalDraft({ slug: 'studio' })), /reserved/);
+  assert.throws(() => validateDraftForPublication(canonicalDraft({ slug: 'article-shell-internal' })), /reserved/);
+
+  const unhashed = canonicalDraft();
+  delete unhashed.contentSha256;
+  assert.throws(() => validateDraftForPreview(unhashed), /missing its governed integrity hash/);
+  assert.throws(() => validateDraftForPublication(unhashed), /missing its governed integrity hash/);
+  const malformedHash = canonicalDraft({ contentSha256: 'not-a-hash' });
+  assert.throws(() => validateDraftForPreview(malformedHash), /missing its governed integrity hash/);
+  const mismatchedHash = canonicalDraft({ contentSha256: 'f'.repeat(64) });
+  assert.throws(() => validateDraftForPublication(mismatchedHash), /hash does not match/);
+});
+
+test('mutation request preflight rejects forged top-level fields', () => {
+  assert.throws(
+    () => assertContentMutationRequest('save', { draft: {}, ownerUid: 'attacker' }),
+    /Request field ownerUid is not allowed/,
+  );
+  assert.throws(
+    () => assertContentMutationRequest('migrate', { expectedUpdatedAt: '', legacyHtmlOriginal: '<p>forged</p>' }),
+    /Request field legacyHtmlOriginal is not allowed/,
+  );
+});
+
+test('opening a supported legacy draft is read-only while production preview requires migration', () => {
+  const legacy = draft();
+  const resolved = resolveStoredDraftContent(legacy);
+  assert.equal(resolved.renderedHtml, '<p>Useful <strong>article</strong>.</p>');
+  assert.throws(() => validateDraftForPreview(legacy), /Convert this legacy draft/);
+});
+
+test('explicit migration atomically replaces legacy body with canonical root fields and exact provenance', async () => {
+  const legacy = draft();
+  const db = new FakeDb({
+    'studioAccess/author-1': { active: true, role: 'author' },
+    'contentDrafts/draft-1': legacy,
+  });
+  const migratedAt = new Date('2026-08-26T15:00:00.000Z');
+
+  const result = await migrateLegacyDraft({
+    db,
+    draftId: 'draft-1',
+    publisherUid: 'author-1',
+    expectedUpdatedAt: legacy.updatedAt,
+    expectedRevision: 0,
+    expectedSourceSha256: sha256(legacy.body),
+    now: migratedAt,
+  });
+  const stored = db.records.get('contentDrafts/draft-1');
+
+  assert.equal(result.status, 'compatible');
+  assert.equal(result.originalPreserved, true);
+  assert.equal(Object.hasOwn(stored, 'body'), false);
+  assert.equal(stored.format, 'tiptap-json');
+  assert.equal(stored.schemaVersion, 1);
+  assert.equal(stored.registryVersion, 'ai-91-v1');
+  assert.equal(stored.contentSha256, result.contentSha256);
+  assert.equal(stored.revision, 1);
+  assert.equal(stored.updatedAt, migratedAt.toISOString());
+  assert.equal(stored.legacyHtmlOriginal, legacy.body);
+  assert.equal(stored.legacyHtmlSha256, sha256(legacy.body));
+  assert.deepEqual(stored.migrationReport, {
+    status: 'compatible',
+    schemaVersion: 1,
+    registryVersion: 'ai-91-v1',
+    sourceSha256: sha256(legacy.body),
+    contentSha256: result.contentSha256,
+    titleOriginal: legacy.title,
+    titleSha256: sha256(legacy.title),
+    migratedAt: migratedAt.toISOString(),
+    migratedBy: 'author-1',
+  });
+  assert.equal([...db.records.values()].filter((value) => value?.action === 'migrate').length, 1);
+});
+
+test('unsupported migration preserves the draft byte-for-byte and records one actionable failure', async () => {
+  const legacy = draft({ body: '<p>Before</p><table><tr><td>Unsupported</td></tr></table>' });
+  const db = new FakeDb({
+    'studioAccess/author-1': { active: true, role: 'author' },
+    'contentDrafts/draft-1': legacy,
+  });
+
+  let migrationError;
+  try {
+    await migrateLegacyDraft({
+      db,
+      draftId: 'draft-1',
+      publisherUid: 'author-1',
+      expectedUpdatedAt: legacy.updatedAt,
+      expectedRevision: 0,
+      expectedSourceSha256: sha256(legacy.body),
+      now: new Date('2026-08-26T15:00:00.000Z'),
+    });
+  } catch (error) {
+    migrationError = error;
+  }
+
+  assert.match(migrationError?.message ?? '', /Original preserved; nothing saved/);
+  assert.deepEqual(publicStudioContentErrorDetails(migrationError), {
+    code: 'unsupported-legacy-element',
+    element: 'table',
+    attribute: '',
+    position: 13,
+  });
+  assert.deepEqual(db.records.get('contentDrafts/draft-1'), legacy);
+  const failures = [...db.records.values()].filter((value) => value?.action === 'migrate_failed');
+  assert.equal(failures.length, 1);
+  assert.match(failures[0].reason, /Original preserved; nothing saved/);
+});
+
+test('canonical save updates one word while preserving immutable legacy provenance', async () => {
+  const legacy = draft();
+  const db = new FakeDb({
+    'studioAccess/author-1': { active: true, role: 'author' },
+    'contentDrafts/draft-1': legacy,
+  });
+  await migrateLegacyDraft({
+    db,
+    draftId: 'draft-1',
+    publisherUid: 'author-1',
+    expectedUpdatedAt: legacy.updatedAt,
+    expectedRevision: 0,
+    expectedSourceSha256: sha256(legacy.body),
+    now: new Date('2026-08-26T15:00:00.000Z'),
+  });
+  const migrated = clone(db.records.get('contentDrafts/draft-1'));
+  const editedDocument = contentDocument('Useful article improved.');
+  const savedAt = new Date('2026-08-26T15:05:00.000Z');
+
+  const result = await saveCanonicalDraft({
+    db,
+    draftId: 'draft-1',
+    publisherUid: 'author-1',
+    publisherEmail: 'forged@example.com',
+    draft: canonicalSavePayload(migrated, editedDocument),
+    expectedUpdatedAt: migrated.updatedAt,
+    expectedRevision: migrated.revision,
+    expectedContentSha256: migrated.contentSha256,
+    now: savedAt,
+  });
+  const stored = db.records.get('contentDrafts/draft-1');
+
+  assert.equal(result.revision, 2);
+  assert.equal(stored.revision, 2);
+  assert.equal(stored.updatedAt, savedAt.toISOString());
+  assert.equal(stored.content.content[0].content[0].text, 'Useful article improved.');
+  assert.equal(stored.contentSha256, canonicalContentFields(editedDocument).contentSha256);
+  assert.equal(stored.legacyHtmlOriginal, migrated.legacyHtmlOriginal);
+  assert.equal(stored.legacyHtmlSha256, migrated.legacyHtmlSha256);
+  assert.deepEqual(stored.migrationReport, migrated.migrationReport);
+  assert.equal(stored.ownerEmail, legacy.ownerEmail);
+  assert.equal(Object.hasOwn(stored, 'body'), false);
+
+  const secondDocument = contentDocument('Useful article improved again.');
+  const secondResult = await saveCanonicalDraft({
+    db,
+    draftId: 'draft-1',
+    publisherUid: 'author-1',
+    publisherEmail: legacy.ownerEmail,
+    draft: canonicalSavePayload(stored, secondDocument),
+    expectedUpdatedAt: stored.updatedAt,
+    expectedRevision: stored.revision,
+    expectedContentSha256: stored.contentSha256,
+    now: new Date('2026-08-26T15:06:00.000Z'),
+  });
+  const reloaded = db.records.get('contentDrafts/draft-1');
+  assert.equal(secondResult.revision, 3);
+  assert.equal(reloaded.content.content[0].content[0].text, 'Useful article improved again.');
+  assert.deepEqual(reloaded.migrationReport, migrated.migrationReport);
+  assert.equal(validateDraftForPreview(reloaded).bodyHtml, '<p>Useful article improved again.</p>');
+});
+
+test('canonical draft creation and updates are server-owned, authorized, and concurrency-safe', async () => {
+  const creationDb = new FakeDb({
+    'studioAccess/author-1': { active: true, role: 'author' },
+  });
+  const newDocument = contentDocument('First cloud draft.');
+  await saveCanonicalDraft({
+    db: creationDb,
+    draftId: 'new-draft',
+    publisherUid: 'author-1',
+    publisherEmail: 'author@example.com',
+    draft: canonicalSavePayload(draft(), newDocument),
+    expectedRevision: 0,
+    now: new Date('2026-08-26T15:10:00.000Z'),
+  });
+  const created = creationDb.records.get('contentDrafts/new-draft');
+  assert.equal(created.ownerUid, 'author-1');
+  assert.equal(created.ownerEmail, 'author@example.com');
+  assert.equal(created.publicationStatus, 'draft');
+  assert.equal(created.publicationReleaseId, '');
+  assert.equal(created.publicationLiveUrl, '');
+  assert.equal(created.revision, 1);
+  assert.equal(Object.hasOwn(created, 'body'), false);
+
+  const unchanged = canonicalDraft();
+  const rejectionCases = [
+    {
+      name: 'wrong owner',
+      access: { active: true, role: 'author' },
+      uid: 'author-2',
+      record: unchanged,
+      request: {},
+      pattern: /only drafts they own/,
+      statusCode: 403,
+    },
+    {
+      name: 'wrong role',
+      access: { active: true, role: 'viewer' },
+      uid: 'viewer-1',
+      record: unchanged,
+      request: {},
+      pattern: /Author, Publisher or Administrator/,
+      statusCode: 403,
+    },
+    {
+      name: 'stale revision',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: unchanged,
+      request: { expectedRevision: 0 },
+      pattern: /revision is stale/,
+      statusCode: 409,
+    },
+    {
+      name: 'stale timestamp',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: unchanged,
+      request: { expectedUpdatedAt: '2026-08-26T13:59:00.000Z' },
+      pattern: /changed in another session/,
+      statusCode: 409,
+    },
+    {
+      name: 'stale content hash',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: unchanged,
+      request: { expectedContentSha256: '0'.repeat(64) },
+      pattern: /content changed in another session/,
+      statusCode: 409,
+    },
+    {
+      name: 'archived draft',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: { ...unchanged, archivedAt: '2026-08-26T14:30:00.000Z' },
+      request: {},
+      pattern: /archived/,
+      statusCode: 409,
+    },
+    {
+      name: 'partial legacy provenance',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: { ...unchanged, legacyHtmlSha256: sha256('<p>legacy</p>') },
+      request: {},
+      pattern: /preserved legacy source is inconsistent/,
+      statusCode: 409,
+    },
+    {
+      name: 'forged legacy report',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: {
+        ...unchanged,
+        legacyHtmlOriginal: '<p>legacy</p>',
+        legacyHtmlSha256: sha256('<p>legacy</p>'),
+        migrationReport: { forged: true },
+      },
+      request: {},
+      pattern: /migration report is inconsistent/,
+      statusCode: 409,
+    },
+    {
+      name: 'forged server field',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: unchanged,
+      request: { draft: { ...canonicalSavePayload(unchanged), ownerUid: 'attacker' } },
+      pattern: /server-owned/,
+      statusCode: 400,
+    },
+    {
+      name: 'stored hash mismatch',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: { ...unchanged, contentSha256: 'f'.repeat(64) },
+      request: {},
+      pattern: /hash does not match/,
+      statusCode: 409,
+    },
+    {
+      name: 'unknown stored field',
+      access: { active: true, role: 'publisher' },
+      uid: 'publisher-1',
+      record: { ...unchanged, ungovernedMetadata: 'must not be erased' },
+      request: {},
+      pattern: /unknown field ungovernedMetadata/,
+      statusCode: 409,
+    },
+  ];
+
+  for (const rejection of rejectionCases) {
+    const db = new FakeDb({
+      [`studioAccess/${rejection.uid}`]: rejection.access,
+      'contentDrafts/draft-1': rejection.record,
+    });
+    await assert.rejects(
+      saveCanonicalDraft({
+        db,
+        draftId: 'draft-1',
+        publisherUid: rejection.uid,
+        publisherEmail: `${rejection.uid}@example.com`,
+        draft: canonicalSavePayload(rejection.record),
+        expectedUpdatedAt: rejection.record.updatedAt,
+        expectedRevision: rejection.record.revision,
+        expectedContentSha256: rejection.record.contentSha256,
+        now: new Date('2026-08-26T15:15:00.000Z'),
+        ...rejection.request,
+      }),
+      rejection.pattern,
+      rejection.name,
+    );
+    assert.deepEqual(db.records.get('contentDrafts/draft-1'), rejection.record, rejection.name);
+    const failures = [...db.records.values()].filter((value) => value?.action === 'save_failed');
+    assert.equal(failures.length, 1, rejection.name);
+    assert.equal(failures[0].statusCode, rejection.statusCode, rejection.name);
+  }
+});
+
+test('legacy migration rejects authority, state, source, format, revision, and provenance forgery without mutation', async () => {
+  const baseline = draft();
+  const cases = [
+    {
+      name: 'wrong owner', uid: 'author-2', access: { active: true, role: 'author' }, record: baseline,
+      request: {}, pattern: /only drafts they own/, statusCode: 403,
+    },
+    {
+      name: 'archived', uid: 'publisher-1', access: { active: true, role: 'publisher' },
+      record: { ...baseline, archivedAt: '2026-08-26T14:30:00.000Z' }, request: {}, pattern: /archived/, statusCode: 409,
+    },
+    {
+      name: 'forged source hash', uid: 'publisher-1', access: { active: true, role: 'publisher' }, record: baseline,
+      request: { expectedSourceSha256: '0'.repeat(64) }, pattern: /legacy source changed/, statusCode: 409,
+    },
+    {
+      name: 'unknown format', uid: 'publisher-1', access: { active: true, role: 'publisher' },
+      record: { ...baseline, format: 'forged' }, request: {}, pattern: /unknown field format/, statusCode: 409,
+    },
+    {
+      name: 'invalid revision', uid: 'publisher-1', access: { active: true, role: 'publisher' },
+      record: { ...baseline, revision: -1 }, request: { expectedRevision: -1 }, pattern: /legacy revision is invalid/, statusCode: 409,
+    },
+    {
+      name: 'pre-existing provenance', uid: 'publisher-1', access: { active: true, role: 'publisher' },
+      record: { ...baseline, legacyHtmlOriginal: baseline.body }, request: {}, pattern: /unknown field legacyHtmlOriginal/, statusCode: 409,
+    },
+    {
+      name: 'missing owner', uid: 'publisher-1', access: { active: true, role: 'publisher' },
+      record: { ...baseline, ownerUid: '' }, request: {}, pattern: /stored draft owner is invalid/, statusCode: 409,
+    },
+    {
+      name: 'unknown stored field', uid: 'publisher-1', access: { active: true, role: 'publisher' },
+      record: { ...baseline, ungovernedMetadata: 'must not be erased' }, request: {}, pattern: /unknown field ungovernedMetadata/, statusCode: 409,
+    },
+  ];
+
+  for (const item of cases) {
+    const db = new FakeDb({
+      [`studioAccess/${item.uid}`]: item.access,
+      'contentDrafts/draft-1': item.record,
+    });
+    await assert.rejects(
+      migrateLegacyDraft({
+        db,
+        draftId: 'draft-1',
+        publisherUid: item.uid,
+        expectedUpdatedAt: item.record.updatedAt,
+        expectedRevision: item.record.revision ?? 0,
+        expectedSourceSha256: sha256(item.record.body),
+        now: new Date('2026-08-26T15:20:00.000Z'),
+        ...item.request,
+      }),
+      item.pattern,
+      item.name,
+    );
+    assert.deepEqual(db.records.get('contentDrafts/draft-1'), item.record, item.name);
+    const failures = [...db.records.values()].filter((value) => value?.action === 'migrate_failed');
+    assert.equal(failures.length, 1, item.name);
+    assert.equal(failures[0].statusCode, item.statusCode, item.name);
+  }
+});
+
+test('canonical save rejects a well-formed but forged immutable migration-output hash', async () => {
+  const legacy = draft();
+  const db = new FakeDb({
+    'studioAccess/author-1': { active: true, role: 'author' },
+    'contentDrafts/draft-1': legacy,
+  });
+  await migrateLegacyDraft({
+    db,
+    draftId: 'draft-1',
+    publisherUid: 'author-1',
+    expectedUpdatedAt: legacy.updatedAt,
+    expectedRevision: 0,
+    expectedSourceSha256: sha256(legacy.body),
+    now: new Date('2026-08-26T15:00:00.000Z'),
+  });
+  const migrated = clone(db.records.get('contentDrafts/draft-1'));
+  const forged = {
+    ...migrated,
+    migrationReport: { ...migrated.migrationReport, contentSha256: 'f'.repeat(64) },
+  };
+  db.records.set('contentDrafts/draft-1', clone(forged));
+
+  await assert.rejects(
+    saveCanonicalDraft({
+      db,
+      draftId: 'draft-1',
+      publisherUid: 'author-1',
+      publisherEmail: legacy.ownerEmail,
+      draft: canonicalSavePayload(forged, contentDocument('Changed.')),
+      expectedUpdatedAt: forged.updatedAt,
+      expectedRevision: forged.revision,
+      expectedContentSha256: forged.contentSha256,
+      now: new Date('2026-08-26T15:10:00.000Z'),
+    }),
+    /migration output hash is inconsistent/,
+  );
+  assert.deepEqual(db.records.get('contentDrafts/draft-1'), forged);
 });
 
 test('publisher creates an immutable release, live snapshot, index, audit event and live URL', async () => {
+  const record = canonicalDraft();
   const db = new FakeDb({
     'studioAccess/publisher-1': { active: true, role: 'publisher' },
-    'contentDrafts/draft-1': draft(),
+    'contentDrafts/draft-1': record,
   });
-  const result = await publishDraft({
+  const preview = await previewCurrent({ db, record });
+  const publishArgs = {
     db,
     draftId: 'draft-1',
-    expectedUpdatedAt: '2026-08-26T14:00:00.000Z',
+    expectedUpdatedAt: record.updatedAt,
+    expectedRevision: record.revision,
+    expectedContentSha256: record.contentSha256,
+    previewReceiptId: preview.receiptId,
     idempotencyKey: 'request-0000000001',
     publisherUid: 'publisher-1',
     origin: 'https://aispanda.com',
+    articleTemplate: articleTemplateV1,
     now: new Date('2026-08-26T15:00:00.000Z'),
-  });
+  };
+  const result = await publishDraft(publishArgs);
 
   assert.equal(result.liveUrl, 'https://aispanda.com/consulting-rewired');
   assert.equal(db.records.get('publishedContent/consulting-rewired').releaseId, result.releaseId);
-  assert.equal(db.records.get(`contentReleases/${result.releaseId}`).bodyHtml.includes('<h1>'), false);
+  const manifest = db.records.get(`contentReleases/${result.releaseId}`);
+  assert.equal(manifest.snapshotSha256, preview.snapshotSha256);
+  assert.equal(manifest.renderedPageSha256, preview.renderedPageSha256);
+  assert.equal(manifest.bodyHtml, undefined);
+  assert.equal(db.records.get(`contentReleasePayloads/${result.releaseId}_body`).bodyHtml, '<p>Useful article.</p>');
+  assert.equal(db.records.get(`contentReleasePayloads/${result.releaseId}_page`).renderedPageHtml, preview.html);
+  assert.deepEqual(db.records.get(`contentReleasePayloads/${result.releaseId}_source`).sourceJson, contentDocument());
   assert.equal(db.records.get('contentPublicationIndex/draft-1').state, 'published');
   assert.equal(db.records.get('contentDrafts/draft-1').publicationStatus, 'published');
   assert.equal([...db.records.values()].some((value) => value?.action === 'publish'), true);
-  const retry = await publishDraft({
-    db,
-    draftId: 'draft-1',
-    expectedUpdatedAt: '2026-08-26T14:00:00.000Z',
-    idempotencyKey: 'request-0000000001',
-    publisherUid: 'publisher-1',
-    origin: 'https://aispanda.com',
-    now: new Date('2026-08-26T15:01:00.000Z'),
-  });
+  const retry = await publishDraft({ ...publishArgs, now: new Date('2026-08-26T15:01:00.000Z') });
   assert.deepEqual(retry, result);
   assert.equal([...db.records.keys()].filter((key) => key.startsWith('contentReleases/')).length, 1);
 });
 
-test('publication rejects unauthorized, stale and duplicate-slug requests without changing the draft', async () => {
-  const initialDraft = draft();
+test('publish rejects a preview receipt after a checkpoint save or template output change', async () => {
+  const record = canonicalDraft();
   const db = new FakeDb({
-    'studioAccess/author-1': { active: true, role: 'author' },
     'studioAccess/publisher-1': { active: true, role: 'publisher' },
-    'contentDrafts/draft-1': initialDraft,
-    'publishedContent/consulting-rewired': { draftId: 'another-draft', slug: 'consulting-rewired', bodyHtml: '<p>Existing</p>' },
+    'contentDrafts/draft-1': record,
   });
+  const preview = await previewCurrent({ db, record, articleTemplate: articleTemplateV1 });
+  await assert.rejects(publishDraft({
+    db,
+    draftId: 'draft-1',
+    expectedUpdatedAt: record.updatedAt,
+    expectedRevision: record.revision,
+    expectedContentSha256: record.contentSha256,
+    previewReceiptId: preview.receiptId,
+    idempotencyKey: 'request-template-v2',
+    publisherUid: 'publisher-1',
+    origin: 'https://aispanda.com',
+    articleTemplate: articleTemplateV2,
+    now: new Date('2026-08-26T15:00:00.000Z'),
+  }), /Preview is out of date/);
+  assert.equal([...db.records.keys()].some((key) => key.startsWith('contentReleases/')), false);
+
+  const checkpointDb = new FakeDb({
+    'studioAccess/publisher-1': { active: true, role: 'publisher' },
+    'contentDrafts/draft-1': record,
+  });
+  const checkpointPreview = await previewCurrent({ db: checkpointDb, record });
+  await saveCanonicalDraft({
+    db: checkpointDb,
+    draftId: 'draft-1',
+    publisherUid: 'publisher-1',
+    publisherEmail: 'publisher@example.com',
+    draft: canonicalSavePayload(record),
+    expectedUpdatedAt: record.updatedAt,
+    expectedRevision: record.revision,
+    expectedContentSha256: record.contentSha256,
+    checkpoint: true,
+    now: new Date('2026-08-26T14:45:00.000Z'),
+  });
+  const checkpointed = checkpointDb.records.get('contentDrafts/draft-1');
+  await assert.rejects(publishDraft({
+    db: checkpointDb,
+    draftId: 'draft-1',
+    expectedUpdatedAt: checkpointed.updatedAt,
+    expectedRevision: checkpointed.revision,
+    expectedContentSha256: checkpointed.contentSha256,
+    previewReceiptId: checkpointPreview.receiptId,
+    idempotencyKey: 'request-checkpoint-save',
+    publisherUid: 'publisher-1',
+    origin: 'https://aispanda.com',
+    articleTemplate: articleTemplateV1,
+    now: new Date('2026-08-26T15:00:00.000Z'),
+  }), /Preview is out of date/);
+  assert.equal([...checkpointDb.records.keys()].some((key) => key.startsWith('contentReleases/')), false);
+});
+
+test('live pages serve validated frozen bytes and slug-changing republish creates a distinct release', async () => {
+  const record = canonicalDraft();
+  const db = new FakeDb({
+    'studioAccess/publisher-1': { active: true, role: 'publisher' },
+    'contentDrafts/draft-1': record,
+  });
+  const first = await publishCurrent({ db, record, articleTemplate: articleTemplateV1 });
+  const firstPage = db.records.get(`contentReleasePayloads/${first.releaseId}_page`).renderedPageHtml;
+  assert.equal((await loadPublishedArticle(db, 'consulting-rewired')).renderedPageHtml, firstPage);
+
+  const publishedDraft = db.records.get('contentDrafts/draft-1');
+  await saveCanonicalDraft({
+    db,
+    draftId: 'draft-1',
+    publisherUid: 'publisher-1',
+    publisherEmail: 'publisher@example.com',
+    draft: canonicalSavePayload({ ...publishedDraft, slug: 'consulting-rewired-v2' }),
+    expectedUpdatedAt: publishedDraft.updatedAt,
+    expectedRevision: publishedDraft.revision,
+    expectedContentSha256: publishedDraft.contentSha256,
+    now: new Date('2026-08-26T15:30:00.000Z'),
+  });
+  const revised = db.records.get('contentDrafts/draft-1');
+  const second = await publishCurrent({
+    db,
+    record: revised,
+    articleTemplate: articleTemplateV2,
+    idempotencyKey: 'request-0000000002',
+    now: new Date('2026-08-26T16:00:00.000Z'),
+  });
+  assert.notEqual(second.releaseId, first.releaseId);
+  assert.equal(second.liveUrl, 'https://aispanda.com/consulting-rewired-v2');
+  assert.equal(await loadPublishedArticle(db, 'consulting-rewired'), null);
+  assert.match((await loadPublishedArticle(db, 'consulting-rewired-v2')).renderedPageHtml, /data-template="v2"/);
+  assert.equal(db.records.get(`contentReleasePayloads/${first.releaseId}_page`).renderedPageHtml, firstPage);
+
+  db.records.get(`contentReleasePayloads/${second.releaseId}_page`).renderedPageHtml += '<script>tampered()</script>';
+  assert.equal(await loadPublishedArticle(db, 'consulting-rewired-v2'), null);
+});
+
+test('image assets are draft-bound, published atomically, and made private again on unpublish', async () => {
+  const document = imageContentDocument();
+  const record = canonicalDraft({ ...canonicalContentFields(document) });
+  const db = new FakeDb({
+    'studioAccess/publisher-1': { active: true, role: 'publisher' },
+    'contentDrafts/draft-1': record,
+    [`contentAssets/${imageAssetId}`]: {
+      id: imageAssetId,
+      draftId: 'draft-1',
+      ownerUid: 'author-1',
+      status: 'ready',
+      objectPath: `studio-content/draft-1/${imageAssetId}.png`,
+      generation: '7',
+      contentType: 'image/png',
+      size: 100,
+      width: 640,
+      height: 360,
+    },
+  });
+  const published = await publishCurrent({ db, record, idempotencyKey: 'request-image-00001' });
+
+  assert.match(db.records.get(`contentReleasePayloads/${published.releaseId}_body`).bodyHtml, new RegExp(`/content-assets/${imageAssetId}`));
+  assert.deepEqual(db.records.get('contentPublicationIndex/draft-1').assetIds, [imageAssetId]);
+  assert.equal(db.records.get(`contentAssetPublicRefs/${imageAssetId}`).active, true);
+  assert.equal(db.records.get(`contentAssetPublicRefs/${imageAssetId}`).releaseId, published.releaseId);
+
+  await unpublishDraft({
+    db,
+    draftId: 'draft-1',
+    expectedUpdatedAt: published.updatedAt,
+    publisherUid: 'publisher-1',
+    now: new Date('2026-08-26T16:00:00.000Z'),
+  });
+  assert.equal(db.records.get(`contentAssetPublicRefs/${imageAssetId}`).active, false);
+  assert.equal(db.records.has(`contentAssets/${imageAssetId}`), true);
+});
+
+test('save rejects missing, unready, or cross-draft image references without mutation', async () => {
+  const record = canonicalDraft();
+  for (const assetRecord of [
+    undefined,
+    { id: imageAssetId, draftId: 'draft-1', status: 'uploading' },
+    { id: imageAssetId, draftId: 'other-draft', status: 'ready' },
+  ]) {
+    const initial = {
+      'studioAccess/author-1': { active: true, role: 'author' },
+      'contentDrafts/draft-1': record,
+      ...(assetRecord ? { [`contentAssets/${imageAssetId}`]: assetRecord } : {}),
+    };
+    const db = new FakeDb(initial);
+    await assert.rejects(saveCanonicalDraft({
+      db,
+      draftId: 'draft-1',
+      publisherUid: 'author-1',
+      publisherEmail: record.ownerEmail,
+      draft: canonicalSavePayload(record, imageContentDocument()),
+      expectedUpdatedAt: record.updatedAt,
+      expectedRevision: record.revision,
+      expectedContentSha256: record.contentSha256,
+    }), /unavailable or does not belong/);
+    assert.deepEqual(db.records.get('contentDrafts/draft-1'), record);
+  }
+});
+
+test('publication rejects unauthorized, stale and duplicate-slug requests without changing the draft', async () => {
+  const initialDraft = canonicalDraft();
+  const unauthorizedDb = new FakeDb({
+    'studioAccess/author-1': { active: true, role: 'author' },
+    'contentDrafts/draft-1': initialDraft,
+  });
+  const authorPreview = await previewCurrent({ db: unauthorizedDb, record: initialDraft, publisherUid: 'author-1' });
   await assert.rejects(
-    publishDraft({ db, draftId: 'draft-1', expectedUpdatedAt: initialDraft.updatedAt, idempotencyKey: 'request-unauthorized', publisherUid: 'author-1', origin: 'https://aispanda.com' }),
+    publishDraft({
+      db: unauthorizedDb,
+      draftId: 'draft-1',
+      expectedUpdatedAt: initialDraft.updatedAt,
+      expectedRevision: initialDraft.revision,
+      expectedContentSha256: initialDraft.contentSha256,
+      previewReceiptId: authorPreview.receiptId,
+      idempotencyKey: 'request-unauthorized',
+      publisherUid: 'author-1',
+      origin: 'https://aispanda.com',
+      articleTemplate: articleTemplateV1,
+    }),
     /Publisher or Administrator/,
   );
+
+  const staleDb = new FakeDb({
+    'studioAccess/publisher-1': { active: true, role: 'publisher' },
+    'contentDrafts/draft-1': initialDraft,
+  });
+  const stalePreview = await previewCurrent({ db: staleDb, record: initialDraft });
   await assert.rejects(
-    publishDraft({ db, draftId: 'draft-1', expectedUpdatedAt: '2026-08-26T13:00:00.000Z', idempotencyKey: 'request-stale-0001', publisherUid: 'publisher-1', origin: 'https://aispanda.com' }),
-    /changed after/,
+    publishDraft({
+      db: staleDb,
+      draftId: 'draft-1',
+      expectedUpdatedAt: '2026-08-26T13:00:00.000Z',
+      expectedRevision: initialDraft.revision,
+      expectedContentSha256: initialDraft.contentSha256,
+      previewReceiptId: stalePreview.receiptId,
+      idempotencyKey: 'request-stale-0001',
+      publisherUid: 'publisher-1',
+      origin: 'https://aispanda.com',
+      articleTemplate: articleTemplateV1,
+    }),
+    /Preview is out of date/,
   );
+
+  const duplicateDb = new FakeDb({
+    'studioAccess/publisher-1': { active: true, role: 'publisher' },
+    'contentDrafts/draft-1': initialDraft,
+    'publishedContent/consulting-rewired': { draftId: 'another-draft', slug: 'consulting-rewired' },
+  });
   await assert.rejects(
-    publishDraft({ db, draftId: 'draft-1', expectedUpdatedAt: initialDraft.updatedAt, idempotencyKey: 'request-duplicate01', publisherUid: 'publisher-1', origin: 'https://aispanda.com' }),
+    previewCurrent({ db: duplicateDb, record: initialDraft }),
     /already uses/,
   );
-  assert.deepEqual(db.records.get('contentDrafts/draft-1'), initialDraft);
-  const rejectedAudits = [...db.records.values()].filter((value) => value?.action === 'publish_failed');
-  assert.deepEqual(rejectedAudits.map((event) => event.statusCode), [403, 409, 409]);
+  for (const database of [unauthorizedDb, staleDb, duplicateDb]) {
+    assert.deepEqual(database.records.get('contentDrafts/draft-1'), initialDraft);
+    assert.equal([...database.records.keys()].some((key) => key.startsWith('contentReleases/')), false);
+  }
 
+  const receiptDb = new FakeDb({
+    'studioAccess/publisher-1': { active: true, role: 'publisher' },
+    'contentDrafts/draft-1': initialDraft,
+  });
+  const validReceipt = await previewCurrent({ db: receiptDb, record: initialDraft });
   const unavailableDb = new FakeDb();
   unavailableDb.runTransaction = async () => { throw new Error('database details must not enter the audit record'); };
   await assert.rejects(
@@ -199,9 +949,13 @@ test('publication rejects unauthorized, stale and duplicate-slug requests withou
       db: unavailableDb,
       draftId: 'draft-1',
       expectedUpdatedAt: initialDraft.updatedAt,
+      expectedRevision: initialDraft.revision,
+      expectedContentSha256: initialDraft.contentSha256,
+      previewReceiptId: validReceipt.receiptId,
       idempotencyKey: 'request-internal-001',
       publisherUid: 'publisher-1',
       origin: 'https://aispanda.com',
+      articleTemplate: articleTemplateV1,
     }),
     /database details/,
   );
@@ -259,16 +1013,17 @@ test('unpublish removes the public snapshot while preserving draft and release h
   assert.equal([...db.records.values()].some((value) => value?.action === 'unpublish'), true);
 });
 
-test('preview uses publication sanitization and archiving cannot orphan a live article', async () => {
+test('preview is authoritative and archiving cannot orphan a live article', async () => {
+  const previewRecord = canonicalDraft();
   const previewDb = new FakeDb({
     'studioAccess/author-1': { active: true, role: 'author' },
+    'contentDrafts/draft-1': previewRecord,
   });
-  const preview = await previewDraft({
-    db: previewDb,
-    publisherUid: 'author-1',
-    draft: draft({ body: '<p onclick="bad()">Safe<script>bad()</script></p>' }),
-  });
-  assert.equal(preview.bodyHtml, '<p>Safe</p>');
+  const preview = await previewCurrent({ db: previewDb, record: previewRecord, publisherUid: 'author-1' });
+  assert.equal(preview.mode, 'preview');
+  assert.match(preview.html, /<article><p>Useful article\.<\/p><\/article>/);
+  assert.equal(preview.snapshotSha256.length, 64);
+  assert.equal([...previewDb.records.values()].some((value) => value?.snapshotSha256 === preview.snapshotSha256), true);
 
   const publishedDb = new FakeDb({
     'studioAccess/publisher-1': { active: true, role: 'publisher' },
@@ -286,15 +1041,17 @@ test('preview uses publication sanitization and archiving cannot orphan a live a
   );
   assert.equal(publishedDb.records.get('contentDrafts/draft-1').archivedAt, undefined);
 
+  const editableRecord = canonicalDraft();
   const draftDb = new FakeDb({
     'studioAccess/author-1': { active: true, role: 'author' },
     'studioAccess/publisher-1': { active: true, role: 'publisher' },
-    'contentDrafts/draft-1': draft(),
+    'contentDrafts/draft-1': editableRecord,
   });
+  const preArchivePreview = await previewCurrent({ db: draftDb, record: editableRecord, publisherUid: 'publisher-1' });
   const archived = await archiveDraft({
     db: draftDb,
     draftId: 'draft-1',
-    expectedUpdatedAt: draft().updatedAt,
+    expectedUpdatedAt: editableRecord.updatedAt,
     publisherUid: 'author-1',
     now: new Date('2026-08-26T16:30:00.000Z'),
   });
@@ -305,9 +1062,13 @@ test('preview uses publication sanitization and archiving cannot orphan a live a
       db: draftDb,
       draftId: 'draft-1',
       expectedUpdatedAt: archived.archivedAt,
+      expectedRevision: editableRecord.revision,
+      expectedContentSha256: editableRecord.contentSha256,
+      previewReceiptId: preArchivePreview.receiptId,
       idempotencyKey: 'request-archived-001',
       publisherUid: 'publisher-1',
       origin: 'https://aispanda.com',
+      articleTemplate: articleTemplateV1,
     }),
     /must be restored/,
   );
@@ -344,13 +1105,13 @@ test('published discovery renderers escape content and use the configured canoni
 test('rendered page receives escaped metadata, safe body and the public canonical URL', () => {
   const template = '<title>@@AISPANDA_ARTICLE_TITLE@@</title><link rel="canonical" href="https://aispanda.com/article-shell-internal"><main>@@AISPANDA_ARTICLE_BODY@@</main>';
   const html = renderPublishedArticle(template, {
-    ...validateDraftForPublication(draft({ title: 'Consulting & AI' })),
+    ...validateDraftForPublication(canonicalDraft({ title: 'Consulting & AI' })),
     draftId: 'draft-1',
     liveUrl: 'https://attacker.example/consulting-rewired',
   }, 'https://aispanda.com');
   assert.match(html, /<title>Consulting &amp; AI<\/title>/);
   assert.match(html, /href="https:\/\/aispanda.com\/consulting-rewired"/);
-  assert.match(html, /<main><h2>Consulting Rewired<\/h2><p>Useful <strong>article<\/strong>\.<\/p><\/main>/);
+  assert.match(html, /<main><p>Useful article\.<\/p><\/main>/);
   assert.equal(html.includes('@@AISPANDA_'), false);
 });
 
@@ -363,7 +1124,7 @@ test('production-style preview keeps the real shell but removes interactive disc
   assert.equal(html.includes('Comment'), false);
 });
 
-test('Studio cloud contract prevents local article storage and direct draft deletion', async () => {
+test('Studio cloud contract prevents local article storage and all direct browser draft mutations', async () => {
   const [studio, backend, rules, server, insights] = await Promise.all([
     readFile(new URL('../src/pages/studio/index.astro', import.meta.url), 'utf8'),
     readFile(new URL('../src/scripts/studio-firebase.ts', import.meta.url), 'utf8'),
@@ -374,22 +1135,36 @@ test('Studio cloud contract prevents local article storage and direct draft dele
   assert.equal(studio.includes('aispanda-studio-prototype'), false);
   assert.equal(studio.includes('localStorage.setItem'), false);
   assert.equal(backend.includes('deleteDoc('), false);
+  assert.equal(backend.includes('runTransaction'), false);
+  assert.equal(backend.includes('generateJSON'), false);
+  assert.equal(backend.includes('generateHTML'), false);
   assert.match(backend, /previewDraft:/);
-  assert.match(backend, /currentData\?\.archivedAt/);
+  assert.match(backend, /contentRequest<\{ updatedAt: string; revision: number; contentSha256: string \}>\(id, 'save'/);
+  assert.match(backend, /contentRequest<\{ updatedAt: string; revision: number; contentSha256: string \}>\(id, 'migrate'/);
   assert.match(studio, /data-filter="archived"/);
   assert.match(studio, /studioBackend\.restoreDraft\(item\.id, state\.updatedAt\)/);
   assert.match(studio, /This draft is archived\. Restore it before editing\./);
   assert.match(studio, /class="studio-mobile-nav"/);
   assert.match(backend, /querySelectorAll<HTMLButtonElement>\('\[data-studio-signout\]'\)/);
-  assert.match(studio, /studioBackend\.previewDocument\(draftId, getState\(\)\)/);
-  assert.match(studio, /sandbox="allow-scripts allow-same-origin"/);
+  assert.match(studio, /studioBackend\.previewDocument\(draftId\)/);
+  assert.match(studio, /title="Production-style article preview" sandbox referrerpolicy/);
+  assert.match(studio, /role="status" data-publish-readiness/);
+  assert.match(studio, /role="alert" tabindex="-1" data-publish-error/);
+  assert.match(studio, /publicationPreviewReceiptId/);
   assert.match(server, /contentRoute\.action === 'preview-document'/);
+  assert.match(server, /contentRoute\.action === 'save' \|\| contentRoute\.action === 'migrate'/);
+  assert.match(server, /readJson\(request, usesContentPayload \? CONTENT_JSON_LIMIT : JSON_LIMIT\)/);
   assert.match(studio, /\['https:', 'http:', 'mailto:'\]/);
   assert.match(studio, /Archived · restore to edit/);
-  assert.match(rules, /match \/contentDrafts\/\{draftId\}[\s\S]*allow delete: if false;/);
-  assert.match(rules, /allow update: if validDraft\(\)[\s\S]*resource\.data\.get\('archivedAt', ''\) == ''/);
-  assert.match(rules, /request\.resource\.data\.publicationStatus == 'draft'/);
-  assert.match(rules, /resource\.data\.publicationStatus == 'published'[\s\S]*request\.resource\.data\.publicationStatus == 'published-with-changes'/);
+  assert.match(rules, /match \/contentDrafts\/\{draftId\}[\s\S]*allow create, update, delete: if false;/);
+  assert.match(studio, /data-migrate-draft/);
+  assert.match(studio, /Legacy draft · convert before editing/);
+  assert.match(studio, /new Editor\(\{/);
+  assert.match(studio, /tiptapEditor\?\.getJSON\(\)/);
+  assert.match(studio, /readDocumentState\(item\)\?\.contentFormat !== 'legacy'/);
+  assert.match(studio, /Convert this legacy draft before duplicating it/);
+  assert.equal(studio.includes('initialSeedHtml'), false);
+  assert.match(studio, /if \(isLibraryLanding\) \{/);
   assert.match(server, /SITE_ORIGIN/);
   assert.match(insights, /AISPANDA_DYNAMIC_INSIGHTS/);
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildRuntimePublicConfig, injectRuntimePublicConfig } from '../server/runtime-config.mjs';
+import { buildRuntimePublicConfig, injectRuntimePublicConfig, prepareServedText } from '../server/runtime-config.mjs';
 
 const validEnvironment = (overrides = {}) => ({
   K_SERVICE: 'example-web-staging',
@@ -52,4 +52,23 @@ test('article text cannot suppress runtime configuration injection', () => {
   const injected = injectRuntimePublicConfig(html, config);
   assert.ok(injected.startsWith('<html><head><script data-aispanda-runtime-config>globalThis.__AISPANDA_RUNTIME_CONFIG__='));
   assert.ok(injected.includes('<script data-aispanda-runtime-config>article()</script>'));
+});
+
+test('the HTTP response path preserves validated frozen publication bytes across runtime config changes', () => {
+  const firstConfig = buildRuntimePublicConfig(validEnvironment());
+  const changedConfig = buildRuntimePublicConfig(validEnvironment({
+    RUNTIME_FIREBASE_API_KEY: 'changed-public-api-key',
+  }));
+  const frozenPage = injectRuntimePublicConfig('<html><head></head><body>Frozen</body></html>', firstConfig);
+  assert.equal(prepareServedText({
+    body: frozenPage,
+    contentType: 'text/html; charset=utf-8',
+    runtimeConfig: changedConfig,
+    preserveExactBytes: true,
+  }), frozenPage);
+  assert.notEqual(prepareServedText({
+    body: frozenPage,
+    contentType: 'text/html; charset=utf-8',
+    runtimeConfig: changedConfig,
+  }), frozenPage);
 });
