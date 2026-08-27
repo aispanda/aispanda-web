@@ -27,9 +27,15 @@ test('the governed article publishes from the exact staging candidate and remain
   await expect(page.locator('[data-slug]')).toHaveValue(expectedSlug);
   const expectedTitle = await title.inputValue();
 
-  await page.locator('[data-save-menu] summary').click();
+  await page.locator('[data-preview]').click();
+  const preview = page.locator('[data-preview-dialog]');
+  await expect(preview).toBeVisible({ timeout: 30_000 });
+  await page.locator('[data-close-preview]').click();
+  await expect(preview).not.toBeVisible();
   await page.locator('[data-open-publish]').click();
-  await expect(page.locator('[data-publish-dialog]')).toBeVisible();
+  const publishDialog = page.locator('[data-publish-dialog]');
+  await expect(publishDialog).toBeVisible();
+  await expect(page.locator('[data-publish-readiness]')).toContainText('Ready');
   await page.locator('[data-publish]').click();
 
   const receipt = page.locator('[data-publication-receipt]');
