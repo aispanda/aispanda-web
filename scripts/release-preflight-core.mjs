@@ -76,6 +76,13 @@ export const validateEffectiveDenials = (checks) => {
   }
 };
 
+export const releaseProjectListsBucket = (buckets, bucketName) => (
+  Array.isArray(buckets)
+  && typeof bucketName === 'string'
+  && bucketName.length > 0
+  && buckets.some((bucket) => bucket?.name === bucketName || bucket?.storage_url === `gs://${bucketName}/`)
+);
+
 export const firebaseManagementHeaders = (accessToken, project) => {
   if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
     throw new Error('Firebase Management access token is required.');

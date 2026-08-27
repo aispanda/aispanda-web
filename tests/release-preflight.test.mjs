@@ -3,6 +3,7 @@ import test from 'node:test';
 import { requireSuccessfulGcloud, resolveGcloudInvocation, spawnGcloudSync } from '../scripts/gcloud-process.mjs';
 import {
   firebaseManagementHeaders,
+  releaseProjectListsBucket,
   validateEffectiveDenials,
   validateReleaseIsolation,
   validateRuntimePrerequisites,
@@ -63,6 +64,17 @@ test('Firebase Management requests attribute quota to the isolated target projec
     Authorization: 'Bearer access-token',
     'x-goog-user-project': 'stage-project-123',
   });
+});
+
+test('source-bucket ownership uses the release project bucket listing, not an unstable descriptor field', () => {
+  assert.equal(releaseProjectListsBucket([
+    { name: 'release-source' },
+    { storage_url: 'gs://another-release-bucket/' },
+  ], 'release-source'), true);
+  assert.equal(releaseProjectListsBucket([
+    { name: 'other-project-bucket' },
+  ], 'release-source'), false);
+  assert.equal(releaseProjectListsBucket({ name: 'release-source' }, 'release-source'), false);
 });
 
 test('release isolation accepts only artifact/log build duties and no staging-to-production role', () => {

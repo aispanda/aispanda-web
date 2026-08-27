@@ -1,4 +1,4 @@
-import { validateEffectiveDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
+import { releaseProjectListsBucket, validateEffectiveDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
 import { spawnGcloudSync } from './gcloud-process.mjs';
 
 const required = (name) => {
@@ -28,11 +28,8 @@ if (imageProject !== releaseProject || !repository) throw new Error('IMAGE_REPOS
 const source = new URL(required('SOURCE_BUCKET'));
 if (source.protocol !== 'gs:' || !source.hostname) throw new Error('SOURCE_BUCKET must be a Cloud Storage path.');
 const sourceBucket = `gs://${source.hostname}`;
-const releaseDescriptor = gcloudJson(['projects', 'describe', releaseProject]);
-const sourceDescriptor = gcloudJson(['storage', 'buckets', 'describe', sourceBucket, '--project', releaseProject]);
-const releaseProjectNumber = String(releaseDescriptor.projectNumber ?? '');
-const sourceProjectNumber = String(sourceDescriptor.projectNumber ?? '');
-if (!releaseProjectNumber || sourceProjectNumber !== releaseProjectNumber) {
+const releaseBuckets = gcloudJson(['storage', 'buckets', 'list', '--project', releaseProject]);
+if (!releaseProjectListsBucket(releaseBuckets, source.hostname)) {
   throw new Error('SOURCE_BUCKET does not belong to RELEASE_PROJECT.');
 }
 
