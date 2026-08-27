@@ -83,6 +83,19 @@ export const releaseProjectListsBucket = (buckets, bucketName) => (
   && buckets.some((bucket) => bucket?.name === bucketName || bucket?.storage_url === `gs://${bucketName}/`)
 );
 
+export const policyTroubleshooterArgs = ({ resource, principalEmail, permission, billingProject }) => {
+  for (const [name, value] of Object.entries({ resource, principalEmail, permission, billingProject })) {
+    if (typeof value !== 'string' || value.trim().length === 0) throw new Error(`${name} is required for Policy Troubleshooter.`);
+  }
+  return [
+    'policy-intelligence', 'troubleshoot-policy', 'iam', resource,
+    `--principal-email=${principalEmail}`,
+    `--permission=${permission}`,
+    `--billing-project=${billingProject}`,
+    '--format=value(access)',
+  ];
+};
+
 export const firebaseManagementHeaders = (accessToken, project) => {
   if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
     throw new Error('Firebase Management access token is required.');

@@ -3,6 +3,7 @@ import test from 'node:test';
 import { requireSuccessfulGcloud, resolveGcloudInvocation, spawnGcloudSync } from '../scripts/gcloud-process.mjs';
 import {
   firebaseManagementHeaders,
+  policyTroubleshooterArgs,
   releaseProjectListsBucket,
   validateEffectiveDenials,
   validateReleaseIsolation,
@@ -75,6 +76,22 @@ test('source-bucket ownership uses the release project bucket listing, not an un
     { name: 'other-project-bucket' },
   ], 'release-source'), false);
   assert.equal(releaseProjectListsBucket({ name: 'release-source' }, 'release-source'), false);
+});
+
+test('Policy Troubleshooter explicitly bills only the dedicated release project', () => {
+  assert.deepEqual(policyTroubleshooterArgs({
+    resource: '//run.googleapis.com/projects/staging/locations/us-east1/services/web',
+    principalEmail: 'build@example.invalid',
+    permission: 'run.services.update',
+    billingProject: 'release-project',
+  }), [
+    'policy-intelligence', 'troubleshoot-policy', 'iam',
+    '//run.googleapis.com/projects/staging/locations/us-east1/services/web',
+    '--principal-email=build@example.invalid',
+    '--permission=run.services.update',
+    '--billing-project=release-project',
+    '--format=value(access)',
+  ]);
 });
 
 test('release isolation accepts only artifact/log build duties and no staging-to-production role', () => {

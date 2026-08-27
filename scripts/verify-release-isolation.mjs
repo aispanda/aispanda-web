@@ -1,4 +1,4 @@
-import { releaseProjectListsBucket, validateEffectiveDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
+import { policyTroubleshooterArgs, releaseProjectListsBucket, validateEffectiveDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
 import { spawnGcloudSync } from './gcloud-process.mjs';
 
 const required = (name) => {
@@ -103,13 +103,12 @@ const crossBoundaryPairs = [
   [productionRuntimeIdentity, stagingTarget],
 ];
 const effectiveChecks = crossBoundaryPairs.flatMap(([principal, target]) => targetResources(target).map(({ permission, resource }) => {
-  const result = spawnGcloudSync([
-    'policy-intelligence', 'troubleshoot-policy', 'iam',
+  const result = spawnGcloudSync(policyTroubleshooterArgs({
     resource,
-    `--principal-email=${principal}`,
-    `--permission=${permission}`,
-    '--format=value(access)',
-  ], { encoding: 'utf8' });
+    principalEmail: principal,
+    permission,
+    billingProject: releaseProject,
+  }), { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`Effective IAM query failed for ${principal} on ${target.project}.`);
   return { principal, project: target.project, permission, access: result.stdout.trim() };
 }));
