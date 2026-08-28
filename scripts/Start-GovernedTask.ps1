@@ -118,6 +118,20 @@ function Get-ResponseProperty {
   return $property.Value
 }
 
+function Get-SafeViolationCodes {
+  param($Value)
+
+  if ($null -eq $Value) {
+    return @()
+  }
+  return @($Value | ForEach-Object {
+    $candidate = [string]$_
+    if ($candidate -match '^[A-Z][A-Z0-9_]{2,63}$') {
+      $candidate
+    }
+  } | Select-Object -Unique)
+}
+
 $canonicalTaskId = $TaskId.Trim().ToUpperInvariant()
 if ([string]::IsNullOrWhiteSpace($OperationId)) {
   $OperationId = 'launcher:{0}:{1}' -f $canonicalTaskId, [Guid]::NewGuid().ToString('N')
@@ -198,18 +212,34 @@ $request = [ordered]@{
 }
 
 try {
-  $response = Invoke-RestMethod -Method Post -Uri $uri.AbsoluteUri -ContentType 'application/json' -Headers @{ $headerName = $headerValue } -Body ($request | ConvertTo-Json -Compress) -TimeoutSec $TimeoutSec -MaximumRedirection 0
+  $httpResponse = Invoke-WebRequest -SkipHttpErrorCheck -MaximumRedirection 0 -Method Post -Uri $uri.AbsoluteUri -ContentType 'application/json' -Headers @{ $headerName = $headerValue } -Body ($request | ConvertTo-Json -Compress) -TimeoutSec $TimeoutSec
 } catch {
   Stop-GovernedTask -Code 'N8N_UNAVAILABLE' -Message 'n8n did not return a usable authorization response.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId }
 }
 
-$responseViolationCodes = Get-ResponseProperty -Response $response -Name 'violation_codes'
-$hasViolationCodes = $null -ne $response.PSObject.Properties['violation_codes']
-$violations = @()
-if ($null -ne $responseViolationCodes) {
-  $violations = @($responseViolationCodes)
+$httpStatus = [int]$httpResponse.StatusCode
+try {
+  $response = $httpResponse.Content | ConvertFrom-Json
+} catch {
+  Stop-GovernedTask -Code 'N8N_INVALID_RESPONSE' -Message 'n8n returned a response that was not a usable authorization decision.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId; http_status = $httpStatus }
 }
+
+if ($httpStatus -in @(401, 403)) {
+  Stop-GovernedTask -Code 'N8N_AUTH_FAILED' -Message 'n8n rejected the governance credential.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId; http_status = $httpStatus }
+}
+
 $responseOutcome = Get-ResponseProperty -Response $response -Name 'outcome'
+$responseViolationCodes = @(Get-SafeViolationCodes -Value (Get-ResponseProperty -Response $response -Name 'violation_codes'))
+if ($responseOutcome -in @('BLOCKED', 'REPLAN', 'FAIL')) {
+  Stop-GovernedTask -Code 'N8N_DENIED' -Message 'n8n denied the governed build start.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId; http_status = $httpStatus; outcome = $responseOutcome; violation_codes = @($responseViolationCodes) }
+}
+
+if ($httpStatus -lt 200 -or $httpStatus -ge 300) {
+  Stop-GovernedTask -Code 'N8N_INVALID_RESPONSE' -Message 'n8n returned a response that was not a usable authorization decision.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId; http_status = $httpStatus }
+}
+
+$hasViolationCodes = $null -ne $response -and $null -ne $response.PSObject.Properties['violation_codes']
+$violations = $responseViolationCodes
 $responseBuildAllowed = Get-ResponseProperty -Response $response -Name 'build_allowed'
 $responseOk = Get-ResponseProperty -Response $response -Name 'ok'
 $responseContractComplete = Get-ResponseProperty -Response $response -Name 'contract_complete'
