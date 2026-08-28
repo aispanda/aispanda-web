@@ -124,7 +124,6 @@ Positive path from the governed worktree:
 ```powershell
 & '.\scripts\Start-GovernedTask.ps1' `
   -TaskId 'AI-93' `
-  -RepositoryPath 'C:\Personal\AIspanda\.worktrees\ai-93' `
   -N8nUri 'http://127.0.0.1:5678/webhook/authorize-build-start'
 ```
 
