@@ -1,0 +1,340 @@
+{
+  "id": "ai93buildstart01",
+  "name": "authorize_build_start",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "none",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "id": "webhook-authorize-build-start",
+      "name": "Authorized Build-Start Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "6b8317f7-5c6c-4f36-83ea-7c063c2c7812",
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "authorize-build-start",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": ""
+        }
+      }
+    },
+    {
+      "id": "normalize-authorize-build-start",
+      "name": "Normalize Authorization Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [240, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body=$json.body&&typeof $json.body==='object'?$json.body:{};const text=(v)=>typeof v==='string'?v.trim():'';return {json:{request:{expected_task_id:text(body.task_id).toUpperCase(),expected_repository:'github.com/aispanda/aispanda-web',expected_policy_version:text(body.governance_policy_version),expected_story_contract_version:text(body.story_contract_version),permitted_action:text(body.permitted_action)},runtime:{branch_name:text(body.branch_name),head_sha:text(body.head_sha),repository:text(body.repository),caller:text(body.caller)}}};"
+      }
+    },
+    {
+      "id": "request-has-task-id",
+      "name": "Request Has Task ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "onError": "continueErrorOutput",
+      "position": [480, 0],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.request.expected_task_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fetch-current-linear-issue-local",
+      "name": "Fetch Current Linear Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [720, -96],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linear.app/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"query\":\"query GetIssue($id: String!) { issue(id: $id) { id identifier title description url branchName priorityLabel updatedAt state { name } team { id name key } project { id name } assignee { id displayName } labels { nodes { id name } } } }\",\"variables\":{\"id\":\"{{ $json.request.expected_task_id }}\"}}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "create-request-failure-local",
+      "name": "Create Request Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [720, 96],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {json:{...$json,request_failure:true,query_errors:[]}};"
+      }
+    },
+    {
+      "id": "validate-contract-and-branch-local",
+      "name": "Validate Contract and Branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [960, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const incoming=$json||{};const request=$('Normalize Authorization Request').first().json||{};const POLICY='governance-policy-v1.1';const SYNTAX='story-contract-v2';const REQUIRED=['User story','Required change','Acceptance criteria','Deployment'];const OPTIONAL=['Non-goals','Execution constraints','Links'];const ORDER=['User story','Required change','Acceptance criteria','Non-goals','Execution constraints','Deployment','Links'];const LEGACY=new Set(['Change','Done when','Evidence','Boundaries']);const DEFAULT_BRANCHES=new Set(['main','master','develop','development','trunk']);const CONTRACT_CODES=new Set(['ISSUE_NOT_FOUND','LINEAR_QUERY_FAILED','MISSING_PROPERTY','INVALID_ISSUE_IDENTIFIER','INVALID_LINEAR_REVISION','CONTENT_OUTSIDE_SECTIONS','MISSING_SECTION','EMPTY_SECTION','EMPTY_OPTIONAL_SECTION','DUPLICATE_SECTION','INVALID_HEADING_LEVEL','INVALID_SECTION_ORDER','UNSUPPORTED_SECTION','LEGACY_CONTRACT','PLACEHOLDER_PRESENT','MISSING_ACCEPTANCE_CRITERIA','INVALID_ACCEPTANCE_CRITERION','DUPLICATE_ACCEPTANCE_CRITERION','NONSEQUENTIAL_ACCEPTANCE_CRITERIA','MISSING_VERIFICATION','ORPHAN_VERIFICATION','UNEXPECTED_ACCEPTANCE_CONTENT','INVALID_DEPLOYMENT']);const GOVERNANCE_CODES=new Set(['DECISION_BLOCKER','STATUS_NOT_BUILDABLE','MISSING_POLICY_VERSION','MISSING_SYNTAX_VERSION','POLICY_VERSION_MISMATCH','SYNTAX_VERSION_MISMATCH']);const RUNTIME_CODES=new Set(['MISSING_EXPECTED_TASK_ID','INVALID_EXPECTED_TASK_ID','MISSING_EXPECTED_REPOSITORY','INVALID_EXPECTED_REPOSITORY','MISSING_RUNTIME_FIELD','DETACHED_HEAD','DEFAULT_BRANCH','BRANCH_TASK_MISMATCH','TASK_ID_MISMATCH','INVALID_REPOSITORY','REPOSITORY_MISMATCH','INVALID_HEAD_SHA','MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION']);const violations=[];const add=(code,field,message)=>violations.push({code,field,message});const text=(value)=>typeof value==='string'?value.replace(/\\r\\n?/g,'\\n').trim():'';const name=(value)=>value&&typeof value==='object'?(value.name||value.label||value.value||''):value;const field=(issue,key)=>{if(key==='identifier')return text(issue&&(issue.identifier||issue.task_id));if(key==='title')return text(issue&&issue.title);if(key==='team')return text(name(issue&&issue.team));if(key==='project')return text(name(issue&&issue.project));if(key==='priority'){const value=name(issue&&(issue.priorityLabel||issue.priority));return value===0||text(String(value||'')).toLowerCase()==='no priority'?'':text(String(value||''));}if(key==='status')return text(name(issue&&(issue.state||issue.status)));if(key==='source_url')return text(issue&&(issue.url||issue.source_url));if(key==='updated_at')return text(issue&&(issue.updatedAt||issue.updated_at));return '';};const labels=(issue)=>{const values=issue&&issue.labels&&(issue.labels.nodes||issue.labels);return Array.isArray(values)?values.map(name).filter((value)=>typeof value==='string'&&value.trim()).map((value)=>value.trim()):[];};const validTask=(value)=>/^[A-Z][A-Z0-9]*-\\d+$/.test(text(value).toUpperCase());const normalizeRepo=(value)=>{let repo=text(value).replace(/\\\\/g,'/');const ssh=repo.match(/^git@([^:]+):(.+)$/i);if(ssh)repo=ssh[1]+'/'+ssh[2];else{try{const url=new URL(repo);repo=url.hostname+url.pathname;}catch{repo=repo.replace(/^ssh:\\/\\//i,'');}}return repo.replace(/^\\/+|\\/+$/g,'').replace(/\\.git$/i,'').toLowerCase();};const validRepo=(value)=>/^[a-z0-9.-]+\\/[^\\s/]+\\/[^\\s/]+$/i.test(value);const placeholder=(value)=>/\\b(?:TBD|TODO|TO[- ]?BE[- ]?DECIDED)\\b|\\?\\?\\?|<target>|\\[(?:real user|accountable operational role|observable|current behaviour|required behaviour|one atomic|specific automated|canonical requirement|include only|use exactly)/i.test(value)||/\\[[^\\]\\n]+\\](?!\\s*\\()/.test(value);const stable=(value)=>{if(Array.isArray(value))return value.map(stable);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map((key)=>[key,stable(value[key])]));return value;};let payload=incoming;if(incoming.request_failure){payload={...incoming,...request};}else{const response=incoming.body&&typeof incoming.body==='object'?incoming.body:incoming;const errors=Array.isArray(response.errors)?response.errors.map((error)=>text(error&&error.message)||'Linear query error'):[];if(response.statusCode&&Number(response.statusCode)>=400)errors.push('Linear request returned HTTP '+response.statusCode+'.');payload={...request,issue:response.data&&response.data.issue?response.data.issue:null,query_errors:errors};}const queryErrors=Array.isArray(payload.query_errors)?payload.query_errors.filter(Boolean).map(String):[];const issue=payload.issue&&typeof payload.issue==='object'?payload.issue:null;const options=payload.request||{};const runtime=payload.runtime||{};if(payload.request_failure){add(text(options.expected_task_id)?'INVALID_EXPECTED_TASK_ID':'MISSING_EXPECTED_TASK_ID','task_id','Caller task ID must use TEAM-NUMBER syntax.');}else if(queryErrors.length){add('LINEAR_QUERY_FAILED','linear','Linear lookup did not return a trustworthy issue.');}else if(!issue){add('ISSUE_NOT_FOUND','task_id','Linear issue was not returned.');}let sections={};let criteria=[];let deployment='';if(!violations.length){['identifier','title','team','project','priority','status','source_url','updated_at'].forEach((key)=>{if(!field(issue,key))add('MISSING_PROPERTY',key,'Required Linear property '+key+' is missing.');});if(field(issue,'identifier')&&!validTask(field(issue,'identifier')))add('INVALID_ISSUE_IDENTIFIER','identifier','Linear issue identifier must use TEAM-NUMBER syntax.');if(field(issue,'updated_at')&&Number.isNaN(Date.parse(field(issue,'updated_at'))))add('INVALID_LINEAR_REVISION','updated_at','Linear updatedAt must be valid.');const lines=text(issue.description).split('\\n');const headings=[];lines.forEach((line,index)=>{const match=line.match(/^(#{1,6})\\s+(.+?)\\s*$/);if(match)headings.push({level:match[1].length,name:match[2].trim(),line:index});});const first=headings.length?headings[0].line:lines.length;if(lines.slice(0,first).join('\\n').trim())add('CONTENT_OUTSIDE_SECTIONS','description','Content before the first contract section is not allowed.');const map=new Map();headings.forEach((heading,index)=>{const end=index+1<headings.length?headings[index+1].line:lines.length;const entry={...heading,content:lines.slice(heading.line+1,end).join('\\n').trim()};map.set(heading.name,[...(map.get(heading.name)||[]),entry]);});sections=Object.fromEntries(Array.from(map.entries()).map(([key,entries])=>[key,entries[0].content]));map.forEach((entries,key)=>{if(entries.length>1)add('DUPLICATE_SECTION',key,'Section appears more than once.');if(entries.some((entry)=>entry.level!==3))add('INVALID_HEADING_LEVEL',key,'Section must use a level-three heading.');if(!ORDER.includes(key))add(LEGACY.has(key)?'LEGACY_CONTRACT':'UNSUPPORTED_SECTION',key,'Unsupported heading.');if(placeholder(entries[0].content||''))add('PLACEHOLDER_PRESENT',key,'Section contains an unresolved placeholder.');});REQUIRED.forEach((key)=>{const entry=map.get(key)&&map.get(key)[0];if(!entry)add('MISSING_SECTION',key,'Required section is missing.');else if(!entry.content)add('EMPTY_SECTION',key,'Required section is empty.');});OPTIONAL.forEach((key)=>{const entry=map.get(key)&&map.get(key)[0];if(entry&&!entry.content)add('EMPTY_OPTIONAL_SECTION',key,'Optional section must be removed when empty.');});const observed=headings.map((heading)=>heading.name).filter((key)=>ORDER.includes(key)).map((key)=>ORDER.indexOf(key));if(observed.some((value,index)=>index>0&&value<=observed[index-1]))add('INVALID_SECTION_ORDER','description','Canonical sections are not in order.');const acLines=text(sections['Acceptance criteria']).split('\\n').map((line)=>line.trim()).filter(Boolean);for(let index=0;index<acLines.length;index+=1){const match=acLines[index].match(/^AC-(\\d+):\\s+(.+)$/);if(!match){if(/^AC-/i.test(acLines[index]))add('INVALID_ACCEPTANCE_CRITERION','acceptance_criteria','Invalid AC line.');else if(/^Verify with:/i.test(acLines[index]))add('ORPHAN_VERIFICATION','acceptance_criteria','Verify with has no preceding AC.');else if(!/^Record every criterion as PASS, FAIL, or UNPROVEN\\./.test(acLines[index]))add('UNEXPECTED_ACCEPTANCE_CONTENT','acceptance_criteria','Unexpected AC content.');continue;}const number=Number(match[1]);const verify=(acLines[index+1]||'').match(/^Verify with:\\s+(.+)$/);criteria.push({number,outcome:match[2],evidence:verify?verify[1]:null});if(!verify)add('MISSING_VERIFICATION','AC-'+number,'Each AC needs its own Verify with line.');else index+=1;}if(!criteria.length)add('MISSING_ACCEPTANCE_CRITERIA','acceptance_criteria','At least one AC is required.');const seen=new Set();criteria.forEach((criterion,index)=>{if(seen.has(criterion.number))add('DUPLICATE_ACCEPTANCE_CRITERION','AC-'+criterion.number,'AC identifier is duplicated.');seen.add(criterion.number);if(criterion.number!==index+1)add('NONSEQUENTIAL_ACCEPTANCE_CRITERIA','AC-'+criterion.number,'AC identifiers must be sequential.');if(placeholder(criterion.outcome)||placeholder(criterion.evidence||''))add('PLACEHOLDER_PRESENT','AC-'+criterion.number,'AC contains a placeholder.');});deployment=text(sections.Deployment);if(deployment&&deployment!=='not applicable'&&deployment!=='later'&&!/^in scope:[ \\t]+\\S[^\\r\\n]*$/.test(deployment))add('INVALID_DEPLOYMENT','Deployment','Deployment must be not applicable, later, or in scope: <target>.');const labelSet=new Set(labels(issue).map((value)=>value.toUpperCase()));['NEEDS_PRODUCT_DECISION','NEEDS_TECHNICAL_INPUT'].forEach((value)=>{if(labelSet.has(value))add('DECISION_BLOCKER','labels',value+' blocks build authorization.');});const status=field(issue,'status');if(status&&status!=='Ready'&&status!=='In Progress')add('STATUS_NOT_BUILDABLE','status','Build start requires Ready or In Progress.');const expectedTask=text(options.expected_task_id).toUpperCase();if(!expectedTask)add('MISSING_EXPECTED_TASK_ID','task_id','Caller task ID is required.');else if(!validTask(expectedTask))add('INVALID_EXPECTED_TASK_ID','task_id','Caller task ID must use TEAM-NUMBER syntax.');else if(field(issue,'identifier')&&expectedTask!==field(issue,'identifier').toUpperCase())add('TASK_ID_MISMATCH','task_id','Linear returned a different issue identifier.');const expectedRepo=normalizeRepo(options.expected_repository);if(!expectedRepo)add('MISSING_EXPECTED_REPOSITORY','repository','Governed repository is required.');else if(!validRepo(expectedRepo))add('INVALID_EXPECTED_REPOSITORY','repository','Governed repository is invalid.');if(!text(options.expected_policy_version))add('MISSING_POLICY_VERSION','governance_policy_version','Caller policy version is required.');else if(text(options.expected_policy_version)!==POLICY)add('POLICY_VERSION_MISMATCH','governance_policy_version','Policy versions differ.');if(!text(options.expected_story_contract_version))add('MISSING_SYNTAX_VERSION','story_contract_version','Caller story syntax version is required.');else if(text(options.expected_story_contract_version)!==SYNTAX)add('SYNTAX_VERSION_MISMATCH','story_contract_version','Story syntax versions differ.');if(!text(options.permitted_action))add('MISSING_PERMITTED_ACTION','permitted_action','Permitted action is required.');else if(text(options.permitted_action)!=='local_build_start')add('UNSUPPORTED_ACTION','permitted_action','Only local_build_start is permitted.');['branch_name','head_sha','repository','caller'].forEach((key)=>{if(!text(runtime[key]))add('MISSING_RUNTIME_FIELD',key,'Runtime field is required.');});const branch=text(runtime.branch_name);if(branch==='HEAD')add('DETACHED_HEAD','branch_name','Detached HEAD cannot be authorized.');if(DEFAULT_BRANCHES.has(branch.toLowerCase()))add('DEFAULT_BRANCH','branch_name','Default branches cannot be authorized.');if(branch&&expectedTask&&!branch.toLowerCase().includes(expectedTask.toLowerCase()))add('BRANCH_TASK_MISMATCH','branch_name','Actual branch is not associated with the task.');if(text(runtime.head_sha)&&!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(text(runtime.head_sha)))add('INVALID_HEAD_SHA','head_sha','HEAD must be a full Git object ID.');const actualRepo=normalizeRepo(runtime.repository);if(text(runtime.repository)&&!validRepo(actualRepo))add('INVALID_REPOSITORY','repository','Actual repository is invalid.');else if(validRepo(expectedRepo)&&actualRepo&&expectedRepo!==actualRepo)add('REPOSITORY_MISMATCH','repository','Actual repository does not match the governed repository.');}const codes=Array.from(new Set(violations.map((entry)=>entry.code)));const contractHashInput=issue?JSON.stringify(stable({task_id:field(issue,'identifier'),title:field(issue,'title'),description:text(issue.description),team:field(issue,'team'),project:field(issue,'project'),priority:field(issue,'priority'),status:field(issue,'status'),labels:labels(issue).sort(),source_url:field(issue,'source_url')})):null;return {json:{contract_version:'2.0',governance_policy_version:POLICY,story_contract_version:SYNTAX,ok:!codes.includes('ISSUE_NOT_FOUND')&&!codes.includes('LINEAR_QUERY_FAILED'),contract_complete:!codes.some((code)=>CONTRACT_CODES.has(code)),governance_compliant:!codes.some((code)=>CONTRACT_CODES.has(code)||GOVERNANCE_CODES.has(code)),runtime_valid:!codes.some((code)=>RUNTIME_CODES.has(code)),candidate_build_allowed:codes.length===0,task_id:field(issue,'identifier')||text(options.expected_task_id).toUpperCase()||null,branch_name:text(runtime.branch_name)||null,repository:text(runtime.repository)||null,caller:text(runtime.caller)||null,permitted_action:text(options.permitted_action)||null,contract_hash_input:contractHashInput,contract_hash:null,contract_hash_algorithm:'sha256',linear_updated_at:field(issue,'updated_at')||null,acceptance_criteria:criteria,sections,deployment:deployment||null,legacy_contract:codes.includes('LEGACY_CONTRACT'),query_errors:queryErrors,violation_codes:codes,violations,authorization_capable:true}};"
+      }
+    },
+    {
+      "id": "calculate-contract-hash-local",
+      "name": "Calculate Contract SHA-256",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [1200, 0],
+      "parameters": {
+        "action": "hash",
+        "binaryData": false,
+        "type": "SHA256",
+        "value": "={{ $json.contract_hash_input ?? '' }}",
+        "dataPropertyName": "computed_contract_hash",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "finalize-contract-hash-local",
+      "name": "Finalize Contract Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [1440, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item={...($json||{})};const hasInput=typeof item.contract_hash_input==='string';const hash=typeof item.computed_contract_hash==='string'?item.computed_contract_hash:'';item.contract_hash=hasInput&&/^[0-9a-f]{64}$/.test(hash)?hash:null;delete item.contract_hash_input;delete item.computed_contract_hash;if(hasInput&&!item.contract_hash){const codes=Array.from(new Set([...(Array.isArray(item.violation_codes)?item.violation_codes:[]),'CONTRACT_HASH_INVALID']));const violations=[...(Array.isArray(item.violations)?item.violations:[]),{code:'CONTRACT_HASH_INVALID',field:'contract_hash',message:'The native SHA-256 result was missing or invalid.'}];return {json:{...item,candidate_build_allowed:false,violation_codes:codes,violations}};}return {json:item};"
+      }
+    },
+    {
+      "id": "classify-local-authorization",
+      "name": "Classify Authorization Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [1920, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item=$json||{};const sourceCodes=Array.isArray(item.violation_codes)?item.violation_codes:['CONTROLLER_INVALID_OUTPUT'];const boundaryAttested=item.branch_boundary_checked===true&&typeof item.branch_boundary_valid==='boolean';const boundaryValid=boundaryAttested&&item.branch_boundary_valid===true;const codes=Array.from(new Set([...sourceCodes,...(boundaryAttested?[]:['BRANCH_BOUNDARY_NOT_ATTESTED']),...(boundaryAttested&&!boundaryValid?['BRANCH_BOUNDARY_INVALID']:[])]));const fail=new Set(['ISSUE_NOT_FOUND','LINEAR_QUERY_FAILED','MISSING_EXPECTED_TASK_ID','INVALID_EXPECTED_TASK_ID','MISSING_EXPECTED_REPOSITORY','INVALID_EXPECTED_REPOSITORY','TASK_ID_MISMATCH','INVALID_ISSUE_IDENTIFIER','INVALID_LINEAR_REVISION','MISSING_POLICY_VERSION','MISSING_SYNTAX_VERSION','POLICY_VERSION_MISMATCH','SYNTAX_VERSION_MISMATCH','MISSING_RUNTIME_FIELD','DETACHED_HEAD','DEFAULT_BRANCH','BRANCH_TASK_MISMATCH','BRANCH_BOUNDARY_NOT_ATTESTED','BRANCH_BOUNDARY_INVALID','INVALID_HEAD_SHA','INVALID_REPOSITORY','REPOSITORY_MISMATCH','MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION','CONTROLLER_INVALID_OUTPUT','CONTRACT_HASH_INVALID']);const blocked=new Set(['DECISION_BLOCKER','STATUS_NOT_BUILDABLE']);const replan=new Set(['MISSING_PROPERTY','CONTENT_OUTSIDE_SECTIONS','MISSING_SECTION','EMPTY_SECTION','EMPTY_OPTIONAL_SECTION','DUPLICATE_SECTION','INVALID_HEADING_LEVEL','INVALID_SECTION_ORDER','UNSUPPORTED_SECTION','LEGACY_CONTRACT','PLACEHOLDER_PRESENT','MISSING_ACCEPTANCE_CRITERIA','INVALID_ACCEPTANCE_CRITERION','DUPLICATE_ACCEPTANCE_CRITERION','NONSEQUENTIAL_ACCEPTANCE_CRITERIA','MISSING_VERIFICATION','ORPHAN_VERIFICATION','UNEXPECTED_ACCEPTANCE_CONTENT','INVALID_DEPLOYMENT']);let outcome='PASS';if(codes.some((code)=>fail.has(code)))outcome='FAIL';else if(codes.some((code)=>blocked.has(code)))outcome='BLOCKED';else if(codes.some((code)=>replan.has(code)))outcome='REPLAN';else if(codes.length)outcome='FAIL';const response_status={PASS:200,BLOCKED:409,REPLAN:422,FAIL:502}[outcome];const build_allowed=outcome==='PASS'&&boundaryValid&&item.candidate_build_allowed===true;return {json:{...item,violation_codes:codes,outcome,response_status,validation_passed:outcome==='PASS',build_allowed,authorization_mode:'localhost_live'}};"
+      }
+    },
+    {
+      "id": "enforce-branch-boundary-local",
+      "name": "Enforce Branch Boundary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [1680, 0],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item=$json||{};const task=typeof item.task_id==='string'?item.task_id.trim():'';const branch=typeof item.branch_name==='string'?item.branch_name.trim():'';if(!task||!branch)return {json:{...item,branch_boundary_checked:true,branch_boundary_valid:false,candidate_build_allowed:false}};const escaped=task.replace(/[.*+?^$(){}|[\\]\\\\]/g,'\\\\$&');const associated=new RegExp('(^|[/_.-])'+escaped+'($|[/_.-])','i').test(branch);if(associated)return {json:{...item,branch_boundary_checked:true,branch_boundary_valid:true}};const codes=Array.from(new Set([...(Array.isArray(item.violation_codes)?item.violation_codes:[]),'BRANCH_TASK_MISMATCH']));const violations=[...(Array.isArray(item.violations)?item.violations:[]),{code:'BRANCH_TASK_MISMATCH',field:'branch_name',message:'Actual branch is not delimiter-associated with the task.'}];return {json:{...item,branch_boundary_checked:true,branch_boundary_valid:false,runtime_valid:false,candidate_build_allowed:false,violation_codes:codes,violations}};"
+      }
+    },
+    {
+      "id": "respond-linear-dependency-error-local",
+      "name": "Respond Linear Dependency Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [960, -240],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { contract_version: '2.0', governance_policy_version: 'governance-policy-v1.1', story_contract_version: 'story-contract-v2', ok: false, contract_complete: false, governance_compliant: false, runtime_valid: false, candidate_build_allowed: false, validation_passed: false, build_allowed: false, authorization_capable: false, outcome: 'FAIL', violation_codes: ['LINEAR_DEPENDENCY_ERROR'] } }}",
+        "options": {
+          "responseCode": 502
+        }
+      }
+    },
+    {
+      "id": "respond-controller-error-local",
+      "name": "Respond Controller Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1680, 240],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { contract_version: '2.0', governance_policy_version: 'governance-policy-v1.1', story_contract_version: 'story-contract-v2', ok: false, contract_complete: false, governance_compliant: false, runtime_valid: false, candidate_build_allowed: false, validation_passed: false, build_allowed: false, authorization_capable: false, outcome: 'FAIL', violation_codes: ['CONTROLLER_RUNTIME_ERROR'] } }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "respond-local-authorization",
+      "name": "Respond Authorization Outcome",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [2160, 0],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.response_status }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Authorized Build-Start Request": {
+      "main": [[{
+        "node": "Normalize Authorization Request",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Normalize Authorization Request": {
+      "main": [[{
+        "node": "Request Has Task ID",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Request Has Task ID": {
+      "main": [[{
+        "node": "Fetch Current Linear Issue",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Create Request Failure",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Fetch Current Linear Issue": {
+      "main": [[{
+        "node": "Validate Contract and Branch",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Linear Dependency Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Create Request Failure": {
+      "main": [[{
+        "node": "Validate Contract and Branch",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Validate Contract and Branch": {
+      "main": [[{
+        "node": "Calculate Contract SHA-256",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Calculate Contract SHA-256": {
+      "main": [[{
+        "node": "Finalize Contract Hash",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Finalize Contract Hash": {
+      "main": [[{
+        "node": "Enforce Branch Boundary",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Enforce Branch Boundary": {
+      "main": [[{
+        "node": "Classify Authorization Outcome",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    },
+    "Classify Authorization Outcome": {
+      "main": [[{
+        "node": "Respond Authorization Outcome",
+        "type": "main",
+        "index": 0
+      }], [{
+        "node": "Respond Controller Error",
+        "type": "main",
+        "index": 0
+      }]]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "governancePolicyVersion": "governance-policy-v1.1",
+    "storyContractVersion": "story-contract-v2",
+    "sanitizedExport": true
+  }
+}
