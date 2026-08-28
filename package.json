@@ -12,7 +12,7 @@
     "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-content-boundary.mjs dist",
     "preview": "astro preview",
     "test:ai": "node --test tests/ai-connections.test.ts tests/ai-vault-core.test.mjs",
-    "test:governance": "node --test tests/governance-contract.test.mjs tests/governed-task-launcher.test.mjs tests/authorize-build-start-workflow.test.mjs",
+    "test:governance": "node scripts/build-ai95-parent-candidate.mjs --check && node scripts/build-ai95-baseline-candidate.mjs --check && node scripts/build-ai95-github-governance-workflow.mjs --check && node --test --test-concurrency=1 tests/governance-contract.test.mjs tests/governance-baseline.test.mjs tests/governed-task-launcher.test.mjs tests/authorize-build-start-workflow.test.mjs tests/ai95-governance-baseline-workflow.test.mjs tests/authorize-build-start-ai95-integration-candidate.test.mjs tests/ai95-governance-baseline-merge-candidate.test.mjs tests/ai-governance-workflow.test.mjs tests/pr-merge-gate.test.mjs",
     "test:e2e": "playwright test",
     "validate:profile": "node scripts/validate-site-profile.mjs",
     "validate:content": "node scripts/validate-content-boundary.mjs"

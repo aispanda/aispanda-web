@@ -31,6 +31,11 @@ export const BLOCKING_LABELS = Object.freeze([
   'NEEDS_TECHNICAL_INPUT',
 ]);
 
+export const PERMITTED_ACTIONS = Object.freeze([
+  'local_build_start',
+  'pr_merge_gate',
+]);
+
 const LEGACY_HEADINGS = new Set(['Change', 'Done when', 'Evidence', 'Boundaries']);
 const DEFAULT_BRANCHES = new Set(['main', 'master', 'develop', 'development', 'trunk']);
 const CONTRACT_COMPLETENESS_CODES = new Set([
@@ -61,6 +66,7 @@ const CONTRACT_COMPLETENESS_CODES = new Set([
 const GOVERNANCE_CODES = new Set([
   'DECISION_BLOCKER',
   'STATUS_NOT_BUILDABLE',
+  'STATUS_NOT_ACTIONABLE',
   'MISSING_POLICY_VERSION',
   'MISSING_SYNTAX_VERSION',
   'POLICY_VERSION_MISMATCH',
@@ -79,6 +85,11 @@ const RUNTIME_CODES = new Set([
   'INVALID_REPOSITORY',
   'REPOSITORY_MISMATCH',
   'INVALID_HEAD_SHA',
+  'UNSUPPORTED_ACTION',
+  'INVALID_OPERATION_ID',
+  'INVALID_BRANCH_FORMAT',
+  'MISSING_LINEAR_BRANCH',
+  'LINEAR_BRANCH_TASK_MISMATCH',
 ]);
 
 function violation(code, field, message) {
@@ -117,6 +128,7 @@ function issueField(issue, field) {
     case 'status': return normalizedText(valueName(issue?.status ?? issue?.state));
     case 'source_url': return normalizedText(issue?.source_url ?? issue?.url);
     case 'updated_at': return normalizedText(issue?.updated_at ?? issue?.updatedAt);
+    case 'linear_branch_name': return normalizedText(issue?.linear_branch_name ?? issue?.branchName);
     default: return '';
   }
 }
@@ -293,7 +305,12 @@ function branchContainsTask(branch, taskId) {
   return new RegExp(`(^|[/_.-])${escaped}($|[/_.-])`, 'i').test(branch);
 }
 
-function normalizeRepository(value) {
+export function taskIdFromGovernedBranch(branch) {
+  const match = normalizedText(branch).match(/^codex\/([a-z][a-z0-9]*-[0-9]+)-[a-z0-9][a-z0-9._-]*$/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+export function normalizeRepository(value) {
   let repository = normalizedText(value).replace(/\\/g, '/');
   const ssh = repository.match(/^git@([^:]+):(.+)$/i);
   if (ssh) repository = `${ssh[1]}/${ssh[2]}`;
@@ -364,6 +381,14 @@ export function evaluateTaskContract(issue, runtime = {}, options = {}) {
     violations.push(violation('STATUS_NOT_BUILDABLE', 'status', 'Build start is allowed only from Ready or as a valid In Progress resumption.'));
   }
 
+  const permittedAction = normalizedText(runtime.permitted_action);
+  if (permittedAction && !PERMITTED_ACTIONS.includes(permittedAction)) {
+    violations.push(violation('UNSUPPORTED_ACTION', 'permitted_action', 'The requested governance action is not supported.'));
+  }
+  if (status && permittedAction === 'pr_merge_gate' && status !== 'In Progress') {
+    violations.push(violation('STATUS_NOT_ACTIONABLE', 'status', 'The pull-request merge gate requires the Linear issue to be In Progress.'));
+  }
+
   const requestedTaskId = normalizedText(options.expected_task_id).toUpperCase();
   const issueTaskId = issueField(issue, 'identifier').toUpperCase();
   const requestedTaskValid = isTaskIdentifier(requestedTaskId);
@@ -385,7 +410,7 @@ export function evaluateTaskContract(issue, runtime = {}, options = {}) {
 
   const requireRuntime = options.require_runtime !== false;
   if (requireRuntime) {
-    for (const field of ['branch_name', 'head_sha', 'repository', 'caller']) {
+    for (const field of ['branch_name', 'head_sha', 'repository', 'caller', 'permitted_action', 'operation_id']) {
       if (!normalizedText(runtime[field])) violations.push(violation('MISSING_RUNTIME_FIELD', field, `Runtime field ${field} is required.`));
     }
 
@@ -398,6 +423,25 @@ export function evaluateTaskContract(issue, runtime = {}, options = {}) {
     }
     if (runtime.head_sha && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(runtime.head_sha)) {
       violations.push(violation('INVALID_HEAD_SHA', 'head_sha', 'HEAD must be a full 40- or 64-character hexadecimal Git object ID.'));
+    }
+    if (runtime.operation_id && !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(runtime.operation_id)) {
+      violations.push(violation('INVALID_OPERATION_ID', 'operation_id', 'Operation ID must be 8-128 safe identifier characters.'));
+    }
+
+    if (permittedAction === 'pr_merge_gate') {
+      const branchTaskId = taskIdFromGovernedBranch(branch);
+      if (!branchTaskId) {
+        violations.push(violation('INVALID_BRANCH_FORMAT', 'branch_name', 'Pull-request branches must use codex/<team>-<number>-<description>.'));
+      } else if (requestedTaskValid && branchTaskId !== requestedTaskId) {
+        violations.push(violation('BRANCH_TASK_MISMATCH', 'branch_name', `Pull-request branch identifies ${branchTaskId}, not ${requestedTaskId}.`));
+      }
+
+      const linearBranchName = issueField(issue, 'linear_branch_name');
+      if (!linearBranchName) {
+        violations.push(violation('MISSING_LINEAR_BRANCH', 'linear_branch_name', 'Linear did not return its generated branch identity.'));
+      } else if (requestedTaskValid && !branchContainsTask(linearBranchName, requestedTaskId)) {
+        violations.push(violation('LINEAR_BRANCH_TASK_MISMATCH', 'linear_branch_name', 'Linear generated branch identity does not match the requested task.'));
+      }
     }
 
     const actualRepository = normalizeRepository(runtime.repository);
@@ -427,8 +471,10 @@ export function evaluateTaskContract(issue, runtime = {}, options = {}) {
     status: issueField(issue, 'status') || null,
     branch_name: normalizedText(runtime.branch_name) || null,
     head_sha: normalizedText(runtime.head_sha) || null,
-    repository: normalizedText(runtime.repository) || null,
+    repository: normalizeRepository(runtime.repository) || null,
     caller: normalizedText(runtime.caller) || null,
+    permitted_action: permittedAction || null,
+    operation_id: normalizedText(runtime.operation_id) || null,
     contract_hash: issue ? hashContract(issue) : null,
     linear_updated_at: issueField(issue, 'updated_at') || null,
     acceptance_criteria: contract.acceptance_criteria,

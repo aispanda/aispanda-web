@@ -13,6 +13,8 @@ param(
 
   [string]$Caller = 'codex',
 
+  [string]$OperationId,
+
   [ValidateRange(1, 60)]
   [int]$TimeoutSec = 15
 )
@@ -117,6 +119,14 @@ function Get-ResponseProperty {
 }
 
 $canonicalTaskId = $TaskId.Trim().ToUpperInvariant()
+if ([string]::IsNullOrWhiteSpace($OperationId)) {
+  $OperationId = 'launcher:{0}:{1}' -f $canonicalTaskId, [Guid]::NewGuid().ToString('N')
+} else {
+  $OperationId = $OperationId.Trim()
+}
+if ($OperationId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$') {
+  Stop-GovernedTask -Code 'INVALID_OPERATION_ID' -Message 'OperationId must be 8-128 safe identifier characters.' -Details @{ task_id = $canonicalTaskId; operation_id = $OperationId }
+}
 if ([string]::IsNullOrWhiteSpace($N8nUri)) {
   Stop-GovernedTask -Code 'MISSING_N8N_URI' -Message 'N8N_GOVERNANCE_URI must point to the localhost authorize_build_start endpoint.'
 }
@@ -181,6 +191,7 @@ $request = [ordered]@{
   head_sha = $headSha
   repository = $repository
   caller = $Caller
+  operation_id = $OperationId
   permitted_action = $PermittedAction
   governance_policy_version = $policyVersion
   story_contract_version = $contractVersion
@@ -189,7 +200,7 @@ $request = [ordered]@{
 try {
   $response = Invoke-RestMethod -Method Post -Uri $uri.AbsoluteUri -ContentType 'application/json' -Headers @{ $headerName = $headerValue } -Body ($request | ConvertTo-Json -Compress) -TimeoutSec $TimeoutSec -MaximumRedirection 0
 } catch {
-  Stop-GovernedTask -Code 'N8N_UNAVAILABLE' -Message 'n8n did not return a usable authorization response.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository }
+  Stop-GovernedTask -Code 'N8N_UNAVAILABLE' -Message 'n8n did not return a usable authorization response.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId }
 }
 
 $responseViolationCodes = Get-ResponseProperty -Response $response -Name 'violation_codes'
@@ -208,6 +219,8 @@ $responseTaskId = Get-ResponseProperty -Response $response -Name 'task_id'
 $responseBranchName = Get-ResponseProperty -Response $response -Name 'branch_name'
 $responseRepository = Get-ResponseProperty -Response $response -Name 'repository'
 $responsePermittedAction = Get-ResponseProperty -Response $response -Name 'permitted_action'
+$responseOperationId = Get-ResponseProperty -Response $response -Name 'operation_id'
+$responseStorageVerified = Get-ResponseProperty -Response $response -Name 'storage_verified'
 $responsePolicyVersion = Get-ResponseProperty -Response $response -Name 'governance_policy_version'
 $responseContractVersion = Get-ResponseProperty -Response $response -Name 'story_contract_version'
 $responseContractHash = Get-ResponseProperty -Response $response -Name 'contract_hash'
@@ -224,6 +237,8 @@ $checks = [ordered]@{
   branch_name = (Test-ExactString -Actual $responseBranchName -Expected $branch)
   repository = (Test-ExactString -Actual (Normalize-Repository -Value ([string]$responseRepository)) -Expected $repository)
   permitted_action = (Test-ExactString -Actual $responsePermittedAction -Expected $PermittedAction)
+  operation_id = (Test-ExactString -Actual $responseOperationId -Expected $OperationId)
+  storage_verified = ($responseStorageVerified -is [bool] -and $responseStorageVerified)
   governance_policy_version = (Test-ExactString -Actual $responsePolicyVersion -Expected $policyVersion)
   story_contract_version = (Test-ExactString -Actual $responseContractVersion -Expected $contractVersion)
   violation_codes = ($hasViolationCodes -and $violations.Count -eq 0)
@@ -235,7 +250,7 @@ $responseValid = -not ($checks.Values -contains $false)
 
 if (-not $responseValid) {
   $invalidFields = @($checks.GetEnumerator() | Where-Object { -not $_.Value } | ForEach-Object { $_.Key })
-  Stop-GovernedTask -Code 'N8N_REJECTED' -Message 'n8n did not return an exact local PASS authorization decision.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; violation_codes = $violations; invalid_response_fields = $invalidFields }
+  Stop-GovernedTask -Code 'N8N_REJECTED' -Message 'n8n did not return an exact persisted local PASS authorization decision.' -Details @{ task_id = $canonicalTaskId; branch_name = $branch; repository = $repository; operation_id = $OperationId; violation_codes = $violations; invalid_response_fields = $invalidFields }
 }
 
 Write-GateResult -Approved $true -Code 'PASS' -Message 'The local governed build-start check passed.' -Details @{
@@ -243,6 +258,7 @@ Write-GateResult -Approved $true -Code 'PASS' -Message 'The local governed build
   branch_name = $branch
   head_sha = $headSha
   repository = $repository
+  operation_id = $OperationId
   permitted_action = $PermittedAction
   contract_hash = $response.contract_hash
   linear_updated_at = $response.linear_updated_at

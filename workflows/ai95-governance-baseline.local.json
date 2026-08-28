@@ -1,0 +1,2055 @@
+{
+  "name": "AI-95 Governance Baseline Store",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "description": "Inactive, credential-free baseline store for the AI-95 governed build-start pilot. It stores only redacted authorization facts in a named Data Table.",
+  "nodes": [
+    {
+      "name": "Baseline Input",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        384
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "task_id",
+              "type": "string"
+            },
+            {
+              "name": "repository",
+              "type": "string"
+            },
+            {
+              "name": "branch_name",
+              "type": "string"
+            },
+            {
+              "name": "head_sha",
+              "type": "string"
+            },
+            {
+              "name": "caller_identity",
+              "type": "string"
+            },
+            {
+              "name": "permitted_action",
+              "type": "string"
+            },
+            {
+              "name": "operation_id",
+              "type": "string"
+            },
+            {
+              "name": "governance_policy_version",
+              "type": "string"
+            },
+            {
+              "name": "story_contract_version",
+              "type": "string"
+            },
+            {
+              "name": "linear_updated_at",
+              "type": "string"
+            },
+            {
+              "name": "contract_hash",
+              "type": "string"
+            },
+            {
+              "name": "build_allowed",
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Prepare Baseline Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        384
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const source = $input.first().json || {};\nconst text = (value) => typeof value === 'string' ? value.trim() : '';\nconst normalizeRepository = (value) => {\n  let repository = text(value).replace(/\\\\/g, '/');\n  const ssh = repository.match(/^git@([^:]+):(.+)$/i);\n  if (ssh) repository = ssh[1] + '/' + ssh[2];\n  else repository = repository.replace(/^(?:https?|ssh):\\/\\//i, '');\n  return repository.replace(/^\\/+|\\/+$/g, '').replace(/\\.git$/i, '').toLowerCase();\n};\nconst taskId = text(source.task_id).toUpperCase();\nconst repository = normalizeRepository(source.repository);\nconst branchName = text(source.branch_name);\nconst branchMatch = branchName.match(/^codex\\/([a-z][a-z0-9]*-[0-9]+)-[a-z0-9][a-z0-9._-]*$/i);\nconst operationId = text(source.operation_id);\nconst violations = [];\nif (source.build_allowed !== true) violations.push('UPSTREAM_BUILD_NOT_ALLOWED');\nif (!/^[A-Z][A-Z0-9]*-\\d+$/.test(taskId)) violations.push('INVALID_TASK_ID');\nif (!/^[a-z0-9.-]+\\/[^\\s/]+\\/[^\\s/]+$/i.test(repository)) violations.push('INVALID_REPOSITORY');\nif (!branchMatch) violations.push('INVALID_BRANCH_FORMAT');\nelse if (branchMatch[1].toUpperCase() !== taskId) violations.push('BRANCH_TASK_MISMATCH');\nif (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(text(source.head_sha))) violations.push('INVALID_HEAD_SHA');\nif (!text(source.caller_identity)) violations.push('MISSING_CALLER');\nif (text(source.permitted_action) !== 'local_build_start') violations.push('UNSUPPORTED_ACTION');\nif (!/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(operationId)) violations.push('INVALID_OPERATION_ID');\nif (text(source.governance_policy_version) !== 'governance-policy-v1.1') violations.push('POLICY_VERSION_MISMATCH');\nif (text(source.story_contract_version) !== 'story-contract-v2') violations.push('SYNTAX_VERSION_MISMATCH');\nif (Number.isNaN(Date.parse(text(source.linear_updated_at)))) violations.push('INVALID_LINEAR_REVISION');\nif (!/^[0-9a-f]{64}$/i.test(text(source.contract_hash))) violations.push('INVALID_CONTRACT_HASH');\nconst normalized = {\n  task_id: taskId,\n  repository,\n  branch_name: branchName,\n  head_sha: text(source.head_sha).toLowerCase(),\n  caller: text(source.caller_identity),\n  permitted_action: text(source.permitted_action),\n  operation_id: operationId,\n  governance_policy_version: text(source.governance_policy_version),\n  story_contract_version: text(source.story_contract_version),\n  linear_updated_at: text(source.linear_updated_at),\n  contract_hash: text(source.contract_hash).toLowerCase(),\n};\nconst fingerprintInput = JSON.stringify({\n  branch_name: normalized.branch_name,\n  caller: normalized.caller,\n  contract_hash: normalized.contract_hash,\n  governance_policy_version: normalized.governance_policy_version,\n  head_sha: normalized.head_sha,\n  linear_updated_at: normalized.linear_updated_at,\n  permitted_action: normalized.permitted_action,\n  repository: normalized.repository,\n  story_contract_version: normalized.story_contract_version,\n  task_id: normalized.task_id,\n});\nreturn [{ json: { ...normalized, adapter_input_valid: violations.length === 0, violation_codes: violations, fingerprint_input: fingerprintInput } }];"
+      }
+    },
+    {
+      "name": "Calculate Baseline Fingerprint",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        448,
+        384
+      ],
+      "parameters": {
+        "action": "hash",
+        "binaryData": false,
+        "type": "SHA256",
+        "value": "={{ $json.fingerprint_input }}",
+        "dataPropertyName": "request_fingerprint",
+        "encoding": "hex"
+      }
+    },
+    {
+      "name": "Create Pending Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        384
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json || {};\nconst violations = Array.isArray(item.violation_codes) ? [...item.violation_codes] : [];\nif (!/^[0-9a-f]{64}$/.test(item.request_fingerprint || '')) violations.push('INVALID_REQUEST_FINGERPRINT');\nconst now = Date.now();\nconst candidate = {\n  operation_id: item.operation_id || '',\n  request_fingerprint: item.request_fingerprint || '',\n  task_id: item.task_id || '',\n  repository: item.repository || '',\n  branch_name: item.branch_name || '',\n  head_sha: item.head_sha || '',\n  caller_identity: item.caller || '',\n  permitted_action: 'local_build_start',\n  governance_policy_version: item.governance_policy_version || '',\n  story_contract_version: item.story_contract_version || '',\n  linear_updated_at: item.linear_updated_at || '',\n  contract_hash: item.contract_hash || '',\n  outcome: 'PASS',\n  status: 'pending',\n  created_at: new Date(now).toISOString(),\n  expires_at: new Date(now + 24 * 60 * 60 * 1000).toISOString(),\n};\nreturn [{ json: { adapter_input_valid: item.adapter_input_valid === true && violations.length === 0, violation_codes: violations, candidate } }];"
+      }
+    },
+    {
+      "name": "Get Baseline Records",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        384
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "name": "Plan Baseline Transition",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        384
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const prepared = $('Create Pending Candidate').first().json || {};\nconst candidate = prepared.candidate || {};\nconst records = $input.all().map((item) => item.json || {}).filter((record) => record.id !== undefined && record.id !== null);\nconst text = (value) => typeof value === 'string' ? value.trim() : '';\nconst upper = (value) => text(value).toUpperCase();\nconst normalizeRepository = (value) => text(value).replace(/\\\\/g, '/').replace(/^https?:\\/\\//i, '').replace(/^git@([^:]+):/i, '$1/').replace(/^\\/+|\\/+$/g, '').replace(/\\.git$/i, '').toLowerCase();\nconst sameScope = (left, right) => upper(left.task_id) === upper(right.task_id) && normalizeRepository(left.repository) === normalizeRepository(right.repository) && text(left.branch_name) === text(right.branch_name);\nconst expired = (record) => { const value = Date.parse(record.expires_at); return !Number.isFinite(value) || value <= Date.now(); };\nconst fail = (code) => [{ json: { mode: 'fail', outcome: 'FAIL', allowed: false, code, candidate } }];\nif (prepared.adapter_input_valid !== true) return fail((prepared.violation_codes || [])[0] || 'BASELINE_INPUT_INVALID');\nconst operationMatches = records.filter((record) => text(record.operation_id) === text(candidate.operation_id));\nif (operationMatches.length > 1) return fail('BASELINE_OPERATION_AMBIGUOUS');\nif (operationMatches.length === 1 && text(operationMatches[0].request_fingerprint) !== text(candidate.request_fingerprint)) return fail('OPERATION_ID_CONFLICT');\nconst scoped = records.filter((record) => sameScope(record, candidate));\nconst active = scoped.filter((record) => record.status === 'active');\nif (active.length > 1) return fail('BASELINE_AMBIGUOUS');\nif (operationMatches.length === 1) {\n  const existing = operationMatches[0];\n  if (existing.status === 'active') {\n    if (expired(existing)) return fail('BASELINE_EXPIRED');\n    return [{ json: { mode: 'reuse', outcome: 'PASS', allowed: true, code: 'BASELINE_DUPLICATE', candidate, target_operation_id: existing.operation_id, expected_fingerprint: existing.request_fingerprint } }];\n  }\n  if (existing.status === 'retired') return fail('BASELINE_OPERATION_RETIRED');\n  if (existing.status !== 'pending') return fail('BASELINE_STATUS_INVALID');\n  if (expired(existing)) return fail('BASELINE_PENDING_EXPIRED');\n  return [{ json: { mode: active.length === 1 ? 'resume_rollover' : 'resume_activate', outcome: 'PASS', allowed: true, code: 'BASELINE_ROLLOVER_RESUME', candidate: existing, target_operation_id: existing.operation_id, expected_fingerprint: existing.request_fingerprint, retire_row_id: active.length === 1 ? active[0].id : null } }];\n}\nif (active.length === 1 && !expired(active[0]) && text(active[0].request_fingerprint) === text(candidate.request_fingerprint)) {\n  return [{ json: { mode: 'reuse', outcome: 'PASS', allowed: true, code: 'BASELINE_UNCHANGED', candidate, target_operation_id: active[0].operation_id, expected_fingerprint: active[0].request_fingerprint } }];\n}\nif (active.length === 1) {\n  return [{ json: { mode: 'rollover', outcome: 'PASS', allowed: true, code: 'BASELINE_ROLLOVER', candidate, target_operation_id: candidate.operation_id, expected_fingerprint: candidate.request_fingerprint, retire_row_id: active[0].id } }];\n}\nreturn [{ json: { mode: 'initialize', outcome: 'PASS', allowed: true, code: 'BASELINE_INITIALIZE', candidate, target_operation_id: candidate.operation_id, expected_fingerprint: candidate.request_fingerprint, retire_row_id: null } }];"
+      }
+    },
+    {
+      "name": "Route Baseline Transition",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        304
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "fail",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "fail"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "reuse",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "reuse"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "initialize",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "initialize"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "rollover",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "rollover"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "resume rollover",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "resume_rollover"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "resume activate",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "resume_activate"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "unexpected",
+          "allMatchingOutputs": false
+        }
+      }
+    },
+    {
+      "name": "Return Baseline Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const plan = $('Plan Baseline Transition').first().json || {};\nreturn [{ json: { outcome: 'FAIL', allowed: false, code: plan.code || 'BASELINE_ROUTE_INVALID', storage_verified: false, violation_codes: [plan.code || 'BASELINE_ROUTE_INVALID'] } }];"
+      }
+    },
+    {
+      "name": "Read After Transition",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "name": "Insert Initial Baseline",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        288
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation_id": "={{ $('Plan Baseline Transition').first().json.candidate.operation_id }}",
+            "request_fingerprint": "={{ $('Plan Baseline Transition').first().json.candidate.request_fingerprint }}",
+            "task_id": "={{ $('Plan Baseline Transition').first().json.candidate.task_id }}",
+            "repository": "={{ $('Plan Baseline Transition').first().json.candidate.repository }}",
+            "branch_name": "={{ $('Plan Baseline Transition').first().json.candidate.branch_name }}",
+            "head_sha": "={{ $('Plan Baseline Transition').first().json.candidate.head_sha }}",
+            "permitted_action": "={{ $('Plan Baseline Transition').first().json.candidate.permitted_action }}",
+            "governance_policy_version": "={{ $('Plan Baseline Transition').first().json.candidate.governance_policy_version }}",
+            "story_contract_version": "={{ $('Plan Baseline Transition').first().json.candidate.story_contract_version }}",
+            "linear_updated_at": "={{ $('Plan Baseline Transition').first().json.candidate.linear_updated_at }}",
+            "contract_hash": "={{ $('Plan Baseline Transition').first().json.candidate.contract_hash }}",
+            "outcome": "PASS",
+            "status": "pending",
+            "created_at": "={{ $('Plan Baseline Transition').first().json.candidate.created_at }}",
+            "expires_at": "={{ $('Plan Baseline Transition').first().json.candidate.expires_at }}",
+            "caller_identity": "={{ $('Plan Baseline Transition').first().json.candidate.caller_identity }}"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Activate Initial Baseline",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        288
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operation_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Plan Baseline Transition').first().json.target_operation_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "active"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Insert Replacement Baseline",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "operation_id": "={{ $('Plan Baseline Transition').first().json.candidate.operation_id }}",
+            "request_fingerprint": "={{ $('Plan Baseline Transition').first().json.candidate.request_fingerprint }}",
+            "task_id": "={{ $('Plan Baseline Transition').first().json.candidate.task_id }}",
+            "repository": "={{ $('Plan Baseline Transition').first().json.candidate.repository }}",
+            "branch_name": "={{ $('Plan Baseline Transition').first().json.candidate.branch_name }}",
+            "head_sha": "={{ $('Plan Baseline Transition').first().json.candidate.head_sha }}",
+            "permitted_action": "={{ $('Plan Baseline Transition').first().json.candidate.permitted_action }}",
+            "governance_policy_version": "={{ $('Plan Baseline Transition').first().json.candidate.governance_policy_version }}",
+            "story_contract_version": "={{ $('Plan Baseline Transition').first().json.candidate.story_contract_version }}",
+            "linear_updated_at": "={{ $('Plan Baseline Transition').first().json.candidate.linear_updated_at }}",
+            "contract_hash": "={{ $('Plan Baseline Transition').first().json.candidate.contract_hash }}",
+            "outcome": "PASS",
+            "status": "pending",
+            "created_at": "={{ $('Plan Baseline Transition').first().json.candidate.created_at }}",
+            "expires_at": "={{ $('Plan Baseline Transition').first().json.candidate.expires_at }}",
+            "caller_identity": "={{ $('Plan Baseline Transition').first().json.candidate.caller_identity }}"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Retire Previous Baseline",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Plan Baseline Transition').first().json.retire_row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "retired"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Activate Replacement Baseline",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        480
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operation_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Plan Baseline Transition').first().json.target_operation_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "active"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Retire Previous For Resume",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        672
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Plan Baseline Transition').first().json.retire_row_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "retired"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Activate Pending For Resume",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        672
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operation_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Plan Baseline Transition').first().json.target_operation_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "active"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Activate Pending Alone",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        864
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "ai95_governance_baselines",
+          "cachedResultName": "ai95_governance_baselines"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "operation_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Plan Baseline Transition').first().json.target_operation_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "active"
+          },
+          "schema": [
+            {
+              "id": "operation_id",
+              "displayName": "operation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "request_fingerprint",
+              "displayName": "request_fingerprint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "task_id",
+              "displayName": "task_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "repository",
+              "displayName": "repository",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "branch_name",
+              "displayName": "branch_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "head_sha",
+              "displayName": "head_sha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_identity",
+              "displayName": "caller_identity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "permitted_action",
+              "displayName": "permitted_action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "governance_policy_version",
+              "displayName": "governance_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "story_contract_version",
+              "displayName": "story_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linear_updated_at",
+              "displayName": "linear_updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contract_hash",
+              "displayName": "contract_hash",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "displayName": "expires_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Verify Stored Baseline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        480
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const plan = $('Plan Baseline Transition').first().json || {};\nconst rows = $input.all().map((item) => item.json || {}).filter((row) => row.id !== undefined && row.id !== null);\nconst text = (value) => typeof value === 'string' ? value.trim() : '';\nconst normalizeRepository = (value) => text(value).replace(/\\\\/g, '/').replace(/^https?:\\/\\//i, '').replace(/^git@([^:]+):/i, '$1/').replace(/^\\/+|\\/+$/g, '').replace(/\\.git$/i, '').toLowerCase();\nconst candidate = plan.candidate || {};\nconst scoped = rows.filter((row) => text(row.task_id).toUpperCase() === text(candidate.task_id).toUpperCase() && normalizeRepository(row.repository) === normalizeRepository(candidate.repository) && text(row.branch_name) === text(candidate.branch_name));\nconst active = scoped.filter((row) => row.status === 'active');\nlet code = plan.code || 'BASELINE_VERIFY_FAILED';\nconst violations = [];\nif (active.length !== 1) violations.push(active.length === 0 ? 'BASELINE_MISSING' : 'BASELINE_AMBIGUOUS');\nconst baseline = active.length === 1 ? active[0] : null;\nif (baseline && text(baseline.operation_id) !== text(plan.target_operation_id)) violations.push('BASELINE_OPERATION_MISMATCH');\nif (baseline && text(baseline.request_fingerprint) !== text(plan.expected_fingerprint)) violations.push('BASELINE_FINGERPRINT_MISMATCH');\nif (baseline && (!Number.isFinite(Date.parse(baseline.expires_at)) || Date.parse(baseline.expires_at) <= Date.now())) violations.push('BASELINE_EXPIRED');\nif (plan.retire_row_id !== undefined && plan.retire_row_id !== null) {\n  const retired = rows.filter((row) => String(row.id) === String(plan.retire_row_id));\n  if (retired.length !== 1 || retired[0].status !== 'retired') violations.push('BASELINE_RETIRE_NOT_VERIFIED');\n}\nif (violations.length) code = violations[0];\nreturn [{ json: { outcome: violations.length === 0 ? 'PASS' : 'FAIL', allowed: violations.length === 0, code, storage_verified: violations.length === 0, violation_codes: violations, baseline: violations.length === 0 ? baseline : null } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Baseline Input": {
+      "main": [
+        [
+          {
+            "node": "Prepare Baseline Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Baseline Candidate": {
+      "main": [
+        [
+          {
+            "node": "Calculate Baseline Fingerprint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Baseline Fingerprint": {
+      "main": [
+        [
+          {
+            "node": "Create Pending Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pending Candidate": {
+      "main": [
+        [
+          {
+            "node": "Get Baseline Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Baseline Records": {
+      "main": [
+        [
+          {
+            "node": "Plan Baseline Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Baseline Transition": {
+      "main": [
+        [
+          {
+            "node": "Route Baseline Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Baseline Transition": {
+      "main": [
+        [
+          {
+            "node": "Return Baseline Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read After Transition",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Initial Baseline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert Replacement Baseline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retire Previous For Resume",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Activate Pending Alone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Baseline Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read After Transition": {
+      "main": [
+        [
+          {
+            "node": "Verify Stored Baseline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Initial Baseline": {
+      "main": [
+        [
+          {
+            "node": "Activate Initial Baseline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate Initial Baseline": {
+      "main": [
+        [
+          {
+            "node": "Read After Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Replacement Baseline": {
+      "main": [
+        [
+          {
+            "node": "Retire Previous Baseline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retire Previous Baseline": {
+      "main": [
+        [
+          {
+            "node": "Activate Replacement Baseline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate Replacement Baseline": {
+      "main": [
+        [
+          {
+            "node": "Read After Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retire Previous For Resume": {
+      "main": [
+        [
+          {
+            "node": "Activate Pending For Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate Pending For Resume": {
+      "main": [
+        [
+          {
+            "node": "Read After Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Activate Pending Alone": {
+      "main": [
+        [
+          {
+            "node": "Read After Transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
