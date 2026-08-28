@@ -38,7 +38,7 @@ async function startServer(responseFactory) {
     requests.push({ headers: request.headers, body: JSON.parse(body) });
     const result = await responseFactory(requests.at(-1));
     response.writeHead(result.status ?? 200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify(result.body));
+    response.end(Object.hasOwn(result, 'rawBody') ? result.rawBody : JSON.stringify(result.body));
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
@@ -243,14 +243,15 @@ test('launcher rejects an n8n response that is not an exact authorization decisi
   assert.equal(result.actionStarted, false);
   assert.deepEqual(result.result, {
     approved: false,
-    code: 'N8N_REJECTED',
-    message: 'n8n did not return an exact persisted local PASS authorization decision.',
+    code: 'N8N_DENIED',
+    message: 'n8n denied the governed build start.',
     task_id: 'AI-93',
     branch_name: 'codex/ai-93-launcher-test',
     repository: 'github.com/aispanda/aispanda-web',
     operation_id: 'test:ai-93:00000001',
+    http_status: 200,
+    outcome: 'REPLAN',
     violation_codes: ['INVALID_DEPLOYMENT'],
-    invalid_response_fields: ['outcome', 'build_allowed', 'violation_codes'],
   });
 });
 
@@ -313,34 +314,71 @@ test('launcher refuses missing authentication before it calls n8n', async (t) =>
   assert.equal(server.requests.length, 0);
 });
 
-test('launcher fails closed on wrong authentication without leaking the token', async (t) => {
+test('launcher reports wrong authentication without leaking the token', async (t) => {
   const directory = await makeRepository();
   const server = await startServer(() => ({ status: 401, body: { error: 'unauthorized' } }));
   t.after(async () => { await server.close(); await rm(directory, { recursive: true, force: true }); });
 
   const result = await invokeCallerChain({ directory, uri: server.uri, token: 'wrong-test-secret' });
   assert.equal(result.code, 1);
-  assert.equal(result.result.code, 'N8N_UNAVAILABLE');
+  assert.equal(result.result.code, 'N8N_AUTH_FAILED');
+  assert.equal(result.result.http_status, 401);
   assert.equal(result.actionStarted, false);
   assert.equal(server.requests[0].headers['x-governance-key'], 'wrong-test-secret');
   assert.doesNotMatch(result.stdout, /wrong-test-secret/);
 });
 
-test('launcher fails closed on malformed and Linear-failure responses', async (t) => {
+test('launcher rejects malformed authorization decisions and reports structured denials', async (t) => {
   const directory = await makeRepository();
   t.after(async () => { await rm(directory, { recursive: true, force: true }); });
 
-  for (const responseFactory of [
-    () => ({ body: { unexpected: true } }),
-    (request) => ({ body: { ...localPass(request).body, outcome: 'FAIL', build_allowed: false, violation_codes: ['LINEAR_QUERY_FAILED'] } }),
+  for (const [responseFactory, expectedCode] of [
+    [() => ({ body: { unexpected: true } }), 'N8N_REJECTED'],
+    [(request) => ({ body: { ...localPass(request).body, outcome: 'FAIL', build_allowed: false, violation_codes: ['LINEAR_QUERY_FAILED'] } }), 'N8N_DENIED'],
   ]) {
     const server = await startServer(responseFactory);
     const result = await invokeCallerChain({ directory, uri: server.uri });
     await server.close();
     assert.equal(result.code, 1, JSON.stringify(result));
-    assert.equal(result.result.code, 'N8N_REJECTED', JSON.stringify(result));
+    assert.equal(result.result.code, expectedCode, JSON.stringify(result));
     assert.equal(result.actionStarted, false);
   }
+});
+
+test('launcher preserves sanitized structured denial reasons for HTTP 409, 422, and 502', async (t) => {
+  const directory = await makeRepository();
+  t.after(async () => { await rm(directory, { recursive: true, force: true }); });
+
+  for (const [status, outcome, violationCode] of [
+    [409, 'BLOCKED', 'STATUS_NOT_BUILDABLE'],
+    [422, 'REPLAN', 'INVALID_DEPLOYMENT'],
+    [502, 'FAIL', 'LINEAR_QUERY_FAILED'],
+  ]) {
+    const server = await startServer((request) => ({
+      status,
+      body: { ...localPass(request).body, outcome, build_allowed: false, violation_codes: [violationCode, 'not-safe'] },
+    }));
+    const result = await invokeCallerChain({ directory, uri: server.uri });
+    await server.close();
+    assert.equal(result.code, 1, `${status} ${outcome}`);
+    assert.equal(result.result.code, 'N8N_DENIED', `${status} ${outcome}`);
+    assert.equal(result.result.http_status, status, `${status} ${outcome}`);
+    assert.equal(result.result.outcome, outcome, `${status} ${outcome}`);
+    assert.deepEqual(result.result.violation_codes, [violationCode], `${status} ${outcome}`);
+    assert.equal(result.actionStarted, false, `${status} ${outcome}`);
+  }
+});
+
+test('launcher rejects an unparseable n8n body without starting work', async (t) => {
+  const directory = await makeRepository();
+  const server = await startServer(() => ({ status: 502, rawBody: 'gateway response unavailable' }));
+  t.after(async () => { await server.close(); await rm(directory, { recursive: true, force: true }); });
+
+  const result = await invokeCallerChain({ directory, uri: server.uri });
+  assert.equal(result.code, 1);
+  assert.equal(result.result.code, 'N8N_INVALID_RESPONSE');
+  assert.equal(result.result.http_status, 502);
+  assert.equal(result.actionStarted, false);
 });
 
 test('launcher rejects each identity, action, and version mismatch', async (t) => {
