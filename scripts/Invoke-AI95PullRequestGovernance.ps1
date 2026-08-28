@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [string]$GovernanceUri = 'http://127.0.0.1:5678/webhook/authorize-build-start',
+  [string]$GovernanceUri = 'http://127.0.0.1:5678/webhook/authorize-build-start-ai95-candidate',
   [string]$GitHubApiBaseUri = $env:GITHUB_API_URL,
   [ValidateRange(1, 30)]
   [int]$TimeoutSec = 15,
