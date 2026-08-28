@@ -1,0 +1,301 @@
+name: AI governance
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+
+concurrency:
+  group: ai-governance-${{ github.event.pull_request.head.repo.full_name }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  governance:
+    name: AI governance
+    runs-on: [self-hosted, windows, x64, ai-governance]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      AI95_BASE_REPOSITORY: ${{ github.repository }}
+      AI95_PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      AI95_PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      AI95_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      AI95_PR_DRAFT: ${{ github.event.pull_request.draft }}
+      AI95_OPERATION_ID: github:pr:${{ github.event.pull_request.number }}:${{ github.run_id }}:${{ github.run_attempt }}
+      AI95_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AI95_N8N_KEY: ${{ secrets.N8N_GOVERNANCE_TOKEN }}
+      AI95_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Validate current story and approved baseline
+        shell: pwsh
+        run: |
+          [CmdletBinding()]
+          param(
+            [string]$GovernanceUri = 'http://127.0.0.1:5678/webhook/authorize-build-start',
+            [string]$GitHubApiBaseUri = $env:GITHUB_API_URL,
+            [ValidateRange(1, 30)]
+            [int]$TimeoutSec = 15,
+            [ValidateRange(1, 2)]
+            [int]$MaxAttempts = 2
+          )
+
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          $policyVersion = 'governance-policy-v1.1'
+          $storyContractVersion = 'story-contract-v2'
+          $action = 'pr_merge_gate'
+          $caller = 'github-actions'
+          $statusContext = 'AI governance'
+          $pendingPosted = $false
+          $decision = $null
+          $failureCode = 'GOVERNANCE_CHECK_FAILED'
+          $summaryWritten = $false
+
+          function Get-RequiredEnvironmentValue {
+            param([Parameter(Mandatory)][string]$Name)
+            $value = [Environment]::GetEnvironmentVariable($Name)
+            if ([string]::IsNullOrWhiteSpace($value)) {
+              throw "MISSING_$Name"
+            }
+            return $value.Trim()
+          }
+
+          function ConvertTo-RepositoryIdentity {
+            param([Parameter(Mandatory)][string]$Value)
+            $normalized = $Value.Trim().Replace('\', '/')
+            $normalized = $normalized -replace '^https?://', ''
+            $normalized = $normalized -replace '^git@([^:]+):', '$1/'
+            $normalized = $normalized.Trim('/') -replace '\.git$', ''
+            $normalized = $normalized.ToLowerInvariant()
+            return ($normalized -replace '^github\.com/', '')
+          }
+
+          function ConvertTo-SafeCode {
+            param([AllowNull()][object]$Value, [string]$Fallback = 'GOVERNANCE_CHECK_FAILED')
+            $candidate = [string]$Value
+            if ($candidate -match '^[A-Z][A-Z0-9_]{2,63}$') {
+              return $candidate
+            }
+            return $Fallback
+          }
+
+          function ConvertTo-InvariantText {
+            param([AllowNull()][object]$Value)
+            if ($null -eq $Value) { return '' }
+            if ($Value -is [DateTimeOffset]) { return $Value.ToUniversalTime().ToString('o') }
+            if ($Value -is [DateTime]) { return $Value.ToUniversalTime().ToString('o') }
+            return [string]$Value
+          }
+
+          function Test-RevisionTimestamp {
+            param([AllowNull()][object]$Value)
+            $text = ConvertTo-InvariantText $Value
+            if ([string]::IsNullOrWhiteSpace($text)) {
+              return $false
+            }
+            $parsed = [DateTimeOffset]::MinValue
+            return [DateTimeOffset]::TryParse(
+              $text,
+              [Globalization.CultureInfo]::InvariantCulture,
+              [Globalization.DateTimeStyles]::RoundtripKind,
+              [ref]$parsed
+            )
+          }
+
+          function Publish-CommitStatus {
+            param(
+              [Parameter(Mandatory)][ValidateSet('pending', 'success', 'failure')][string]$State,
+              [Parameter(Mandatory)][string]$Description
+            )
+            $safeDescription = ($Description -replace '[\r\n]+', ' ').Trim()
+            if ($safeDescription.Length -gt 140) {
+              $safeDescription = $safeDescription.Substring(0, 140)
+            }
+            $statusUri = '{0}/repos/{1}/statuses/{2}' -f $script:githubApiBase.TrimEnd('/'), $script:baseRepository, $script:headSha
+            $statusBody = @{
+              state = $State
+              context = $script:statusContext
+              description = $safeDescription
+              target_url = $script:runUrl
+            } | ConvertTo-Json -Compress
+            $headers = @{
+              Authorization = "Bearer $script:githubToken"
+              Accept = 'application/vnd.github+json'
+              'X-GitHub-Api-Version' = '2022-11-28'
+            }
+            $null = Invoke-RestMethod -Method Post -Uri $statusUri -Headers $headers -ContentType 'application/json' -Body $statusBody -TimeoutSec $TimeoutSec
+          }
+
+          function Write-GovernanceSummary {
+            param(
+              [Parameter(Mandatory)][string]$Outcome,
+              [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Codes,
+              [AllowNull()][hashtable]$ResponseBody
+            )
+            if ([string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+              return
+            }
+            $contractHash = if ($null -ne $ResponseBody) { ConvertTo-InvariantText $ResponseBody['contract_hash'] } else { '' }
+            $linearRevision = if ($null -ne $ResponseBody) { ConvertTo-InvariantText $ResponseBody['linear_updated_at'] } else { '' }
+            $safeCodes = @($Codes | ForEach-Object { ConvertTo-SafeCode -Value $_ } | Select-Object -Unique)
+            $lines = @(
+              '## AI governance',
+              '',
+              "- Decision ID: ``$script:operationId``",
+              "- Task: ``$script:taskId``",
+              "- Repository: ``$script:headRepository``",
+              "- Branch: ``$script:headRef``",
+              "- Commit: ``$script:headSha``",
+              "- Action: ``$script:action``",
+              "- Caller: ``$script:caller``",
+              "- Outcome: ``$Outcome``",
+              "- Violation codes: ``$($safeCodes -join ',')``",
+              "- Contract hash: ``$contractHash``",
+              "- Linear revision: ``$linearRevision``",
+              "- Checked at: ``$([DateTimeOffset]::UtcNow.ToString('o'))``"
+            )
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ($lines -join [Environment]::NewLine)
+          }
+
+          try {
+            $script:baseRepository = ConvertTo-RepositoryIdentity (Get-RequiredEnvironmentValue 'AI95_BASE_REPOSITORY')
+            $script:headRepository = ConvertTo-RepositoryIdentity (Get-RequiredEnvironmentValue 'AI95_PR_HEAD_REPOSITORY')
+            $script:headRef = Get-RequiredEnvironmentValue 'AI95_PR_HEAD_REF'
+            $script:headSha = (Get-RequiredEnvironmentValue 'AI95_PR_HEAD_SHA').ToLowerInvariant()
+            $script:operationId = Get-RequiredEnvironmentValue 'AI95_OPERATION_ID'
+            $script:githubToken = Get-RequiredEnvironmentValue 'AI95_GITHUB_TOKEN'
+            $n8nKey = Get-RequiredEnvironmentValue 'AI95_N8N_KEY'
+            $script:runUrl = Get-RequiredEnvironmentValue 'AI95_RUN_URL'
+            $script:githubApiBase = if ([string]::IsNullOrWhiteSpace($GitHubApiBaseUri)) { 'https://api.github.com' } else { $GitHubApiBaseUri.Trim() }
+            $draftValue = Get-RequiredEnvironmentValue 'AI95_PR_DRAFT'
+
+            if ($script:baseRepository -ne 'aispanda/aispanda-web') {
+              throw 'UNEXPECTED_BASE_REPOSITORY'
+            }
+            if ($script:headRepository -ne $script:baseRepository) {
+              throw 'FORK_PULL_REQUEST_REJECTED'
+            }
+            $script:repositoryIdentity = "github.com/$script:headRepository"
+            if ($draftValue -ne 'false') {
+              throw 'DRAFT_PULL_REQUEST_REJECTED'
+            }
+            if ($script:headSha -notmatch '^[0-9a-f]{40}$') {
+              throw 'INVALID_HEAD_SHA'
+            }
+            if ($script:operationId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$') {
+              throw 'INVALID_OPERATION_ID'
+            }
+            $branchMatch = [regex]::Match($script:headRef, '^codex/([a-z][a-z0-9]*-[0-9]+)-[a-z0-9][a-z0-9._-]*$', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if (-not $branchMatch.Success) {
+              throw 'INVALID_BRANCH_FORMAT'
+            }
+            $script:taskId = $branchMatch.Groups[1].Value.ToUpperInvariant()
+
+            Publish-CommitStatus -State pending -Description 'Current Linear contract and approved baseline are being checked.'
+            $pendingPosted = $true
+
+            $requestBody = @{
+              task_id = $script:taskId
+              governance_policy_version = $policyVersion
+              story_contract_version = $storyContractVersion
+              permitted_action = $action
+              branch_name = $script:headRef
+              head_sha = $script:headSha
+              repository = $script:repositoryIdentity
+              caller = $caller
+              operation_id = $script:operationId
+            } | ConvertTo-Json -Compress
+
+            for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+              try {
+                $response = Invoke-WebRequest -SkipHttpErrorCheck -MaximumRedirection 0 -Method Post -Uri $GovernanceUri -Headers @{ 'X-Governance-Key' = $n8nKey } -ContentType 'application/json' -Body $requestBody -TimeoutSec $TimeoutSec
+                $statusCode = [int]$response.StatusCode
+                try {
+                  $decision = $response.Content | ConvertFrom-Json -AsHashtable
+                }
+                catch {
+                  $decision = $null
+                }
+                if ($statusCode -lt 500 -or $attempt -eq $MaxAttempts) {
+                  break
+                }
+              }
+              catch {
+                $statusCode = 0
+                $decision = $null
+                if ($attempt -eq $MaxAttempts) {
+                  break
+                }
+              }
+            }
+
+            if ($null -eq $decision) {
+              throw 'N8N_INVALID_RESPONSE'
+            }
+            $returnedCodes = @($decision['violation_codes'])
+            $decisionOutcome = [string]$decision['outcome']
+            if ($statusCode -ne 200 -or $decisionOutcome -ne 'PASS') {
+              $failureCode = if ($returnedCodes.Count -gt 0) { ConvertTo-SafeCode $returnedCodes[0] } else { ConvertTo-SafeCode $decision['baseline_code'] }
+              $summaryOutcome = if ([string]::IsNullOrWhiteSpace($decisionOutcome)) { 'FAIL' } else { $decisionOutcome }
+              Write-GovernanceSummary -Outcome $summaryOutcome -Codes @($failureCode) -ResponseBody $decision
+              $summaryWritten = $true
+              throw $failureCode
+            }
+
+            $responseRepository = ConvertTo-RepositoryIdentity ([string]$decision['repository'])
+            $hasViolationCodes = $decision.ContainsKey('violation_codes')
+            $contractHash = [string]$decision['contract_hash']
+            $exactResponse =
+              $decision['ok'] -eq $true -and
+              $decision['contract_complete'] -eq $true -and
+              $decision['governance_compliant'] -eq $true -and
+              $decision['runtime_valid'] -eq $true -and
+              $decision['validation_passed'] -eq $true -and
+              $decision['build_allowed'] -eq $true -and
+              $decision['storage_verified'] -eq $true -and
+              [string]$decision['task_id'] -eq $script:taskId -and
+              $responseRepository -eq $script:headRepository -and
+              [string]$decision['branch_name'] -eq $script:headRef -and
+              [string]$decision['head_sha'] -eq $script:headSha -and
+              [string]$decision['permitted_action'] -eq $action -and
+              [string]$decision['operation_id'] -eq $script:operationId -and
+              [string]$decision['governance_policy_version'] -eq $policyVersion -and
+              [string]$decision['story_contract_version'] -eq $storyContractVersion -and
+              [string]$decision['caller'] -eq $caller -and
+              [string]$decision['baseline_code'] -eq 'BASELINE_CURRENT' -and
+              [string]$decision['authorization_mode'] -eq 'localhost_merge_verified' -and
+              $hasViolationCodes -and
+              $returnedCodes.Count -eq 0 -and
+              $contractHash -match '^[0-9a-f]{64}$' -and
+              [string]$decision['contract_hash_algorithm'] -eq 'sha256' -and
+              (Test-RevisionTimestamp $decision['linear_updated_at'])
+            if (-not $exactResponse) {
+              throw 'N8N_RESPONSE_MISMATCH'
+            }
+
+            Write-GovernanceSummary -Outcome PASS -Codes @() -ResponseBody $decision
+            $summaryWritten = $true
+            Publish-CommitStatus -State success -Description 'Current story and approved baseline match this exact PR commit.'
+            Write-Output 'AI governance PASS'
+          }
+          catch {
+            $failureCode = ConvertTo-SafeCode -Value $_.Exception.Message -Fallback $failureCode
+            if ($pendingPosted) {
+              try {
+                Publish-CommitStatus -State failure -Description "Governance denied: $failureCode"
+              }
+              catch {
+                $failureCode = 'STATUS_PUBLISH_FAILED'
+              }
+            }
+            if (-not $summaryWritten) {
+              Write-GovernanceSummary -Outcome FAIL -Codes @($failureCode) -ResponseBody $decision
+            }
+            [Console]::Error.WriteLine("AI governance denied: $failureCode")
+            exit 1
+          }

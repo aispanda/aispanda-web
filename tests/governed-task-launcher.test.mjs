@@ -62,6 +62,8 @@ function localPass(request) {
       branch_name: request.body.branch_name,
       repository: request.body.repository,
       permitted_action: request.body.permitted_action,
+      operation_id: request.body.operation_id,
+      storage_verified: true,
       governance_policy_version: request.body.governance_policy_version,
       story_contract_version: request.body.story_contract_version,
       violation_codes: [],
@@ -86,20 +88,22 @@ async function protectTestToken(path, token) {
   });
 }
 
-async function invokeLauncher({ directory, uri, taskId = 'AI-93', token = 'test-secret', tokenFile, timeoutSec = 15 }) {
+async function invokeLauncher({ directory, uri, taskId = 'AI-93', token = 'test-secret', tokenFile, timeoutSec = 15, operationId = 'test:ai-93:00000001' }) {
   const environment = { ...process.env };
   environment.N8N_GOVERNANCE_TOKEN_FILE = tokenFile ?? join(directory, '.missing-governance-token.dpapi');
   if (token === null) delete environment.N8N_GOVERNANCE_TOKEN;
   else environment.N8N_GOVERNANCE_TOKEN = token;
-  const output = await new Promise((resolve, reject) => {
-    const child = spawn('pwsh', [
+  const launcherArguments = [
       '-NoLogo', '-NoProfile', '-NonInteractive', '-File', launcher,
       '-TaskId', taskId,
       '-RepositoryPath', directory,
       '-N8nUri', uri,
       '-Caller', 'launcher-test',
       '-TimeoutSec', String(timeoutSec),
-    ], {
+  ];
+  if (operationId !== null) launcherArguments.push('-OperationId', operationId);
+  const output = await new Promise((resolve, reject) => {
+    const child = spawn('pwsh', launcherArguments, {
       env: environment,
       windowsHide: true,
     });
@@ -153,11 +157,49 @@ test('launcher sends independently observed Git state and accepts only an exact 
     head_sha: await git(directory, 'rev-parse', 'HEAD'),
     repository: 'github.com/aispanda/aispanda-web',
     caller: 'launcher-test',
+    operation_id: 'test:ai-93:00000001',
     permitted_action: 'local_build_start',
     governance_policy_version: 'governance-policy-v1.1',
     story_contract_version: 'story-contract-v2',
   });
+  assert.equal(result.result.operation_id, 'test:ai-93:00000001');
   assert.doesNotMatch(result.stdout, /test-secret/);
+});
+
+test('launcher generates and propagates a unique safe operation ID when none is supplied', async (t) => {
+  const directory = await makeRepository();
+  const server = await startServer(localPass);
+  t.after(async () => { await server.close(); await rm(directory, { recursive: true, force: true }); });
+
+  const result = await invokeCallerChain({ directory, uri: server.uri, operationId: null });
+  assert.equal(result.code, 0, JSON.stringify(result));
+  assert.match(server.requests[0].body.operation_id, /^launcher:AI-93:[0-9a-f]{32}$/);
+  assert.equal(result.result.operation_id, server.requests[0].body.operation_id);
+});
+
+test('launcher preserves an explicit operation ID across an exact retry', async (t) => {
+  const directory = await makeRepository();
+  const server = await startServer(localPass);
+  const operationId = 'retry:ai-93:00000001';
+  t.after(async () => { await server.close(); await rm(directory, { recursive: true, force: true }); });
+
+  const first = await invokeLauncher({ directory, uri: server.uri, operationId });
+  const retry = await invokeLauncher({ directory, uri: server.uri, operationId });
+  assert.equal(first.code, 0, JSON.stringify(first));
+  assert.equal(retry.code, 0, JSON.stringify(retry));
+  assert.deepEqual(server.requests.map(({ body }) => body.operation_id), [operationId, operationId]);
+});
+
+test('launcher rejects an invalid operation ID before calling n8n', async (t) => {
+  const directory = await makeRepository();
+  const server = await startServer(localPass);
+  t.after(async () => { await server.close(); await rm(directory, { recursive: true, force: true }); });
+
+  const result = await invokeCallerChain({ directory, uri: server.uri, operationId: 'bad id' });
+  assert.equal(result.code, 1);
+  assert.equal(result.result.code, 'INVALID_OPERATION_ID');
+  assert.equal(result.actionStarted, false);
+  assert.equal(server.requests.length, 0);
 });
 
 test('launcher retrieves a DPAPI-protected key across processes without printing it', async (t) => {
@@ -202,10 +244,11 @@ test('launcher rejects an n8n response that is not an exact authorization decisi
   assert.deepEqual(result.result, {
     approved: false,
     code: 'N8N_REJECTED',
-    message: 'n8n did not return an exact local PASS authorization decision.',
+    message: 'n8n did not return an exact persisted local PASS authorization decision.',
     task_id: 'AI-93',
     branch_name: 'codex/ai-93-launcher-test',
     repository: 'github.com/aispanda/aispanda-web',
+    operation_id: 'test:ai-93:00000001',
     violation_codes: ['INVALID_DEPLOYMENT'],
     invalid_response_fields: ['outcome', 'build_allowed', 'violation_codes'],
   });

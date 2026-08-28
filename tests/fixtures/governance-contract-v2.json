@@ -10,6 +10,7 @@
     "priorityLabel": "High",
     "state": { "name": "Ready" },
     "labels": { "nodes": [{ "name": "quality" }, { "name": "delivery-automation" }] },
+    "branchName": "rajeevkasat/ai-93-build-an-n8n-mvp-governance-gate",
     "url": "https://linear.example/issue/AI-93",
     "updatedAt": "2026-08-27T21:37:16.319Z"
   },
@@ -17,7 +18,9 @@
     "branch_name": "codex/ai-93-n8n-delivery-controller",
     "head_sha": "d1bd8810123456789abcdef0123456789abcdef0",
     "repository": "https://github.com/aispanda/aispanda-web.git",
-    "caller": "codex-local"
+    "caller": "codex-local",
+    "permitted_action": "local_build_start",
+    "operation_id": "local:ai-93:00000001"
   },
   "base_options": {
     "expected_task_id": "AI-93",
@@ -106,6 +109,16 @@
     { "name": "invalid-runtime-repository", "runtime": { "repository": "local-folder" }, "build_allowed": false, "codes": ["INVALID_REPOSITORY"], "runtime_valid": false },
     { "name": "wrong-repository", "runtime": { "repository": "https://github.com/example/other.git" }, "build_allowed": false, "codes": ["REPOSITORY_MISMATCH"], "runtime_valid": false },
     { "name": "wrong-returned-task", "options": { "expected_task_id": "AI-94" }, "build_allowed": false, "codes": ["TASK_ID_MISMATCH", "BRANCH_TASK_MISMATCH"], "runtime_valid": false },
+    { "name": "pr-merge-pass", "issue": { "state": { "name": "In Progress" } }, "runtime": { "permitted_action": "pr_merge_gate", "operation_id": "github:1001:1:ai-93" }, "build_allowed": true, "codes": [], "contract_complete": true, "governance_compliant": true, "runtime_valid": true },
+    { "name": "pr-merge-requires-in-progress", "runtime": { "permitted_action": "pr_merge_gate", "operation_id": "github:1002:1:ai-93" }, "build_allowed": false, "codes": ["STATUS_NOT_ACTIONABLE"], "contract_complete": true, "governance_compliant": false, "runtime_valid": true },
+    { "name": "unsupported-action", "runtime": { "permitted_action": "commit", "operation_id": "local:ai-93:00000002" }, "build_allowed": false, "codes": ["UNSUPPORTED_ACTION"], "runtime_valid": false },
+    { "name": "missing-action", "runtime": { "permitted_action": null }, "build_allowed": false, "codes": ["MISSING_RUNTIME_FIELD"], "runtime_valid": false },
+    { "name": "missing-operation-id", "runtime": { "operation_id": null }, "build_allowed": false, "codes": ["MISSING_RUNTIME_FIELD"], "runtime_valid": false },
+    { "name": "invalid-operation-id", "runtime": { "operation_id": "bad id" }, "build_allowed": false, "codes": ["INVALID_OPERATION_ID"], "runtime_valid": false },
+    { "name": "pr-merge-invalid-branch-format", "issue": { "state": { "name": "In Progress" } }, "runtime": { "branch_name": "feature/ai-93-governance", "permitted_action": "pr_merge_gate", "operation_id": "github:1003:1:ai-93" }, "build_allowed": false, "codes": ["INVALID_BRANCH_FORMAT"], "runtime_valid": false },
+    { "name": "pr-merge-branch-requires-description", "issue": { "state": { "name": "In Progress" } }, "runtime": { "branch_name": "codex/ai-93", "permitted_action": "pr_merge_gate", "operation_id": "github:1003:2:ai-93" }, "build_allowed": false, "codes": ["INVALID_BRANCH_FORMAT"], "runtime_valid": false },
+    { "name": "pr-merge-missing-linear-branch", "issue": { "state": { "name": "In Progress" }, "branchName": null }, "runtime": { "permitted_action": "pr_merge_gate", "operation_id": "github:1004:1:ai-93" }, "build_allowed": false, "codes": ["MISSING_LINEAR_BRANCH"], "runtime_valid": false },
+    { "name": "pr-merge-linear-branch-mismatch", "issue": { "state": { "name": "In Progress" }, "branchName": "rajeevkasat/ai-91-unrelated" }, "runtime": { "permitted_action": "pr_merge_gate", "operation_id": "github:1005:1:ai-93" }, "build_allowed": false, "codes": ["LINEAR_BRANCH_TASK_MISMATCH"], "runtime_valid": false },
     { "name": "diagnostics-without-runtime-cannot-authorize", "options": { "require_runtime": false }, "build_allowed": false, "codes": [], "contract_complete": true, "governance_compliant": true, "runtime_valid": false }
   ]
 }
