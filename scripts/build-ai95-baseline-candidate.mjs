@@ -157,8 +157,8 @@ const serializedWorkflow = `${JSON.stringify(workflow, null, 2)}\n`;
 if (process.argv.includes('--check')) {
   const committedWorkflow = await readFile(targetUrl, 'utf8');
   assert.equal(
-    committedWorkflow,
-    serializedWorkflow,
+    committedWorkflow.replace(/\r\n?/g, '\n'),
+    serializedWorkflow.replace(/\r\n?/g, '\n'),
     'The committed AI-95 baseline candidate has drifted. Run this script without --check to regenerate it.',
   );
 } else {

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+
+import { GOVERNANCE_CONSUMER_PROFILES, validateConsumerProfiles } from '../server/governance-consumers.mjs';
 
 const sourceUrl = new URL('../workflows/authorize-build-start.local.json', import.meta.url);
 const targetUrl = new URL('../workflows/authorize-build-start-ai95.integration-candidate.local.json', import.meta.url);
@@ -16,37 +19,138 @@ function replaceOnce(value, before, after, label) {
   return value.replace(before, after);
 }
 
+assert.deepEqual(validateConsumerProfiles(), [], 'Governance consumer profiles must be valid before workflow generation');
+
+function deterministicWebhookId(profileId) {
+  const hex = createHash('sha256').update(`governance-consumer:${profileId}`).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function consumerNormalizerCode(profile) {
+  return `const body = $json.body && typeof $json.body === 'object' ? $json.body : {};
+const text = (value) => typeof value === 'string' ? value.trim() : '';
+const profile = ${JSON.stringify(profile)};
+const normalizeRepository = (value) => {
+  const supplied = text(value);
+  if (!supplied || supplied.split('').some((character) => character.trim() === '' || ['\\\\', '*', '?', '[', ']', '{', '}'].includes(character)) || /%[0-9a-f]{2}/i.test(supplied)) return null;
+  let host = '';
+  let path = '';
+  const scp = supplied.match(/^git@([^:]+):(.+)$/);
+  if (scp) {
+    host = scp[1];
+    path = scp[2];
+  } else if (supplied.includes('://')) {
+    let url;
+    try { url = new URL(supplied); } catch { return null; }
+    if (!['https:', 'ssh:'].includes(url.protocol) || url.password || url.port || url.search || url.hash) return null;
+    if (url.username && !(url.protocol === 'ssh:' && url.username === 'git')) return null;
+    host = url.hostname;
+    path = url.pathname;
+  } else {
+    const parts = supplied.split('/');
+    host = parts.shift() || '';
+    path = parts.join('/');
+  }
+  host = host.toLowerCase();
+  while (path.startsWith('/')) path = path.slice(1);
+  while (path.endsWith('/')) path = path.slice(0, -1);
+  if (path.endsWith('.git')) path = path.slice(0, -4);
+  const parts = path.split('/');
+  const segment = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
+  if (host !== 'github.com' || parts.length !== 2 || parts.some((part) => !segment.test(part))) return null;
+  return host + '/' + parts.join('/');
+};
+const repository = normalizeRepository(body.repository);
+const consumerViolationCodes = [];
+if (!repository) consumerViolationCodes.push('INVALID_REPOSITORY_IDENTITY');
+else if (repository !== profile.repository) consumerViolationCodes.push('CONSUMER_REPOSITORY_MISMATCH');
+if (!profile.actions.includes(text(body.permitted_action))) consumerViolationCodes.push('ACTION_NOT_APPROVED');
+if (profile.callers !== null && text(body.caller) !== profile.callers[0]) consumerViolationCodes.push('CALLER_NOT_APPROVED');
+if (text(body.governance_policy_version) !== profile.governance_policy_version) consumerViolationCodes.push('POLICY_VERSION_MISMATCH');
+if (text(body.story_contract_version) !== profile.story_contract_version) consumerViolationCodes.push('SYNTAX_VERSION_MISMATCH');
+return {
+  json: {
+    request: {
+      expected_task_id: text(body.task_id).toUpperCase(),
+      expected_repository: profile.repository,
+      expected_policy_version: profile.governance_policy_version,
+      expected_story_contract_version: profile.story_contract_version,
+      permitted_action: text(body.permitted_action),
+      consumer_id: profile.id,
+      consumer_violation_codes: consumerViolationCodes,
+    },
+    runtime: {
+      branch_name: text(body.branch_name),
+      head_sha: text(body.head_sha),
+      repository: text(body.repository),
+      caller: profile.callers === null ? text(body.caller) : profile.callers[0],
+      operation_id: text(body.operation_id),
+    },
+  },
+};`;
+}
+
 workflow.id = 'ai95buildcandidate1';
 workflow.name = 'AI-95 authorize_build_start Integration Candidate (Inactive)';
 workflow.active = false;
 workflow.settings = { ...workflow.settings, availableInMCP: false };
 
 const webhook = workflowNode('Authorized Build-Start Request');
+const webProfile = GOVERNANCE_CONSUMER_PROFILES.find((profile) => profile.id === 'aispanda-web');
+const governanceProfile = GOVERNANCE_CONSUMER_PROFILES.find((profile) => profile.id === 'aispanda-governance');
+assert.ok(webProfile && governanceProfile, 'Both approved consumer profiles are required');
 webhook.webhookId = 'f3fdd5c1-cc2a-47e1-95d0-bf0bd6829a95';
-webhook.parameters.path = 'authorize-build-start-ai95-candidate';
+webhook.parameters.path = webProfile.webhook_path;
 
-workflowNode('Normalize Authorization Request').parameters.jsCode = `const body = $json.body && typeof $json.body === 'object' ? $json.body : {};
-const text = (value) => typeof value === 'string' ? value.trim() : '';
-return {
-  json: {
-    request: {
-      expected_task_id: text(body.task_id).toUpperCase(),
-      expected_repository: 'github.com/aispanda/aispanda-web',
-      expected_policy_version: text(body.governance_policy_version),
-      expected_story_contract_version: text(body.story_contract_version),
-      permitted_action: text(body.permitted_action),
-    },
-    runtime: {
-      branch_name: text(body.branch_name),
-      head_sha: text(body.head_sha),
-      repository: text(body.repository),
-      caller: text(body.caller),
-      operation_id: text(body.operation_id),
-    },
-  },
-};`;
+const webNormalizer = workflowNode('Normalize Authorization Request');
+webNormalizer.parameters.jsCode = consumerNormalizerCode(webProfile);
+
+const governanceWebhook = structuredClone(webhook);
+governanceWebhook.id = `webhook-${governanceProfile.id}`;
+governanceWebhook.name = 'Governance Consumer Build-Start Request';
+governanceWebhook.webhookId = deterministicWebhookId(governanceProfile.id);
+governanceWebhook.parameters.path = governanceProfile.webhook_path;
+governanceWebhook.position = [webhook.position[0], webhook.position[1] + 320];
+delete governanceWebhook.credentials;
+
+const governanceNormalizer = structuredClone(webNormalizer);
+governanceNormalizer.id = `normalize-${governanceProfile.id}`;
+governanceNormalizer.name = 'Normalize Governance Consumer Request';
+governanceNormalizer.parameters.jsCode = consumerNormalizerCode(governanceProfile);
+governanceNormalizer.position = [webNormalizer.position[0], webNormalizer.position[1] + 320];
+delete governanceNormalizer.credentials;
+
+const requestContext = structuredClone(webNormalizer);
+requestContext.id = 'authorization-request-context-ai99';
+requestContext.name = 'Authorization Request Context';
+requestContext.parameters.jsCode = 'return { json: $json };';
+requestContext.position = [webNormalizer.position[0] + 240, webNormalizer.position[1] + 160];
+delete requestContext.credentials;
+workflow.nodes.push(governanceWebhook, governanceNormalizer, requestContext);
+workflow.connections[webNormalizer.name].main[0] = [{ node: requestContext.name, type: 'main', index: 0 }];
+workflow.connections[governanceWebhook.name] = {
+  main: [[{ node: governanceNormalizer.name, type: 'main', index: 0 }]],
+};
+workflow.connections[governanceNormalizer.name] = {
+  main: [
+    [{ node: requestContext.name, type: 'main', index: 0 }],
+    [{ node: 'Respond Controller Error', type: 'main', index: 0 }],
+  ],
+};
+workflow.connections[requestContext.name] = {
+  main: [
+    [{ node: 'Request Has Task ID', type: 'main', index: 0 }],
+    [{ node: 'Respond Controller Error', type: 'main', index: 0 }],
+  ],
+};
 
 const validator = workflowNode('Validate Contract and Branch');
+validator.parameters.jsCode = replaceOnce(
+  validator.parameters.jsCode,
+  "$('Normalize Authorization Request')",
+  "$('Authorization Request Context')",
+  'shared authorization request context',
+);
 validator.parameters.jsCode = replaceOnce(
   validator.parameters.jsCode,
   "const status=field(issue,'status');if(status&&status!=='Ready'&&status!=='In Progress')add('STATUS_NOT_BUILDABLE','status','Build start requires Ready or In Progress.');",
@@ -62,8 +166,14 @@ validator.parameters.jsCode = replaceOnce(
 validator.parameters.jsCode = replaceOnce(
   validator.parameters.jsCode,
   "'MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION'",
-  "'MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION','INVALID_OPERATION_ID','INVALID_BRANCH_FORMAT','LINEAR_BRANCH_MISSING','LINEAR_BRANCH_TASK_MISMATCH'",
+  "'MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION','INVALID_OPERATION_ID','INVALID_BRANCH_FORMAT','LINEAR_BRANCH_MISSING','LINEAR_BRANCH_TASK_MISMATCH','INVALID_REPOSITORY_IDENTITY','CONSUMER_NOT_APPROVED','CONSUMER_REPOSITORY_MISMATCH','ACTION_NOT_APPROVED','CALLER_NOT_APPROVED'",
   'runtime-code set',
+);
+validator.parameters.jsCode = replaceOnce(
+  validator.parameters.jsCode,
+  "const options=payload.request||{};const runtime=payload.runtime||{};",
+  "const options=payload.request||{};const runtime=payload.runtime||{};const consumerCodes=Array.isArray(options.consumer_violation_codes)?options.consumer_violation_codes:[];consumerCodes.forEach((code)=>add(text(code),'consumer','Governed consumer profile rejected the request.'));",
+  'consumer-profile violations',
 );
 validator.parameters.jsCode = replaceOnce(
   validator.parameters.jsCode,
@@ -88,7 +198,7 @@ const classifier = workflowNode('Classify Authorization Outcome');
 classifier.parameters.jsCode = replaceOnce(
   classifier.parameters.jsCode,
   "'MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION','CONTROLLER_INVALID_OUTPUT'",
-  "'MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION','INVALID_OPERATION_ID','INVALID_BRANCH_FORMAT','LINEAR_BRANCH_MISSING','LINEAR_BRANCH_TASK_MISMATCH','CONTROLLER_INVALID_OUTPUT'",
+  "'MISSING_PERMITTED_ACTION','UNSUPPORTED_ACTION','INVALID_OPERATION_ID','INVALID_BRANCH_FORMAT','LINEAR_BRANCH_MISSING','LINEAR_BRANCH_TASK_MISMATCH','INVALID_REPOSITORY_IDENTITY','CONSUMER_NOT_APPROVED','CONSUMER_REPOSITORY_MISMATCH','ACTION_NOT_APPROVED','CALLER_NOT_APPROVED','CONTROLLER_INVALID_OUTPUT'",
   'classifier fail set',
 );
 classifier.parameters.jsCode = replaceOnce(
@@ -301,8 +411,8 @@ const serializedWorkflow = `${JSON.stringify(workflow, null, 2)}\n`;
 if (process.argv.includes('--check')) {
   const committedWorkflow = await readFile(targetUrl, 'utf8');
   assert.equal(
-    committedWorkflow,
-    serializedWorkflow,
+    committedWorkflow.replace(/\r\n?/g, '\n'),
+    serializedWorkflow.replace(/\r\n?/g, '\n'),
     'The committed AI-95 parent candidate has drifted from its deterministic builder. Run this script without --check to regenerate it.',
   );
 } else {
