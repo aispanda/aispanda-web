@@ -8,6 +8,7 @@ test('protected merge workflow uses exact PR head facts and executes no candidat
   const source = await readFile(workflowUrl, 'utf8');
   assert.match(source, /pull_request_target:/);
   assert.match(source, /branches: \[main\]/);
+  assert.match(source, /if: github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(source, /runs-on: \[self-hosted, windows, x64, ai-governance\]/);
   assert.match(source, /permissions:\s*\{\}/);
   assert.match(source, /contents: read/);

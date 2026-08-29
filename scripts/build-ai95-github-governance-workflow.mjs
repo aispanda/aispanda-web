@@ -25,6 +25,7 @@ permissions: {}
 jobs:
   governance:
     name: AI governance
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, windows, x64, ai-governance]
     timeout-minutes: 5
     permissions:
