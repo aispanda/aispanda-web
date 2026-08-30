@@ -83,6 +83,10 @@ test('inactive candidate calls storage only after an exact parent PASS', async (
   const workflow = await loadWorkflow();
   assert.equal(workflow.active, false);
   assert.equal(workflow.settings.availableInMCP, false);
+  assert.equal(workflow.settings.saveDataSuccessExecution, 'none');
+  assert.equal(workflow.settings.saveDataErrorExecution, 'none');
+  assert.equal(workflow.settings.saveManualExecutions, false);
+  assert.equal(workflow.settings.saveExecutionProgress, false);
   assert.equal(workflowNode(workflow, 'Authorized Build-Start Request').parameters.path, 'authorize-build-start-ai95-candidate');
   assert.equal(workflowNode(workflow, 'Authorized Build-Start Request').parameters.authentication, 'headerAuth');
   assert.equal(workflowNode(workflow, 'Governance Consumer Build-Start Request').parameters.path, 'authorize-build-start-ai99-governance-candidate');
@@ -163,7 +167,7 @@ test('operation ID and all governed facts propagate unchanged to the child', asy
 test('the inactive n8n candidate derives repository authority from exact embedded consumer profiles', async () => {
   const workflow = await loadWorkflow();
   const normalize = workflowNode(workflow, 'Normalize Governance Consumer Request').parameters.jsCode;
-  const execute = (body) => new Function('$json', normalize)({ body }).json;
+  const execute = (body) => new Function('$json', 'URL', normalize)({ body }, undefined).json;
   const base = {
     task_id: 'AI-99',
     governance_policy_version: 'governance-policy-v1.1',
@@ -177,6 +181,7 @@ test('the inactive n8n candidate derives repository authority from exact embedde
   };
 
   const approved = execute(base);
+  assert.doesNotMatch(normalize, /new URL\(/);
   assert.equal(approved.request.consumer_id, 'aispanda-governance');
   assert.equal(approved.request.expected_repository, 'github.com/aispanda/aispanda-governance');
   assert.deepEqual(approved.request.consumer_violation_codes, []);
@@ -247,7 +252,7 @@ test('server and generated n8n route enforcement have spoof-corpus parity', asyn
       governancePolicyVersion: body.governance_policy_version,
       storyContractVersion: body.story_contract_version,
     });
-    const generated = new Function('$json', routes[consumerId])({ body }).json;
+    const generated = new Function('$json', 'URL', routes[consumerId])({ body }, undefined).json;
     assert.deepEqual(generated.request.consumer_violation_codes, pure.violation_codes, `${consumerId}: ${JSON.stringify(overrides)}`);
     assert.equal(generated.request.expected_repository, pure.profile.repository);
     if (consumerId === 'aispanda-governance') assert.equal(generated.runtime.caller, 'codex');
