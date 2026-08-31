@@ -4,7 +4,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 const scriptUrl = new URL('./Invoke-AI95PullRequestGovernance.ps1', import.meta.url);
 const workflowUrl = new URL('../.github/workflows/ai-governance.yml', import.meta.url);
 const script = (await readFile(scriptUrl, 'utf8')).replace(/\r\n?/g, '\n').trimEnd();
-const indentedScript = script
+const wrappedScript = [
+  '& {',
+  script,
+  '}',
+].join('\n');
+const indentedScript = wrappedScript
   .split('\n')
   .map((line) => (line === '' ? '' : `          ${line}`))
   .join('\n');
