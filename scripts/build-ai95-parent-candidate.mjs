@@ -360,6 +360,7 @@ const mergeExact = baseline &&
   text(baseline.task_id).toUpperCase() === text(parent.task_id).toUpperCase() &&
   normalizeRepository(baseline.repository) === normalizeRepository(parent.repository) &&
   text(baseline.branch_name) === text(parent.branch_name) &&
+  text(baseline.head_sha).toLowerCase() === text(parent.head_sha).toLowerCase() &&
   text(baseline.permitted_action) === 'local_build_start' &&
   text(baseline.governance_policy_version) === text(parent.governance_policy_version) &&
   text(baseline.story_contract_version) === text(parent.story_contract_version) &&

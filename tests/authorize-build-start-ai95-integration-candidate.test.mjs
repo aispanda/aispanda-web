@@ -348,7 +348,6 @@ test('merge PASS is bound to current PR facts and one matching build-start basel
   });
   const baseline = matchingBaseline(parent, {
     operation_id: 'ai95:build:00000001',
-    head_sha: 'a'.repeat(40),
     caller_identity: 'codex',
     permitted_action: 'local_build_start',
   });
@@ -371,6 +370,37 @@ test('merge PASS is bound to current PR facts and one matching build-start basel
   assert.equal(result.head_sha, parent.head_sha);
   assert.equal(result.operation_id, parent.operation_id);
   assert.equal(result.authorization_mode, 'localhost_merge_verified');
+});
+
+test('merge finalizer rejects a build-start baseline for a different commit', async () => {
+  const workflow = await loadWorkflow();
+  const parent = parentDecision({
+    permitted_action: 'pr_merge_gate',
+    operation_id: 'github:pr:95:00000009',
+    head_sha: 'f'.repeat(40),
+    caller: 'github-actions',
+  });
+  const result = runFinalizer(
+    workflowNode(workflow, 'Finalize Persisted Authorization').parameters.jsCode,
+    {
+      outcome: 'PASS',
+      allowed: true,
+      code: 'BASELINE_CURRENT',
+      storage_verified: true,
+      violation_codes: [],
+      baseline: matchingBaseline(parent, {
+        operation_id: 'ai95:build:00000009',
+        head_sha: 'a'.repeat(40),
+        caller_identity: 'codex',
+        permitted_action: 'local_build_start',
+      }),
+    },
+    parent,
+  );
+  assert.equal(result.outcome, 'FAIL');
+  assert.equal(result.response_status, 502);
+  assert.equal(result.build_allowed, false);
+  assert.ok(result.violation_codes.includes('BASELINE_RESPONSE_MISMATCH'));
 });
 
 test('stale merge baseline preserves REPLAN and mismatched scope fails closed', async () => {

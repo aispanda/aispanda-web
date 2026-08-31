@@ -125,10 +125,6 @@ export function planBuildStartBaseline(records, candidate, options = {}) {
     };
   }
 
-  if (active.length === 1 && !isExpired(active[0], now) && active[0].request_fingerprint === candidate.request_fingerprint) {
-    return { outcome: 'PASS', allowed: true, code: 'BASELINE_UNCHANGED', mode: 'reuse', baseline: active[0], steps: [] };
-  }
-
   return {
     outcome: 'PASS',
     allowed: true,
@@ -159,6 +155,7 @@ export function evaluateMergeBaseline(records, current, options = {}) {
   }
 
   const changed = [];
+  if (text(current.head_sha).toLowerCase() !== text(baseline.head_sha).toLowerCase()) changed.push('head_sha');
   if (text(current.linear_updated_at) !== text(baseline.linear_updated_at)) changed.push('linear_updated_at');
   if (text(current.contract_hash).toLowerCase() !== text(baseline.contract_hash).toLowerCase()) changed.push('contract_hash');
   if (text(current.governance_policy_version) !== text(baseline.governance_policy_version)) changed.push('governance_policy_version');
@@ -168,7 +165,7 @@ export function evaluateMergeBaseline(records, current, options = {}) {
       outcome: 'REPLAN',
       allowed: false,
       code: 'BASELINE_STALE',
-      message: 'Current Linear or governance facts differ from the approved build-start baseline.',
+      message: 'Current commit, Linear, or governance facts differ from the approved build-start baseline.',
       changed_fields: changed,
       baseline,
     };

@@ -127,6 +127,7 @@ const baseline = active[0];
 if (!Number.isFinite(Date.parse(baseline.expires_at)) || Date.parse(baseline.expires_at) <= Date.now()) return fail('BASELINE_EXPIRED');
 if (text(current.permitted_action) !== 'pr_merge_gate' || text(baseline.permitted_action) !== 'local_build_start') return fail('BASELINE_ACTION_MISMATCH');
 const changed = [];
+if (text(current.head_sha).toLowerCase() !== text(baseline.head_sha).toLowerCase()) changed.push('head_sha');
 if (text(current.linear_updated_at) !== text(baseline.linear_updated_at)) changed.push('linear_updated_at');
 if (text(current.contract_hash).toLowerCase() !== text(baseline.contract_hash).toLowerCase()) changed.push('contract_hash');
 if (text(current.governance_policy_version) !== text(baseline.governance_policy_version)) changed.push('governance_policy_version');
