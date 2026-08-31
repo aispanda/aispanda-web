@@ -23,7 +23,7 @@ function extractRunBody(workflow) {
     .join('\n');
 }
 
-async function runInsideGitHubPowerShellWrapper(body) {
+async function runInsideGitHubPowerShellWrapper(body, envOverrides = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'ai-governance-wrapper-'));
   const path = join(directory, 'runner-wrapper.ps1');
   const wrapped = `$ErrorActionPreference = 'stop'\n${body}\nif ((Test-Path -LiteralPath variable:\\LASTEXITCODE)) { exit $LASTEXITCODE }\n`;
@@ -32,6 +32,7 @@ async function runInsideGitHubPowerShellWrapper(body) {
     if (name.startsWith('AI95_')) delete env[name];
   }
   delete env.GITHUB_STEP_SUMMARY;
+  Object.assign(env, envOverrides);
 
   try {
     await writeFile(path, wrapped, 'utf8');
@@ -97,4 +98,37 @@ test('generated run block survives the GitHub PowerShell prelude that rejects th
   assert.equal(repaired.code, 1);
   assert.match(output, /MISSING_AI95_BASE_REPOSITORY/);
   assert.doesNotMatch(output, /ParserError|Unexpected attribute|param is not recognized/i);
+});
+
+test('generated run block reports a draft denial without losing shared governance context', async () => {
+  const workflow = (await readFile(workflowUrl, 'utf8')).replace(/\r\n?/g, '\n');
+  const directory = await mkdtemp(join(tmpdir(), 'ai-governance-summary-'));
+  const summaryPath = join(directory, 'summary.md');
+
+  try {
+    const denied = await runInsideGitHubPowerShellWrapper(extractRunBody(workflow), {
+      AI95_BASE_REPOSITORY: 'aispanda/aispanda-web',
+      AI95_PR_HEAD_REPOSITORY: 'aispanda/aispanda-web',
+      AI95_PR_HEAD_REF: 'codex/ai-62-central-ai-spanda-credential-foundation',
+      AI95_PR_HEAD_SHA: '522bc9c411bc3f49341fdc436f763b9ebf036d31',
+      AI95_PR_DRAFT: 'true',
+      AI95_OPERATION_ID: 'github:pr:13:test:1',
+      AI95_GITHUB_TOKEN: 'synthetic-github-token',
+      AI95_N8N_KEY: 'synthetic-n8n-token',
+      AI95_RUN_URL: 'https://example.invalid/actions/runs/test',
+      GITHUB_STEP_SUMMARY: summaryPath,
+    });
+    const output = `${denied.stdout}\n${denied.stderr}`;
+    const summary = await readFile(summaryPath, 'utf8');
+
+    assert.equal(denied.code, 1);
+    assert.match(output, /AI governance denied: DRAFT_PULL_REQUEST_REJECTED/);
+    assert.doesNotMatch(output, /cannot be retrieved|ParserError|Unexpected attribute/i);
+    assert.match(summary, /Task: `AI-62`/);
+    assert.match(summary, /Action: `pr_merge_gate`/);
+    assert.match(summary, /Caller: `github-actions`/);
+    assert.match(summary, /Violation codes: `DRAFT_PULL_REQUEST_REJECTED`/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
