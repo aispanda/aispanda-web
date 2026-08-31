@@ -11,9 +11,10 @@ $ErrorActionPreference = 'Stop'
 
 $policyVersion = 'governance-policy-v1.1'
 $storyContractVersion = 'story-contract-v2'
-$action = 'pr_merge_gate'
-$caller = 'github-actions'
-$statusContext = 'AI governance'
+$script:action = 'pr_merge_gate'
+$script:caller = 'github-actions'
+$script:statusContext = 'AI governance'
+$script:taskId = 'UNRESOLVED'
 $pendingPosted = $false
 $decision = $null
 $failureCode = 'GOVERNANCE_CHECK_FAILED'
@@ -144,6 +145,10 @@ try {
     throw 'FORK_PULL_REQUEST_REJECTED'
   }
   $script:repositoryIdentity = "github.com/$script:headRepository"
+  $branchMatch = [regex]::Match($script:headRef, '^codex/([a-z][a-z0-9]*-[0-9]+)-[a-z0-9][a-z0-9._-]*$', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+  if ($branchMatch.Success) {
+    $script:taskId = $branchMatch.Groups[1].Value.ToUpperInvariant()
+  }
   if ($draftValue -ne 'false') {
     throw 'DRAFT_PULL_REQUEST_REJECTED'
   }
@@ -153,11 +158,9 @@ try {
   if ($script:operationId -notmatch '^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$') {
     throw 'INVALID_OPERATION_ID'
   }
-  $branchMatch = [regex]::Match($script:headRef, '^codex/([a-z][a-z0-9]*-[0-9]+)-[a-z0-9][a-z0-9._-]*$', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
   if (-not $branchMatch.Success) {
     throw 'INVALID_BRANCH_FORMAT'
   }
-  $script:taskId = $branchMatch.Groups[1].Value.ToUpperInvariant()
 
   Publish-CommitStatus -State pending -Description 'Current Linear contract and approved baseline are being checked.'
   $pendingPosted = $true
@@ -166,11 +169,11 @@ try {
     task_id = $script:taskId
     governance_policy_version = $policyVersion
     story_contract_version = $storyContractVersion
-    permitted_action = $action
+    permitted_action = $script:action
     branch_name = $script:headRef
     head_sha = $script:headSha
     repository = $script:repositoryIdentity
-    caller = $caller
+    caller = $script:caller
     operation_id = $script:operationId
   } | ConvertTo-Json -Compress
 
@@ -225,11 +228,11 @@ try {
     $responseRepository -eq $script:headRepository -and
     [string]$decision['branch_name'] -eq $script:headRef -and
     [string]$decision['head_sha'] -eq $script:headSha -and
-    [string]$decision['permitted_action'] -eq $action -and
+    [string]$decision['permitted_action'] -eq $script:action -and
     [string]$decision['operation_id'] -eq $script:operationId -and
     [string]$decision['governance_policy_version'] -eq $policyVersion -and
     [string]$decision['story_contract_version'] -eq $storyContractVersion -and
-    [string]$decision['caller'] -eq $caller -and
+    [string]$decision['caller'] -eq $script:caller -and
     [string]$decision['baseline_code'] -eq 'BASELINE_CURRENT' -and
     [string]$decision['authorization_mode'] -eq 'localhost_merge_verified' -and
     $hasViolationCodes -and
