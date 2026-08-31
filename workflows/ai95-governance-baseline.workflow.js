@@ -220,9 +220,6 @@ if (operationMatches.length === 1) {
   if (expired(existing)) return fail('BASELINE_PENDING_EXPIRED');
   return [{ json: { mode: active.length === 1 ? 'resume_rollover' : 'resume_activate', outcome: 'PASS', allowed: true, code: 'BASELINE_ROLLOVER_RESUME', candidate: existing, target_operation_id: existing.operation_id, expected_fingerprint: existing.request_fingerprint, retire_row_id: active.length === 1 ? active[0].id : null } }];
 }
-if (active.length === 1 && !expired(active[0]) && text(active[0].request_fingerprint) === text(candidate.request_fingerprint)) {
-  return [{ json: { mode: 'reuse', outcome: 'PASS', allowed: true, code: 'BASELINE_UNCHANGED', candidate, target_operation_id: active[0].operation_id, expected_fingerprint: active[0].request_fingerprint } }];
-}
 if (active.length === 1) {
   return [{ json: { mode: 'rollover', outcome: 'PASS', allowed: true, code: 'BASELINE_ROLLOVER', candidate, target_operation_id: candidate.operation_id, expected_fingerprint: candidate.request_fingerprint, retire_row_id: active[0].id } }];
 }

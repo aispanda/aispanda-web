@@ -40,12 +40,21 @@ const normalizeRepository = (value) => {
     host = scp[1];
     path = scp[2];
   } else if (supplied.includes('://')) {
-    let url;
-    try { url = new URL(supplied); } catch { return null; }
-    if (!['https:', 'ssh:'].includes(url.protocol) || url.password || url.port || url.search || url.hash) return null;
-    if (url.username && !(url.protocol === 'ssh:' && url.username === 'git')) return null;
-    host = url.hostname;
-    path = url.pathname;
+    const uri = supplied.match(/^([a-z][a-z0-9+.-]*):\\/\\/([^/?#]+)(\\/[^?#]*)?$/i);
+    if (!uri) return null;
+    const protocol = uri[1].toLowerCase();
+    if (!['https', 'ssh'].includes(protocol)) return null;
+    let authority = uri[2];
+    const atIndex = authority.lastIndexOf('@');
+    if (atIndex >= 0) {
+      if (authority.indexOf('@') !== atIndex) return null;
+      const username = authority.slice(0, atIndex);
+      authority = authority.slice(atIndex + 1);
+      if (username.includes(':') || protocol !== 'ssh' || username !== 'git') return null;
+    }
+    if (!authority || authority.includes(':')) return null;
+    host = authority;
+    path = uri[3] || '';
   } else {
     const parts = supplied.split('/');
     host = parts.shift() || '';
@@ -150,6 +159,12 @@ validator.parameters.jsCode = replaceOnce(
   "$('Normalize Authorization Request')",
   "$('Authorization Request Context')",
   'shared authorization request context',
+);
+validator.parameters.jsCode = replaceOnce(
+  validator.parameters.jsCode,
+  "const normalizeRepo=(value)=>{let repo=text(value).replace(/\\\\/g,'/');const ssh=repo.match(/^git@([^:]+):(.+)$/i);if(ssh)repo=ssh[1]+'/'+ssh[2];else{try{const url=new URL(repo);repo=url.hostname+url.pathname;}catch{repo=repo.replace(/^ssh:\\/\\//i,'');}}return repo.replace(/^\\/+|\\/+$/g,'').replace(/\\.git$/i,'').toLowerCase();};",
+  "const normalizeRepo=(value)=>{let repo=text(value).replace(/\\\\/g,'/');const scp=repo.match(/^git@([^:]+):(.+)$/i);if(scp)repo=scp[1]+'/'+scp[2];else{const uri=repo.match(/^(?:https|ssh):\\/\\/(?:git@)?([^/?#:]+)(\\/[^?#]*)$/i);if(uri)repo=uri[1]+uri[2];else repo=repo.replace(/^ssh:\\/\\//i,'');}return repo.replace(/^\\/+|\\/+$/g,'').replace(/\\.git$/i,'').toLowerCase();};",
+  'n8n-compatible repository normalization',
 );
 validator.parameters.jsCode = replaceOnce(
   validator.parameters.jsCode,
@@ -345,6 +360,7 @@ const mergeExact = baseline &&
   text(baseline.task_id).toUpperCase() === text(parent.task_id).toUpperCase() &&
   normalizeRepository(baseline.repository) === normalizeRepository(parent.repository) &&
   text(baseline.branch_name) === text(parent.branch_name) &&
+  text(baseline.head_sha).toLowerCase() === text(parent.head_sha).toLowerCase() &&
   text(baseline.permitted_action) === 'local_build_start' &&
   text(baseline.governance_policy_version) === text(parent.governance_policy_version) &&
   text(baseline.story_contract_version) === text(parent.story_contract_version) &&
@@ -404,6 +420,16 @@ workflow.connections['Finalize Persisted Authorization'] = {
     [{ node: 'Respond Authorization Outcome', type: 'main', index: 0 }],
     [{ node: 'Respond Baseline Dependency Error', type: 'main', index: 0 }],
   ],
+};
+
+// Webhook authentication headers contain secrets. Keep the authorization
+// decision and baseline as the audit evidence, not the raw execution payload.
+workflow.settings = {
+  ...workflow.settings,
+  saveDataSuccessExecution: 'none',
+  saveDataErrorExecution: 'none',
+  saveManualExecutions: false,
+  saveExecutionProgress: false,
 };
 
 const serializedWorkflow = `${JSON.stringify(workflow, null, 2)}\n`;

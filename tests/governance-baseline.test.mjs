@@ -39,6 +39,7 @@ function mergeFacts(record, patch = {}) {
     task_id: record.task_id,
     repository: record.repository,
     branch_name: record.branch_name,
+    head_sha: record.head_sha,
     permitted_action: 'pr_merge_gate',
     governance_policy_version: record.governance_policy_version,
     story_contract_version: record.story_contract_version,
@@ -81,6 +82,17 @@ test('an exact duplicate reuses its original active result', () => {
   assert.equal(plan.code, 'BASELINE_DUPLICATE');
   assert.equal(plan.baseline.id, 'row-a');
   assert.deepEqual(plan.steps, []);
+});
+
+test('a fresh operation rolls over even when the governed facts are unchanged', () => {
+  const original = active(candidate());
+  const replacement = candidate('local:ai-95:00000002');
+  const plan = planBuildStartBaseline([original], replacement, { now });
+  assert.equal(plan.code, 'BASELINE_ROLLOVER');
+  assert.equal(plan.baseline.operation_id, replacement.operation_id);
+  assert.deepEqual(plan.steps.map((step) => step.action), ['insert', 'retire', 'activate']);
+  assert.equal(plan.steps[1].row_id, 'row-a');
+  assert.equal(plan.steps[2].operation_id, replacement.operation_id);
 });
 
 test('an expired operation cannot be replayed but a new operation can replace it', () => {
@@ -172,6 +184,15 @@ test('merge gate accepts exactly one current, unexpired baseline', () => {
   const result = evaluateMergeBaseline([baseline], mergeFacts(baseline), { now });
   assert.equal(result.allowed, true);
   assert.equal(result.code, 'BASELINE_CURRENT');
+});
+
+test('merge gate requires the pull request commit to match the approved build-start commit', () => {
+  const baseline = active(candidate());
+  const result = evaluateMergeBaseline([baseline], mergeFacts(baseline, { head_sha: 'd'.repeat(40) }), { now });
+  assert.equal(result.allowed, false);
+  assert.equal(result.outcome, 'REPLAN');
+  assert.equal(result.code, 'BASELINE_STALE');
+  assert.deepEqual(result.changed_fields, ['head_sha']);
 });
 
 test('changed Linear revision or contract requires replan', () => {

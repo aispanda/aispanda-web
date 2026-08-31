@@ -45,7 +45,7 @@ function activeBaseline(overrides = {}) {
     task_id: 'AI-95',
     repository: 'github.com/aispanda/aispanda-web',
     branch_name: 'codex/ai-95-governance-hardening',
-    head_sha: 'a'.repeat(40),
+    head_sha: 'f'.repeat(40),
     caller_identity: 'codex',
     permitted_action: 'local_build_start',
     operation_id: 'ai95:build:00000001',
@@ -118,7 +118,7 @@ test('current merge facts pass against one matching unexpired build-start baseli
   assert.equal(result.allowed, true);
   assert.equal(result.storage_verified, true);
   assert.equal(result.code, 'BASELINE_CURRENT');
-  assert.equal(result.baseline.head_sha, 'a'.repeat(40));
+  assert.equal(result.baseline.head_sha, 'f'.repeat(40));
 });
 
 test('changed Linear or contract facts require REPLAN and never authorize merge', async () => {
@@ -126,14 +126,14 @@ test('changed Linear or contract facts require REPLAN and never authorize merge'
   const prepared = runPrepare(workflowNode(workflow, 'Prepare Merge Baseline Check').parameters.jsCode, mergeInput());
   const result = runEvaluate(
     workflowNode(workflow, 'Evaluate Merge Baseline').parameters.jsCode,
-    [activeBaseline({ linear_updated_at: '2026-08-28T21:00:00.000Z', contract_hash: 'c'.repeat(64) })],
+    [activeBaseline({ head_sha: 'a'.repeat(40), linear_updated_at: '2026-08-28T21:00:00.000Z', contract_hash: 'c'.repeat(64) })],
     prepared,
   );
   assert.equal(result.outcome, 'REPLAN');
   assert.equal(result.allowed, false);
   assert.equal(result.storage_verified, false);
   assert.equal(result.code, 'BASELINE_STALE');
-  assert.deepEqual(result.changed_fields, ['linear_updated_at', 'contract_hash']);
+  assert.deepEqual(result.changed_fields, ['head_sha', 'linear_updated_at', 'contract_hash']);
 });
 
 test('missing, ambiguous, expired, and wrong-action baselines fail closed', async () => {

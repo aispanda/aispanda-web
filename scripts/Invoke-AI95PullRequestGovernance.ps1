@@ -1,7 +1,10 @@
-$GovernanceUri = 'http://127.0.0.1:5678/webhook/authorize-build-start-ai95-candidate'
-$GitHubApiBaseUri = $env:GITHUB_API_URL
-$TimeoutSec = 15
-$MaxAttempts = 2
+[CmdletBinding()]
+param(
+  [string]$GovernanceUri = 'http://127.0.0.1:5678/webhook/authorize-build-start-ai95-candidate',
+  [string]$GitHubApiBaseUri = $env:GITHUB_API_URL,
+  [ValidateRange(1, 300)][int]$TimeoutSec = 15,
+  [ValidateRange(1, 5)][int]$MaxAttempts = 2
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

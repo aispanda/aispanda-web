@@ -20,6 +20,30 @@ function connectedNode(workflow, from, output = 0) {
   return connection[0].node;
 }
 
+function runPlan(code, records, candidate) {
+  return new Function('$input', '$', code)(
+    { all: () => records.map((json) => ({ json })) },
+    (name) => {
+      assert.equal(name, 'Create Pending Candidate');
+      return { first: () => ({ json: { adapter_input_valid: true, candidate } }) };
+    },
+  )[0].json;
+}
+
+function baseline(operationId, patch = {}) {
+  return {
+    id: 'row-a',
+    operation_id: operationId,
+    request_fingerprint: 'f'.repeat(64),
+    task_id: 'AI-95',
+    repository: 'github.com/aispanda/aispanda-web',
+    branch_name: 'codex/ai-95-governance-hardening',
+    status: 'active',
+    expires_at: '2099-08-29T22:00:00.000Z',
+    ...patch,
+  };
+}
+
 test('AI-95 baseline-store import is inactive, portable, and contains no credential or story data', async () => {
   const workflow = await loadWorkflow();
   const serialized = JSON.stringify(workflow);
@@ -78,4 +102,28 @@ test('AI-95 baseline-store routes safe lifecycle outcomes through the expected s
   assert.equal(connectedNode(workflow, 'Retire Previous For Resume'), 'Activate Pending For Resume');
   assert.equal(connectedNode(workflow, 'Read After Transition'), 'Verify Stored Baseline');
   assert.equal(connectedNode(workflow, 'Route Baseline Transition', 6), 'Return Baseline Failure');
+});
+
+test('workflow planner rolls a fresh operation, deduplicates its replay, and rejects conflicting reuse', async () => {
+  const workflow = await loadWorkflow();
+  const code = node(workflow, 'Plan Baseline Transition').parameters.jsCode;
+  const original = baseline('local:ai-95:00000001');
+  const replacement = baseline('local:ai-95:00000002', { id: undefined, status: 'pending' });
+
+  const rollover = runPlan(code, [original], replacement);
+  assert.equal(rollover.mode, 'rollover');
+  assert.equal(rollover.code, 'BASELINE_ROLLOVER');
+  assert.equal(rollover.target_operation_id, replacement.operation_id);
+  assert.equal(rollover.retire_row_id, original.id);
+
+  const duplicate = runPlan(code, [baseline(replacement.operation_id)], replacement);
+  assert.equal(duplicate.mode, 'reuse');
+  assert.equal(duplicate.code, 'BASELINE_DUPLICATE');
+
+  const conflict = runPlan(code, [baseline(replacement.operation_id)], {
+    ...replacement,
+    request_fingerprint: 'e'.repeat(64),
+  });
+  assert.equal(conflict.mode, 'fail');
+  assert.equal(conflict.code, 'OPERATION_ID_CONFLICT');
 });
