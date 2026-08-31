@@ -34,6 +34,7 @@ jobs:
       - name: Validate current story and approved baseline
         shell: pwsh
         run: |
+          & {
           [CmdletBinding()]
           param(
             [string]$GovernanceUri = 'http://127.0.0.1:5678/webhook/authorize-build-start-ai95-candidate',
@@ -297,4 +298,5 @@ jobs:
             }
             [Console]::Error.WriteLine("AI governance denied: $failureCode")
             exit 1
+          }
           }
