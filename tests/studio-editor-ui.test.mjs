@@ -9,6 +9,18 @@ import {
 } from '../src/scripts/studio-toolbar-navigation.mjs';
 import { createStudioImageOperationCoordinator } from '../src/scripts/studio-image-operations.mjs';
 import { captureStudioPreviewState, isStudioPreviewStateCurrent } from '../src/scripts/studio-preview-operations.mjs';
+import { studioPublicUrl } from '../src/scripts/studio-library-operations.mjs';
+
+test('library Read retains the published URL while a working draft changes slug', () => {
+  const draft = { publicationStatus: 'published-with-changes', slug: 'new-draft-slug', publicationLiveUrl: 'https://aispanda.com/previous-release' };
+  assert.equal(studioPublicUrl(draft), 'https://aispanda.com/previous-release');
+  assert.equal(studioPublicUrl({ ...draft, publicationLiveUrl: 'https://aispanda.com/new-draft-slug' }), 'https://aispanda.com/new-draft-slug');
+  assert.equal(studioPublicUrl({ ...draft, publicationStatus: 'unpublished' }), undefined);
+  assert.equal(studioPublicUrl({ ...draft, archivedAt: '2026-09-05T12:00:00.000Z' }), undefined);
+  assert.equal(studioPublicUrl({ ...draft, publicationLiveUrl: '' }), undefined);
+  assert.equal(studioPublicUrl({ ...draft, publicationLiveUrl: 'javascript:alert(1)' }), undefined);
+  assert.equal(studioPublicUrl({ publicationStatus: 'published' }, '/open-the-ai'), '/open-the-ai');
+});
 
 test('an edit during delayed preview cannot restore publication readiness', async () => {
   let current = {

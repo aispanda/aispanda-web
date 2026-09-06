@@ -1039,7 +1039,9 @@ export const archiveDraft = async ({ db, draftId, expectedUpdatedAt, publisherUi
     if (!draft) fail('The cloud draft is unavailable.', 404);
     assertDraftEditor(access, draft, publisherUid);
     assertExpectedRevision(draft, expectedUpdatedAt);
-    if (index?.state === 'published') fail('Unpublish this article before archiving its draft.', 409);
+    if (index?.state === 'published' || ['published', 'published-with-changes'].includes(draft.publicationStatus)) {
+      fail('Unpublish this article before moving its draft to trash.', 409);
+    }
 
     transaction.update(draftRef, { archivedAt: occurredAt, updatedAt: occurredAt });
     transaction.create(auditRef, {

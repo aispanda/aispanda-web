@@ -121,7 +121,7 @@ const { Content } = await render(entry);
             <button type="button" data-filter="draft"><span>Drafts</span><small data-draft-count>0</small></button>
             <button type="button" data-filter="published"><span>Published</span><small data-published-count>1</small></button>
             <button type="button" data-filter="unpublished"><span>Unpublished</span><small data-unpublished-count>0</small></button>
-            <button type="button" data-filter="archived"><span>Archived</span><small data-archived-count>0</small></button>
+            <button type="button" data-filter="archived"><span>Trash</span><small data-archived-count>0</small></button>
             <button type="button" disabled title="Book workspace comes after the article MVP">
               <span>Books</span><small>Next</small>
             </button>
@@ -162,7 +162,7 @@ const { Content } = await render(entry);
               <button type="button" data-filter="draft">Drafts</button>
               <button type="button" data-filter="published">Published</button>
               <button type="button" data-filter="unpublished">Unpublished</button>
-              <button type="button" data-filter="archived">Archived</button>
+              <button type="button" data-filter="archived">Trash</button>
               <button type="button" data-new-article>New article</button>
               <a href="/account">Account settings</a>
               <button type="button" data-studio-signout>Sign out</button>
@@ -518,6 +518,7 @@ const { Content } = await render(entry);
       import { configureStudioImageLoader, studioTiptapExtensions } from '@/scripts/studio-tiptap-schema.mjs';
       import { createStudioImageOperationCoordinator } from '@/scripts/studio-image-operations.mjs';
       import { captureStudioPreviewState, isStudioPreviewStateCurrent } from '@/scripts/studio-preview-operations.mjs';
+      import { studioPublicUrl } from '@/scripts/studio-library-operations.mjs';
       import {
         closeToolbarMenuAndFocusSummary,
         evaluateStudioClipboardPaste,
@@ -987,9 +988,10 @@ const { Content } = await render(entry);
             publicationStatus: normalizedStatus,
             updatedAt: draft.updatedAt,
             archivedAt: draft.archivedAt,
-            publicPath: hasLiveVersion({ id, title: draft.title, publicationStatus: normalizedStatus, updatedAt: draft.updatedAt })
-              ? id === 'open-the-ai' ? '/open-the-ai' : `/${draft.slug}`
-              : undefined,
+            publicPath: studioPublicUrl(
+              { ...draft, publicationStatus: normalizedStatus },
+              id === 'open-the-ai' ? '/open-the-ai' : undefined,
+            ),
           });
         }
 
@@ -1025,7 +1027,7 @@ const { Content } = await render(entry);
             : currentFilter === 'unpublished'
               ? 'Unpublished'
               : currentFilter === 'archived'
-                ? 'Archived'
+                ? 'Trash'
                 : 'All content';
         documentList.replaceChildren();
 
@@ -1048,14 +1050,14 @@ const { Content } = await render(entry);
           itemTitle.textContent = item.title;
           if (item.archivedAt) {
             itemTitle.removeAttribute('href');
-            itemTitle.setAttribute('aria-label', `${item.title}, archived`);
+            itemTitle.setAttribute('aria-label', `${item.title}, in trash`);
           } else {
             itemTitle.href = item.publicPath && hasLiveVersion(item) ? item.publicPath : editPath;
             itemTitle.setAttribute('aria-label', item.publicPath && hasLiveVersion(item) ? `Read ${item.title}` : `Edit ${item.title}`);
           }
           const itemMeta = document.createElement('div');
           const itemStatus = document.createElement('small');
-          itemStatus.textContent = item.archivedAt ? 'Archived' : statusLabel(item.publicationStatus);
+          itemStatus.textContent = item.archivedAt ? 'In trash' : statusLabel(item.publicationStatus);
           itemMeta.append(itemStatus);
           if (item.publicPath && hasLiveVersion(item)) {
             const editLink = document.createElement('a');
@@ -1128,10 +1130,10 @@ const { Content } = await render(entry);
 
       const archiveDocument = async (item: DocumentSummary) => {
         if (hasLiveVersion(item)) {
-          showToast('Unpublish this article before archiving its draft');
+          showToast('Unpublish this article before moving it to trash');
           return;
         }
-        const confirmed = window.confirm(`Archive the cloud draft “${item.title}”? Its audit history will be preserved.`);
+        const confirmed = window.confirm(`Move “${item.title}” to trash? You can restore it from Trash. Its draft and publication history will be preserved.`);
         if (!confirmed) return;
         const state = readDocumentState(item);
         if (!state) {
@@ -1142,17 +1144,17 @@ const { Content } = await render(entry);
           const result = await studioBackend.archiveDraft(item.id, state.updatedAt);
           draftRecords.set(item.id, { ...state, archivedAt: result.archivedAt, updatedAt: result.archivedAt });
         } catch {
-          showToast('Could not archive the cloud draft; nothing was changed');
+          showToast('Could not move the cloud draft to trash; nothing was changed');
           return;
         }
-        showToast('Cloud draft archived');
+        showToast('Draft moved to trash · you can restore it');
         showContentLibrary('archived');
       };
 
       const restoreDocument = async (item: DocumentSummary) => {
         const state = readDocumentState(item);
         if (!state?.archivedAt) {
-          showToast('The archived cloud draft could not be loaded');
+          showToast('The cloud draft in trash could not be loaded');
           return;
         }
         try {
@@ -1188,7 +1190,7 @@ const { Content } = await render(entry);
             : currentFilter === 'unpublished'
               ? 'Unpublished'
               : currentFilter === 'archived'
-                ? 'Archived'
+                ? 'Trash'
                 : 'All content';
         libraryTitle.textContent = heading;
         const guidance = currentFilter === 'published'
@@ -1196,9 +1198,9 @@ const { Content } = await render(entry);
           : currentFilter === 'draft'
             ? 'Includes unpublished articles and draft changes to published articles.'
             : currentFilter === 'unpublished'
-              ? 'These articles are offline and may be republished or deleted.'
+              ? 'These articles are offline and may be republished or moved to trash.'
               : currentFilter === 'archived'
-                ? 'Archived drafts are hidden from editing and publishing until restored.'
+                ? 'Drafts in trash are retained for recovery. Restore a draft to edit or publish it.'
               : 'Published titles open the live article; Edit draft opens unpublished work.';
         librarySummary.textContent = `${visible.length} ${visible.length === 1 ? 'item' : 'items'} · ${guidance}`;
         libraryList.replaceChildren();
@@ -1240,7 +1242,7 @@ const { Content } = await render(entry);
 
           const status = document.createElement('span');
           status.className = `studio-library-status is-${item.archivedAt ? 'archived' : item.publicationStatus}`;
-          status.textContent = item.archivedAt ? 'Archived' : statusLabel(item.publicationStatus);
+          status.textContent = item.archivedAt ? 'In trash' : statusLabel(item.publicationStatus);
 
           const updated = document.createElement('time');
           updated.dateTime = item.updatedAt;
@@ -1301,9 +1303,9 @@ const { Content } = await render(entry);
                 void navigateAfterSave(`/studio?draft=${encodeURIComponent(item.id)}`);
               });
             }
-            addMenuButton('Archive draft', () => archiveDocument(item), true);
+            addMenuButton('Move to trash', () => archiveDocument(item), true);
           } else {
-            addMenuButton('Archive draft', () => archiveDocument(item), true);
+            addMenuButton('Move to trash', () => archiveDocument(item), true);
           }
 
           menu.append(menuTrigger, menuItems);
@@ -1366,7 +1368,7 @@ const { Content } = await render(entry);
       const renderStatus = (override?: string) => {
         renderPublicationReceipt();
         if (draftRecords.get(draftId)?.archivedAt) {
-          saveState.textContent = 'Archived · restore to edit';
+          saveState.textContent = 'In trash · restore to edit';
           return;
         }
         if (override) {
@@ -1674,7 +1676,7 @@ const { Content } = await render(entry);
       const stored = draftRecords.get(draftId);
       if (stored?.archivedAt) {
         showContentLibrary('archived');
-        showToast('This draft is archived. Restore it before editing.');
+        showToast('This draft is in trash. Restore it before editing.');
       }
       if (stored) {
         title.value = stored.title;

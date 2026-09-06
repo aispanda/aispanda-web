@@ -719,6 +719,130 @@ test('publisher creates an immutable release, live snapshot, index, audit event 
   assert.equal([...db.records.keys()].filter((key) => key.startsWith('contentReleases/')).length, 1);
 });
 
+test('Administrator completes the cloud draft lifecycle without exposing unpublished edits or losing release history', async () => {
+  const publisherUid = 'administrator-1';
+  const draftId = 'admin-lifecycle';
+  const db = new FakeDb({
+    [`studioAccess/${publisherUid}`]: { active: true, role: 'administrator' },
+    'studioAccess/viewer-1': { active: true, role: 'viewer' },
+  });
+  const readDraft = async () => (await db.collection('contentDrafts').doc(draftId).get()).data();
+  const save = async (text, slug, timestamp) => {
+    const current = await readDraft();
+    await saveCanonicalDraft({
+      db, draftId, publisherUid, publisherEmail: 'administrator@example.test',
+      draft: canonicalSavePayload({ ...(current ?? draft()), slug }, contentDocument(text)),
+      expectedUpdatedAt: current?.updatedAt,
+      expectedRevision: current?.revision ?? 0,
+      expectedContentSha256: current?.contentSha256,
+      checkpoint: true,
+      now: new Date(timestamp),
+    });
+    return readDraft();
+  };
+  const publish = async (key, timestamp) => publishCurrent({
+    db, draftId, publisherUid, record: await readDraft(),
+    idempotencyKey: key, now: new Date(timestamp),
+  });
+
+  const created = await save('First published version.', 'admin-lifecycle', '2026-09-05T10:00:00.000Z');
+  assert.equal(created.ownerUid, publisherUid);
+  assert.equal(created.publicationStatus, 'draft');
+  assert.deepEqual(created.content, contentDocument('First published version.').content);
+  assert.equal(await loadPublishedArticle(db, 'admin-lifecycle'), null);
+
+  const first = await publish('admin-lifecycle-release-1', '2026-09-05T10:10:00.000Z');
+  const firstPublic = await loadPublishedArticle(db, 'admin-lifecycle');
+  assert.match(firstPublic.renderedPageHtml, /First published version\./);
+
+  const changedBody = await save('Second published version.', 'admin-lifecycle', '2026-09-05T10:20:00.000Z');
+  assert.equal(changedBody.publicationStatus, 'published-with-changes');
+  assert.equal(changedBody.publicationReleaseId, first.releaseId);
+  assert.deepEqual(await loadPublishedArticle(db, 'admin-lifecycle'), firstPublic);
+  const second = await publish('admin-lifecycle-release-2', '2026-09-05T10:30:00.000Z');
+  assert.notEqual(second.releaseId, first.releaseId);
+  assert.equal(second.liveUrl, first.liveUrl);
+  const secondPublic = await loadPublishedArticle(db, 'admin-lifecycle');
+  assert.match(secondPublic.renderedPageHtml, /Second published version\./);
+  assert.doesNotMatch(secondPublic.renderedPageHtml, /First published version\./);
+
+  const changedSlug = await save('Third published version.', 'admin-lifecycle-renamed', '2026-09-05T10:40:00.000Z');
+  assert.equal(changedSlug.publicationStatus, 'published-with-changes');
+  assert.equal(changedSlug.publicationLiveUrl, first.liveUrl);
+  assert.deepEqual(await loadPublishedArticle(db, 'admin-lifecycle'), secondPublic);
+  assert.equal(await loadPublishedArticle(db, 'admin-lifecycle-renamed'), null);
+  const third = await publish('admin-lifecycle-release-3', '2026-09-05T10:50:00.000Z');
+  assert.equal(third.liveUrl, 'https://aispanda.com/admin-lifecycle-renamed');
+  assert.notEqual(third.releaseId, second.releaseId);
+  assert.equal(await loadPublishedArticle(db, 'admin-lifecycle'), null);
+  const thirdPublic = await loadPublishedArticle(db, 'admin-lifecycle-renamed');
+  assert.match(thirdPublic.renderedPageHtml, /Third published version\./);
+
+  const liveDraft = await readDraft();
+  await assert.rejects(archiveDraft({
+    db, draftId, publisherUid, expectedUpdatedAt: liveDraft.updatedAt,
+  }), /Unpublish this article/);
+  await assert.rejects(saveCanonicalDraft({
+    db, draftId, publisherUid: 'viewer-1', publisherEmail: 'viewer@example.test',
+    draft: canonicalSavePayload(liveDraft, contentDocument('Unauthorized replacement.')),
+    expectedUpdatedAt: liveDraft.updatedAt,
+    expectedRevision: liveDraft.revision,
+    expectedContentSha256: liveDraft.contentSha256,
+  }), (error) => error.statusCode === 403);
+  await assert.rejects(unpublishDraft({
+    db, draftId, publisherUid: 'viewer-1', expectedUpdatedAt: liveDraft.updatedAt,
+  }), (error) => error.statusCode === 403);
+  assert.deepEqual(await readDraft(), liveDraft);
+  assert.deepEqual(await loadPublishedArticle(db, 'admin-lifecycle-renamed'), thirdPublic);
+
+  const unpublished = await unpublishDraft({
+    db, draftId, publisherUid, expectedUpdatedAt: liveDraft.updatedAt,
+    now: new Date('2026-09-05T11:00:00.000Z'),
+  });
+  assert.equal(await loadPublishedArticle(db, 'admin-lifecycle-renamed'), null);
+  assert.equal((await readDraft()).publicationStatus, 'unpublished');
+  assert.deepEqual((await readDraft()).content, liveDraft.content);
+  const archived = await archiveDraft({
+    db, draftId, publisherUid, expectedUpdatedAt: unpublished.updatedAt,
+    now: new Date('2026-09-05T11:10:00.000Z'),
+  });
+  assert.equal((await readDraft()).archivedAt, archived.archivedAt);
+  await restoreDraft({
+    db, draftId, publisherUid, expectedUpdatedAt: archived.archivedAt,
+    now: new Date('2026-09-05T11:20:00.000Z'),
+  });
+  const restored = await readDraft();
+  assert.equal(restored.archivedAt, undefined);
+  assert.equal(restored.publicationStatus, 'unpublished');
+  assert.deepEqual(restored.content, liveDraft.content);
+  assert.equal(await loadPublishedArticle(db, 'admin-lifecycle-renamed'), null);
+
+  for (const [release, published] of [[first, firstPublic], [second, secondPublic], [third, thirdPublic]]) {
+    assert.equal(db.records.get(`contentReleasePayloads/${release.releaseId}_page`).renderedPageHtml, published.renderedPageHtml);
+    assert.equal(db.records.get(`contentReleases/${release.releaseId}`).draftId, draftId);
+  }
+  const auditActions = new Set([...db.records.entries()]
+    .filter(([path, event]) => path.startsWith('contentAuditEvents/') && event.actorUid === publisherUid && event.draftId === draftId)
+    .map(([, event]) => event.action));
+  for (const action of ['save', 'publish', 'unpublish', 'archive', 'restore']) {
+    assert.equal(auditActions.has(action), true, `${action} must retain an Administrator audit event`);
+  }
+});
+
+test('trash refuses a draft marked live even when its publication index is missing', async () => {
+  for (const publicationStatus of ['published', 'published-with-changes']) {
+    const record = canonicalDraft({ publicationStatus });
+    const db = new FakeDb({
+      'studioAccess/administrator-1': { active: true, role: 'administrator' },
+      'contentDrafts/draft-1': record,
+    });
+    await assert.rejects(archiveDraft({
+      db, draftId: 'draft-1', publisherUid: 'administrator-1', expectedUpdatedAt: record.updatedAt,
+    }), (error) => error.statusCode === 409);
+    assert.deepEqual(db.records.get('contentDrafts/draft-1'), record);
+  }
+});
+
 test('publish rejects a preview receipt after a checkpoint save or template output change', async () => {
   const record = canonicalDraft();
   const db = new FakeDb({
@@ -1143,7 +1267,7 @@ test('Studio cloud contract prevents local article storage and all direct browse
   assert.match(backend, /contentRequest<\{ updatedAt: string; revision: number; contentSha256: string \}>\(id, 'migrate'/);
   assert.match(studio, /data-filter="archived"/);
   assert.match(studio, /studioBackend\.restoreDraft\(item\.id, state\.updatedAt\)/);
-  assert.match(studio, /This draft is archived\. Restore it before editing\./);
+  assert.match(studio, /This draft is in trash\. Restore it before editing\./);
   assert.match(studio, /class="studio-mobile-nav"/);
   assert.match(backend, /querySelectorAll<HTMLButtonElement>\('\[data-studio-signout\]'\)/);
   assert.match(studio, /studioBackend\.previewDocument\(draftId\)/);
@@ -1155,7 +1279,7 @@ test('Studio cloud contract prevents local article storage and all direct browse
   assert.match(server, /contentRoute\.action === 'save' \|\| contentRoute\.action === 'migrate'/);
   assert.match(server, /readJson\(request, usesContentPayload \? CONTENT_JSON_LIMIT : JSON_LIMIT\)/);
   assert.match(studio, /\['https:', 'http:', 'mailto:'\]/);
-  assert.match(studio, /Archived · restore to edit/);
+  assert.match(studio, /In trash · restore to edit/);
   assert.match(rules, /match \/contentDrafts\/\{draftId\}[\s\S]*allow create, update, delete: if false;/);
   assert.match(studio, /data-migrate-draft/);
   assert.match(studio, /Legacy draft · convert before editing/);
