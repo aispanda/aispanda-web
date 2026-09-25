@@ -65,8 +65,18 @@ if (!/^[a-f0-9]{64}$/.test(lock.packageSha256 || '') || !/^[0-9]+\.[0-9]+\.[0-9]
   || typeof lock.archive !== 'string' || /[\\/]/.test(lock.archive)) throw new Error('Invalid pinned blog package.');
 const archive = await readFile(resolve(root, 'vendor/blog', lock.archive));
 if (createHash('sha256').update(archive).digest('hex') !== lock.packageSha256) throw new Error('Pinned blog archive integrity mismatch.');
-const { verifyImageStoragePrerequisites } = await import(pathToFileURL(resolve(root, '.blog/releases',
+const { verifyImageStoragePrerequisites, verifyFirebaseAuthPrerequisites } = await import(pathToFileURL(resolve(root, '.blog/releases',
   `${lock.packageVersion}-${lock.packageSha256.slice(0, 12)}`, 'runtime/tests/staging-preflight.mjs')).href);
+if (typeof verifyFirebaseAuthPrerequisites !== 'function') {
+  throw new Error('Pinned blog package lacks Firebase Auth permission preflight; adopt the updated package before release.');
+}
+const checkRuntimePermission = async request => {
+  const result = spawnGcloudSync(policyTroubleshooterArgs({ ...request, billingProject: required('RELEASE_PROJECT') }), { encoding: 'utf8' });
+  return policyTroubleshooterAccess(result.stdout);
+};
+await verifyFirebaseAuthPrerequisites({
+  projectId: project, runtimeIdentity: expectedRuntimeIdentity, checkPermission: checkRuntimePermission,
+});
 const describedProject = spawnGcloudSync(['projects', 'describe', project, '--format=json'], { encoding: 'utf8' });
 const projectNumber = JSON.parse(describedProject.stdout).projectNumber;
 await verifyImageStoragePrerequisites({
@@ -80,9 +90,6 @@ await verifyImageStoragePrerequisites({
     if (!response.ok) throw new Error('Configured image storage bucket metadata is inaccessible.');
     return response.json();
   },
-  checkPermission: async request => {
-    const result = spawnGcloudSync(policyTroubleshooterArgs({ ...request, billingProject: required('RELEASE_PROJECT') }), { encoding: 'utf8' });
-    return policyTroubleshooterAccess(result.stdout);
-  },
+  checkPermission: checkRuntimePermission,
 });
-console.log(`PASS: ${expectedEnvironment} runtime profile, Firestore and private image storage with effective runtime permissions are verified.`);
+console.log(`PASS: ${expectedEnvironment} runtime profile, Firebase Auth user lookup, Firestore and private image storage with effective runtime permissions are verified.`);

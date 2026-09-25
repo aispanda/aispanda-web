@@ -6,6 +6,15 @@ AI-114 now requires the RA-002 image-pull preflight helper as well as that stage
 
 ## Required separate bootstrap approval
 
+The pinned blog prerequisite hook also checks `firebaseauth.users.get` for each
+environment's runtime identity. The backend validates revoked/disabled accounts;
+successful Google authentication alone does not prove this server permission.
+Denied, unknown or missing effective access blocks release. Keep any required
+least-privilege IAM repair separate from the read-only verifier. The shared
+package also tests same-account retries and distinguishes unavailable server
+verification from an invalid session; verify the real Google-to-home transition
+after promotion, in addition to public route smoke tests.
+
 Before the first staging run, explicitly approve and create or designate two non-production projects: one dedicated release/build project for Cloud Build, logs, a dedicated source-staging bucket and Artifact Registry, and one dedicated web-publishing staging project for Cloud Run, Firebase and test data. Bootstrap billing and required APIs (including Firebase Management and Policy Troubleshooter), the default staging Firestore database, `aispanda-web-staging`, isolated build/runtime identities, repository-scoped Artifact Registry access, source-bucket-scoped object read access and environment-specific Secret Manager bindings. Configure the staging and production Cloud Run services with their own `RUNTIME_*` public client values outside Git. The authoritative Firebase Management API configuration must match each runtime profile, and Policy Troubleshooter must deny cross-environment access on the exact Cloud Run, Firestore, Secret Manager, service-account and project resources.
 
 Deploy the bound Firestore rules to each environment as a separately governed prerequisite. The release controller verifies prerequisites but does not create infrastructure, change IAM, deploy rules or write secrets.
