@@ -35,6 +35,7 @@ If these answers are missing, do not create the document; update an existing own
 | `PRODUCT_ROADMAP.md` | Phased user outcomes, ordering and exit gates | Detailed requirements or committed dates | Current |
 | `REQUIREMENTS_EPICS_INVENTORY.md` | Epic scope, status, requirement ownership and next proof | Detailed acceptance criteria | Current |
 | `CONTENT_AUTHORING_REQUIREMENTS.md` | Authenticated authoring, draft/publish lifecycle, editor capabilities, book-ready model and recommended studio architecture | Named comparative research or implementation detail | Proposed baseline |
+| `AI_95_GOVERNANCE_HARDENING_PLAN.md` | AI-95 baseline lifecycle, exact-commit PR gate design, verified local evidence and controlled bootstrap/cutover sequence | Story-contract policy, AI-96 agent capability governance, product requirements or permission to merge/publish | Current |
 | `SEED_IDEAS.md` + `docs/seeds/` | Local-only incubating ideas (gitignored — not published) | Live routes | Local only — gitignored |
 | `../site-profile.json` | Machine-readable identity, audiences, launch capabilities, repository and hosting profile | Long explanations or secrets | Current |
 | `../README.md` | Human quick start | Strategy or detailed operating procedure | Current |
