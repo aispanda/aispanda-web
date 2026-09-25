@@ -18,15 +18,15 @@ import {
   validateVaultConnection,
 } from './ai-vault-core.mjs';
 import {
-  appendPublishedUrlsToSitemap,
+  appendPublishedUrlsToSitemap as legacyAppendPublishedUrlsToSitemap,
   assertContentMutationRequest,
   archiveDraft,
-  listPublishedArticles,
-  loadPublishedArticle,
+  listPublishedArticles as legacyListPublishedArticles,
+  loadPublishedArticle as legacyLoadPublishedArticle,
   migrateLegacyDraft,
   previewDraft,
   publishDraft,
-  renderPublishedInsightRows,
+  renderPublishedInsightRows as legacyRenderPublishedInsightRows,
   restoreDraft,
   saveCanonicalDraft,
   unpublishDraft,
@@ -36,6 +36,7 @@ import { isInternalArticleShellFile } from './static-routing.mjs';
 import { publicStudioContentErrorDetails } from './studio-content-document.mjs';
 import { createStudioImageAsset, resolveStudioContentAsset } from './studio-content-assets.mjs';
 import { buildRuntimePublicConfig, injectRuntimePublicConfig, prepareServedText } from './runtime-config.mjs';
+import { loadBlogAdapter } from './blog-adapter.mjs';
 
 const PORT = Number(process.env.PORT) || 8080;
 const DIST_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -60,6 +61,13 @@ const auth = getAuth(app);
 // identity is the only server principal intended to access this collection.
 const db = getFirestore(app);
 const bucket = getStorage(app).bucket(RUNTIME_PUBLIC_CONFIG?.firebase.storageBucket);
+const blog = process.env.BLOG_CAPABILITY_ENABLED === 'true'
+  ? await loadBlogAdapter({ db, auth, bucket }) : null;
+const handleBlog = blog?.handle;
+const { listPublishedArticles, loadPublishedArticle, renderPublishedInsightRows, appendPublishedUrlsToSitemap } = blog?.publicContent ?? {
+  listPublishedArticles: legacyListPublishedArticles, loadPublishedArticle: legacyLoadPublishedArticle,
+  renderPublishedInsightRows: legacyRenderPublishedInsightRows, appendPublishedUrlsToSitemap: legacyAppendPublishedUrlsToSitemap,
+};
 
 const securityHeaders = {
   'X-Content-Type-Options': 'nosniff',
@@ -535,6 +543,7 @@ const serveStatic = async (request, response, url) => {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', requestOrigin(request));
   try {
+    if (handleBlog?.(request, response)) return;
     if (url.pathname.startsWith('/api/')) await handleApi(request, response, url);
     else if (url.pathname.startsWith('/__/auth')) await proxyFirebaseAuth(request, response, url);
     else if ((request.method === 'GET' || request.method === 'HEAD') && /^\/content-assets\/[a-f0-9-]+$/.test(url.pathname)) {

@@ -1,0 +1,9 @@
+{
+  "scope": "local-integration-candidate",
+  "installerSha256": "62c01425119f0781b739904ac14b33f95682be0f7ef87722c590598c6f7b72b5",
+  "archive": "blog-community-0.2.0-rc.8-8bf5f5834254.blog.json.gz",
+  "packageVersion": "0.2.0-rc.8",
+  "sourceRepository": "https://github.com/aispanda/reusable-ai-assets",
+  "sourceBranch": "codex/ai-114-reusable-publishing",
+  "packageSha256": "8bf5f58342541b68dffc78557c2980cb1743d9bb8ace0934384c25eca0a139d2"
+}

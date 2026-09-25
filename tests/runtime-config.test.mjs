@@ -16,7 +16,7 @@ const validEnvironment = (overrides = {}) => ({
   ...overrides,
 });
 
-test('local static serving can use the build-time Firebase fallback', () => {
+test('an unconfigured static host receives no runtime Firebase configuration', () => {
   assert.equal(buildRuntimePublicConfig({}), null);
 });
 

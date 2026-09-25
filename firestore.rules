@@ -2,8 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Provider credentials are encrypted and accessed only through the Cloud Run
-    // service identity. Browser SDK clients must never read or write this vault.
+    // AIspanda credential vault remains server-only.
     match /aiCredentialVault/{userId}/{document=**} {
       allow read, write: if false;
     }
@@ -34,7 +33,10 @@ service cloud.firestore {
     }
 
     function isPublisher() {
-      return hasStudioAccess() && get(accessPath()).data.role == 'publisher';
+      // Administrators inherit Publisher capabilities. The roles that are
+      // exclusive to Administrators still call isAdministrator().
+      return hasStudioAccess()
+        && get(accessPath()).data.role in ['publisher', 'administrator'];
     }
 
     function canComment() {
@@ -42,6 +44,18 @@ service cloud.firestore {
         && get(accessPath()).data.role in [
           'administrator', 'publisher', 'author', 'commenter'
         ];
+    }
+
+    function articleIsPublished(slug) {
+      return exists(/databases/$(database)/documents/publishedContent/$(slug));
+    }
+
+    function approvedAccessMatchesRequest(uid) {
+      let access = getAfter(/databases/$(database)/documents/studioAccess/$(uid)).data;
+      return access.active == true
+        && access.role == resource.data.requestedRole
+        && access.approvedBy == request.auth.uid
+        && access.approvedAt == request.resource.data.reviewedAt;
     }
 
     function profilePath() {
@@ -61,12 +75,12 @@ service cloud.firestore {
     }
 
     function canPinComments() {
-      return hasStudioAccess()
-        && get(accessPath()).data.role in ['administrator', 'publisher'];
+      return isPublisher();
     }
 
     function validNewComment(slug, commentId) {
-      return canComment()
+      return articleIsPublished(slug)
+        && canComment()
         && exists(profilePath())
         && request.resource.data.keys().hasOnly([
           'articleSlug', 'parentId', 'body', 'authorName',
@@ -86,6 +100,7 @@ service cloud.firestore {
         && request.resource.data.body is string
         && request.resource.data.body.size() > 0
         && request.resource.data.body.size() <= 5000
+        && request.resource.data.body.matches('(?s).*[\\p{L}\\p{M}\\p{N}\\p{P}\\p{S}].*')
         && request.resource.data.authorName == get(profilePath()).data.displayName
         && request.resource.data.authorName is string
         && request.resource.data.authorName.size() <= 200
@@ -118,6 +133,7 @@ service cloud.firestore {
         && request.resource.data.body is string
         && request.resource.data.body.size() > 0
         && request.resource.data.body.size() <= 5000
+        && request.resource.data.body.matches('(?s).*[\\p{L}\\p{M}\\p{N}\\p{P}\\p{S}].*')
         && request.resource.data.edited == true
         && request.resource.data.updatedAt == request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -237,30 +253,12 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn()
         && request.auth.uid == uid
+        && request.auth.token.email_verified == true
         && request.resource.data.keys().hasOnly(['active', 'role', 'email', 'claimedAt'])
         && request.resource.data.active == true
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.role in [
-          'administrator', 'publisher', 'author', 'commenter', 'viewer'
-        ]
-        && (
-          request.resource.data.role == 'commenter'
-          || (
-            exists(invitePath())
-            && get(invitePath()).data.active == true
-            && request.resource.data.role == get(invitePath()).data.role
-          )
-        );
-      allow update: if isAdministrator()
-        && request.resource.data.keys().hasOnly([
-          'active', 'role', 'email', 'claimedAt', 'approvedAt', 'approvedBy'
-        ])
-        && request.resource.data.active is bool
-        && request.resource.data.email == resource.data.email
-        && request.resource.data.claimedAt == resource.data.claimedAt
-        && request.resource.data.role in [
-          'administrator', 'publisher', 'author', 'commenter', 'viewer'
-        ];
+        && request.resource.data.role == 'commenter';
+      allow update: if false;
       allow delete: if false;
     }
 
@@ -283,7 +281,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == uid
         && hasStudioAccess()
-        && get(accessPath()).data.role in ['commenter', 'viewer']
+        && get(accessPath()).data.role in ['commenter', 'viewer', 'author']
         && request.resource.data.keys().hasOnly([
           'uid', 'email', 'currentRole', 'requestedRole', 'status',
           'createdAt', 'reviewedAt', 'reviewedBy', 'lastCancelledAt'
@@ -291,7 +289,7 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.currentRole == get(accessPath()).data.role
-        && request.resource.data.requestedRole in ['author', 'publisher', 'administrator']
+        && request.resource.data.requestedRole in ['author', 'publisher']
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt is string
         && request.resource.data.reviewedAt == ''
@@ -300,7 +298,7 @@ service cloud.firestore {
       allow update: if (
           request.auth.uid == uid
           && hasStudioAccess()
-          && get(accessPath()).data.role in ['commenter', 'viewer']
+          && get(accessPath()).data.role in ['commenter', 'viewer', 'author']
           && resource.data.status == 'pending'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'lastCancelledAt'
@@ -311,8 +309,12 @@ service cloud.firestore {
         ) || (
           request.auth.uid == uid
           && hasStudioAccess()
-          && get(accessPath()).data.role in ['commenter', 'viewer']
-          && resource.data.status in ['denied', 'cancelled']
+          && get(accessPath()).data.role in ['commenter', 'viewer', 'author']
+          && (resource.data.status in ['denied', 'cancelled']
+            || (resource.data.status == 'approved'
+              && get(accessPath()).data.role == 'author'
+              && resource.data.requestedRole == 'author'
+              && request.resource.data.requestedRole == 'publisher'))
           && request.resource.data.keys().hasOnly([
             'uid', 'email', 'currentRole', 'requestedRole', 'status',
             'createdAt', 'reviewedAt', 'reviewedBy', 'lastCancelledAt'
@@ -320,29 +322,21 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.email == request.auth.token.email
           && request.resource.data.currentRole == get(accessPath()).data.role
-          && request.resource.data.requestedRole in ['author', 'publisher', 'administrator']
+          && request.resource.data.requestedRole in ['author', 'publisher']
           && request.resource.data.status == 'pending'
           && request.resource.data.createdAt is string
           && request.resource.data.reviewedAt == ''
           && request.resource.data.reviewedBy == ''
           && request.resource.data.lastCancelledAt is string
           && request.resource.data.lastCancelledAt == resource.data.get('lastCancelledAt', '')
-        ) || (
-          isAdministrator()
-          && resource.data.status == 'pending'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'status', 'reviewedAt', 'reviewedBy'
-          ])
-          && request.resource.data.status in ['approved', 'denied']
-          && request.resource.data.reviewedAt is string
-          && request.resource.data.reviewedBy == request.auth.uid
         );
       allow delete: if false;
     }
 
     match /contentDrafts/{draftId} {
-      allow read: if isAdministrator() || isPublisher()
-        || (isAuthor() && resource.data.ownerUid == request.auth.uid);
+      // Reviewers use the server's current-submission DTO, never legacy private
+      // source/checkpoint metadata on the raw draft document.
+      allow read: if (isAuthor() || isPublisher()) && resource.data.ownerUid == request.auth.uid;
       allow create, update, delete: if false;
     }
 
@@ -383,9 +377,10 @@ service cloud.firestore {
     }
 
     match /publishedContent/{slug}/comments/{commentId} {
-      allow read: if true;
+      allow read: if articleIsPublished(slug);
       allow create: if validNewComment(slug, commentId);
-      allow update: if canComment()
+      allow update: if articleIsPublished(slug)
+        && canComment()
         && preservesCommentIdentity()
         && (
           validOwnCommentEdit(slug, commentId)
@@ -403,9 +398,9 @@ service cloud.firestore {
     }
 
     match /publishedContent/{slug}/commentOwners/{commentId} {
-      allow read: if signedIn()
+      allow read: if articleIsPublished(slug) && signedIn()
         && (resource.data.authorUid == request.auth.uid || isAdministrator());
-      allow create: if canComment()
+      allow create: if articleIsPublished(slug) && canComment()
         && request.resource.data.keys().hasOnly(['commentId', 'authorUid', 'createdAt'])
         && request.resource.data.commentId == commentId
         && request.resource.data.authorUid == request.auth.uid
@@ -416,9 +411,9 @@ service cloud.firestore {
     }
 
     match /publishedContent/{slug}/commentLikes/{likeId} {
-      allow read: if signedIn()
+      allow read: if articleIsPublished(slug) && signedIn()
         && (resource.data.userUid == request.auth.uid || isAdministrator());
-      allow create: if canComment()
+      allow create: if articleIsPublished(slug) && canComment()
         && request.resource.data.keys().hasOnly(['commentId', 'userUid', 'createdAt'])
         && likeId == request.resource.data.commentId + '_' + request.auth.uid
         && request.resource.data.userUid == request.auth.uid
@@ -427,11 +422,17 @@ service cloud.firestore {
         && getAfter(commentPath(slug, request.resource.data.commentId)).data.likeCount
           == get(commentPath(slug, request.resource.data.commentId)).data.likeCount + 1;
       allow update: if false;
-      allow delete: if canComment()
+      allow delete: if articleIsPublished(slug) && canComment()
         && resource.data.userUid == request.auth.uid
         && likeId == resource.data.commentId + '_' + request.auth.uid
         && getAfter(commentPath(slug, resource.data.commentId)).data.likeCount
           == get(commentPath(slug, resource.data.commentId)).data.likeCount - 1;
+    }
+
+    // Metadata and assignments use authenticated server transactions. Browser
+    // writes cannot bypass role, uniqueness, stale-state or nonempty checks.
+    match /contentCollections/{id} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

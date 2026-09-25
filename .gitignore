@@ -174,3 +174,5 @@ docs/Roadmap.pdf
 playwright-report/
 test-results/
 blob-report/
+.blog/
+.test-config/

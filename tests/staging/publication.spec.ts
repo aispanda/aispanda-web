@@ -16,11 +16,12 @@ test('the governed article publishes from the exact staging candidate and remain
 
   const runtime = await page.evaluate(() => (
     globalThis as typeof globalThis & {
-      __AISPANDA_RUNTIME_CONFIG__?: { environment?: string; firebase?: { projectId?: string } };
+      __BLOG_RUNTIME_CONFIG__?: { environment?: string; firebase?: { projectId?: string } };
     }
-  ).__AISPANDA_RUNTIME_CONFIG__);
+  ).__BLOG_RUNTIME_CONFIG__);
   expect(runtime?.environment).toBe('staging');
   expect(runtime?.firebase?.projectId).toBe(expectedProject);
+  await expect(page.locator('[data-studio]')).toHaveAttribute('data-studio-ready', 'true');
 
   const title = page.locator('[data-title]');
   await expect(title).not.toHaveValue('');
@@ -41,7 +42,7 @@ test('the governed article publishes from the exact staging candidate and remain
   const receipt = page.locator('[data-publication-receipt]');
   await expect(receipt).toBeVisible({ timeout: 30_000 });
   const livePath = new URL(await page.locator('[data-publication-live]').getAttribute('href') ?? '').pathname;
-  expect(livePath).toBe(`/${expectedSlug}`);
+  expect(livePath).toBe(`/stories/${expectedSlug}`);
 
   const candidatePublicUrl = new URL(livePath, page.url());
   const response = await page.request.get(candidatePublicUrl.href);

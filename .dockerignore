@@ -3,6 +3,8 @@
 node_modules
 dist
 .astro
+.blog
+.test-config
 docs
 tmp
 *.log
