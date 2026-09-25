@@ -65,3 +65,9 @@ success file or a deployment receipt. RA-002 revalidates the exact staged revisi
 before and after the hook, then writes its own immutable receipt. Every later hook
 invocation requires fresh browser observations; previous PASS files are not reused.
 The isolated Playwright path remains the default for unattended reruns.
+
+### Image storage prerequisite regression — 25 September 2026
+
+A hosted image upload returned 502 because the Firebase web-app config named a bucket that had never been provisioned. A config name is not proof of a working storage resource. The reusable preflight now verifies actual bucket existence/owning project, uniform bucket-level access, public access prevention, and effective runtime object create/get/delete permissions before release. The consumer uses the packaged check for both staging and production. Missing, foreign, public, denied and indeterminate configurations fail closed. Provisioning remains environment-specific.
+
+Both configured buckets were provisioned privately in US-EAST1 with bucket-scoped objectUser access for their respective runtime identities. Retrying the user's selected image in the designated staging fixture succeeded; the image decoded and persisted after Save checkpoint and reload. It remains an unpublished draft change until the publisher publishes. Hosted candidate publication is still required by the release verification.
