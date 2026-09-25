@@ -43,6 +43,12 @@ export const spawnGcloudSync = (args, options = {}) => {
     throw new Error(`Unsupported gcloud process options: ${unsupported.sort().join(', ')}`);
   }
   const invocation = resolveGcloudInvocation(args);
+  // This project's Policy Troubleshooter quota is 15 requests/minute.
+  // Pace every query (including the first across sequential preflight scripts)
+  // without retrying errors or treating an unavailable check as a denial.
+  if (args.slice(0, 3).join(' ') === 'policy-intelligence troubleshoot-policy iam') {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 4500);
+  }
   return requireSuccessfulGcloud(spawnSync(invocation.command, invocation.args, {
     ...options,
     shell: false,
