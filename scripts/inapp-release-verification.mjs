@@ -15,6 +15,10 @@ const boundFields = ['nonce', 'origin', 'projectId', 'commit', 'digest', 'packag
 const safeText = (value, max) => typeof value === 'string' && value.trim().length > 0
   && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
 
+export function verificationWindow(now = Date.now()) {
+  return { issuedAt: new Date(now).toISOString(), expiresAt: new Date(now + 900000).toISOString() };
+}
+
 export function validateReleaseIdentity(profile, environment, head) {
   requireThat(environment.TARGET_URL === profile.origin && environment.TARGET_PROJECT === profile.projectId, 'Controller target differs from approved staging.');
   requireThat(/^[a-f0-9]{40}$/.test(environment.RELEASE_COMMIT || '') && environment.RELEASE_COMMIT === head, 'Controller commit must equal current HEAD.');
@@ -115,7 +119,8 @@ async function main() {
   const identity = validateReleaseIdentity(profile, process.env, head);
   await verifyConfig(profile);
   const directory = resolve(root, '.release-evidence'); await mkdir(directory, { recursive: true });
-  const nonce = randomUUID(), issuedAt = new Date().toISOString(), expiresAt = new Date(Date.now() + 900000).toISOString();
+  const nonce = randomUUID();
+  const { issuedAt, expiresAt } = verificationWindow();
   const resultPath = resolve(directory, `inapp-result-${nonce}.json`);
   let previous;
   try { previous = JSON.parse(await readFile(resolve(directory, 'inapp-last-verified.json'), 'utf8')); }

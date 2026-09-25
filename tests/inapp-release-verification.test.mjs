@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { requiredChecks, validateReleaseIdentity, validateObservations, validateRuntimeConfig, validatePublicHtml } from '../scripts/inapp-release-verification.mjs';
+import { requiredChecks, verificationWindow, validateReleaseIdentity, validateObservations, validateRuntimeConfig, validatePublicHtml } from '../scripts/inapp-release-verification.mjs';
 
 const now = Date.parse('2026-01-01T00:05:00.000Z');
 const identity = { origin: 'https://staging.example.test', projectId: 'staging-example', commit: 'a'.repeat(40),
@@ -40,6 +40,16 @@ test('expired, future, stale and first-run revalidation claims fail closed', () 
   assert.throws(() => validateObservations(request, { ...observations(), completedAt: '2026-01-01T00:06:00Z' }, now));
   assert.throws(() => validateObservations(request, { ...observations(), action: 'reverified' }, now));
   assert.equal(validateObservations({ ...request, requiredAction: 'published-or-reverified' }, { ...observations(), action: 'reverified' }, now).action, 'reverified');
+});
+
+test('issued challenge uses a single clock reading and stays within the strict verification window', () => {
+  const start = Date.parse(request.issuedAt) + 933;
+  const window = verificationWindow(start);
+  assert.equal(Date.parse(window.expiresAt) - Date.parse(window.issuedAt), 900000);
+  assert.equal(validateObservations({ ...request, ...window }, observations(), now).releaseId, observations().releaseId);
+  assert.throws(() => validateObservations({ ...request, ...window,
+    expiresAt: new Date(start + 900001).toISOString() }, observations(), now), /timestamps/);
+  assert.throws(() => validateObservations({ ...request, ...window }, observations(), start + 900001), /expired/);
 });
 
 test('unsafe image paths are rejected and unrelated result fields are not retained', () => {
