@@ -49,3 +49,11 @@ Storybook remains optional for isolated states of actual shared components. Do n
 No AI-114 production deployment is claimed. The staging gate requires `STAGING_STORAGE_STATE`, `STAGING_DRAFT_ID`, `STAGING_EXPECTED_SLUG`, `TARGET_PROJECT` and `PLAYWRIGHT_BASE_URL`. Browser storage state is secret and must remain untracked. Production content must not be used as a disposable fixture.
 
 The current browser journey also verifies that restored sessions remain on account settings and both My articles and bare studio open the list rather than an editor. Five navigation tests cover explicit sign-in to home, callback ordering, cancellation and stale account callbacks. Hosted Google OAuth is still unproven.
+
+## Historical article comments repair — 2026-09-25
+
+Candidate package `9b1496b7aaacda32f3772b5f9806034f5bb4942978dc408c33bf8c7873e73347` repairs native-host routing of retired Comments bundles. The comments compatibility response initializes the current public configuration before importing the current entry. Shared modules retain exports; existing host bundles retain precedence over compatibility fallback. Publication bytes are not rewritten.
+
+Evidence on this exact archive: build PASS; 122 runtime tests PASS; 3 adapter routing tests PASS; actual consumer Playwright/emulator journey PASS, including historical HTML without the modern configuration global, restored-account composer, anonymous sign-in, loaded comment count and byte-identical stored publication. Test-only local-network permission is scoped to the disposable loopback origin; external requests remain blocked.
+
+The prior staging build was deployed, and real Google sign-in/navigation was manually verified after a staging-only Firebase Auth read permission correction. This candidate still requires staging deployment and exact-page verification. The full hosted publication automation remains blocked by missing dedicated `STAGING_STORAGE_STATE` and fixture settings; no production promotion is claimed.

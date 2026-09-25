@@ -25,7 +25,7 @@ export async function loadBlogAdapter({ db, auth, bucket }) {
   const distRoot = resolve(runtime, 'dist');
   const publicContent = await import(pathToFileURL(resolve(runtime, 'server/content-publishing.mjs')));
   return {
-    handle: mountBlog({ distRoot, server: createBlogServer({ db, auth, bucket, siteOrigin: config.siteOrigin, runtimeConfig: config, distRoot }) }),
+    handle: mountBlog({ distRoot, hostDistRoot: resolve(root, 'dist'), server: createBlogServer({ db, auth, bucket, siteOrigin: config.siteOrigin, runtimeConfig: config, distRoot }) }),
     publicContent,
   };
 }
