@@ -1,0 +1,17 @@
+[
+  {
+    "id": "principles",
+    "title": "The 10 principles of building with AI",
+    "excerpt": "Practical principles for human-led AI work: clear intent, evidence, accountability and useful outcomes.",
+    "path": "/principles",
+    "collectionIds": ["building-with-ai"]
+  },
+  {
+    "id": "open-the-ai",
+    "title": "Own the Shared Track. Make AI Providers Compete for the Work.",
+    "excerpt": "An independent public shared track for AI: expand access, preserve choice and make providers compete on results.",
+    "path": "/open-the-ai",
+    "collectionIds": ["ai-access-independence"],
+    "readMinutes": 18
+  }
+]

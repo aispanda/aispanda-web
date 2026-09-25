@@ -6,6 +6,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { initializeApp, deleteApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { setTimeout as delay } from 'node:timers/promises';
 
 test('installed package preserves host and editorial UI across desktop/mobile roles', { timeout: 180000 }, async () => {
@@ -16,6 +18,7 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
   const projectId = 'demo-blog-community';
   const origin = 'http://127.0.0.1:18771';
   let host;
+  let catalogueApp;
   try {
     const env = { ...process.env, AI_VAULT_KEY_B64: randomBytes(32).toString('base64'), METADATA_SERVER_DETECTION: 'none', BLOG_CAPABILITY_ENABLED: 'true', BLOG_EMULATOR_MODE: 'true',
       PUBLIC_SITE_ORIGIN: origin, ARTICLE_SITE_ORIGIN: origin, PORT: '18771', RUNTIME_ENVIRONMENT: 'staging', GOOGLE_CLOUD_PROJECT: projectId,
@@ -37,11 +40,35 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
     for (const path of ['/', '/ai', '/assets', '/account', '/my-articles', '/manage/users', '/manage/collections', '/topics', '/stories']) {
       assert.equal((await fetch(origin + path)).status, 200, path);
     }
+    catalogueApp = initializeApp({ projectId }, 'host-catalogue-test');
+    const registry = getFirestore(catalogueApp).collection('contentCollections').doc('registry');
+    const before = await registry.get();
+    assert.equal(before.exists, false, 'Host catalogue test requires a clean disposable registry');
+    try {
+      await registry.set({ revision: 0, collections: [
+        { id: 'building-with-ai', title: 'Building with AI', type: 'practice', order: 10 },
+        { id: 'ai-access-independence', title: 'AI Access & Independence', type: 'theme', order: 20 },
+      ] });
+      for (const [collection, path] of [['building-with-ai', '/principles'], ['ai-access-independence', '/open-the-ai']]) {
+        const page = await fetch(origin + '/topics/' + collection);
+        assert.equal(page.status, 200);
+        assert.ok((await page.text()).includes(`href="${path}"`), 'Use the original host article URL');
+        assert.equal((await fetch(origin + path)).status, 200, 'Original host route remains served');
+      }
+      const publicArticles = (await (await fetch(origin + '/api/content/articles')).json()).articles;
+      assert.deepEqual(publicArticles.filter(row => row.source === 'host').map(row => row.path).sort(), ['/open-the-ai', '/principles']);
+      for (const image of ['building-with-ai', 'ai-access-independence']) {
+        const response = await fetch(origin + '/images/collections/' + image + '.png');
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get('content-type'), /^image\/png/);
+      }
+    } finally { await registry.delete(); }
     const installed = await installBlog();
     const { runEditorialBrowserJourney } = await import(pathToFileURL(resolve(installed.release, 'runtime/tests/editorial-browser-journey.mjs')));
     const report = await runEditorialBrowserJourney({ origin, packageSha256: installed.packageSha256, artifactDirectory: resolve('.release-evidence/local-browser') });
     console.log(JSON.stringify({ ...report, hostRoutes: 'PASS' }));
   } finally {
+    if (catalogueApp) await deleteApp(catalogueApp);
     if (host && host.exitCode === null) { host.kill(); await new Promise(resolve => host.once('exit', resolve)); }
   }
 });
