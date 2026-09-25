@@ -1,5 +1,36 @@
 {
-  "topics": [],
+  "topics": [
+    {
+      "id": "building-with-ai",
+      "type": "practice",
+      "title": "Building with AI",
+      "subtitle": "Practical ways to turn AI capability into useful, dependable work.",
+      "description": "Principles, experiments and reusable methods for building with AI. Explore how to define the right problem, design human-led workflows, test what matters and improve results without wasting time or resources.",
+      "family": "Practice",
+      "order": 10,
+      "featured": true,
+      "art": {
+        "src": "/images/collections/building-with-ai.png",
+        "smallSrc": "/images/collections/building-with-ai.png",
+        "alt": "Cobalt and glass building blocks form a bridge traced by an amber path, illustrating purposeful construction with AI."
+      }
+    },
+    {
+      "id": "ai-access-independence",
+      "type": "theme",
+      "title": "AI Access & Independence",
+      "subtitle": "Fair access, meaningful choice and independence in an AI-shaped world.",
+      "description": "Ideas for making capable AI accessible without surrendering choice. Explore shared infrastructure, open models, provider competition, affordability and the responsibilities that come with technological independence.",
+      "family": "Theme",
+      "order": 20,
+      "featured": true,
+      "art": {
+        "src": "/images/collections/ai-access-independence.png",
+        "smallSrc": "/images/collections/ai-access-independence.png",
+        "alt": "An open plaza connects varied cobalt and ivory pavilions around a shared golden track, suggesting fair access and independent choice."
+      }
+    }
+  ],
   "articleTopics": {},
   "articlePresentation": {},
   "approvedImages": [

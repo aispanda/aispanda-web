@@ -71,3 +71,25 @@ Verification on the candidate: 126 runtime tests and 3 native-adapter tests pass
 Candidate package `4c780be16f1dccf649391e0c7bfdc2d8cfd5b892e382198e90507da592cf9e7b` adds optional validated local artwork to host article metadata and linked collection cards. Cover descriptions remain accessible; cards contain the entire illustration. Project-specific images, generation prompts, article captions and social metadata stay in AIspanda, outside the shared package. This does not add a CMS upload or asset-versioning feature.
 
 Exact-candidate evidence: 129 runtime tests PASS, host and reusable builds PASS, actual consumer emulator/Playwright journey PASS. Consumer assertions verify both original article routes, matching collection covers and article images, article-specific social tags, image MIME types, image sizes below 250 KB, and API cover metadata. The full hosted publication gate and real browser file upload remain separate outstanding evidence; these image checks do not complete AI-114 or authorize production promotion.
+
+## Reusable hosted journey and production preparation — 2026-09-25
+
+Candidate `51b2db1ddafcb88644c49ccd57957103d12f9078a3372ada163109f374f8998b`
+packages the hosted Playwright journey, isolated-session preflight and setup guide.
+AIspanda imports that journey instead of maintaining another implementation. It
+checks runtime project/origin before authenticated initialization, verifies real
+upload/save/reload/preview/publication and records progress even after a later
+failure. See [the operator instructions](AI_114_STAGING_TEST.md).
+
+The same package preserves consumer branding on generated public pages. A read-only
+production lookup found `contentCollections/registry` absent. The consumer now
+provides only the two approved editorial collection seeds. The real browser/API
+journey verifies empty-registry discovery and that an existing registry is not
+overwritten. No staging QA collection or publication is transferred to production.
+
+Verification: 141 packaged runtime tests PASS; 32 package/adoption/native adapter
+tests PASS, with one Linux-specific symlink test skipped on Windows; both builds
+PASS; installed-package consumer emulator/Playwright journey PASS. The independent
+review's target-check ordering and failure-ledger findings were addressed. Hosted
+upload/publication remains UNPROVEN pending the isolated Google sign-in capture.
+No production promotion or complete hosted acceptance is claimed by these results.

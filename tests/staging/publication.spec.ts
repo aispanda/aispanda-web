@@ -1,51 +1,18 @@
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { loadStagingTestProfile } from '../../scripts/staging-test-profile.mjs';
 
-const required = (name: string) => {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is required for the staging publication gate.`);
-  return value;
-};
-
-const draftId = required('STAGING_DRAFT_ID');
-const expectedSlug = required('STAGING_EXPECTED_SLUG');
-const expectedProject = required('TARGET_PROJECT');
-
-test('the governed article publishes from the exact staging candidate and remains public', async ({ page }) => {
-  await page.goto(`/studio?draft=${encodeURIComponent(draftId)}`);
-  await expect(page.locator('[data-studio]')).toBeVisible({ timeout: 30_000 });
-
-  const runtime = await page.evaluate(() => (
-    globalThis as typeof globalThis & {
-      __BLOG_RUNTIME_CONFIG__?: { environment?: string; firebase?: { projectId?: string } };
-    }
-  ).__BLOG_RUNTIME_CONFIG__);
-  expect(runtime?.environment).toBe('staging');
-  expect(runtime?.firebase?.projectId).toBe(expectedProject);
-  await expect(page.locator('[data-studio]')).toHaveAttribute('data-studio-ready', 'true');
-
-  const title = page.locator('[data-title]');
-  await expect(title).not.toHaveValue('');
-  await expect(page.locator('[data-slug]')).toHaveValue(expectedSlug);
-  const expectedTitle = await title.inputValue();
-
-  await page.locator('[data-preview]').click();
-  const preview = page.locator('[data-preview-dialog]');
-  await expect(preview).toBeVisible({ timeout: 30_000 });
-  await page.locator('[data-close-preview]').click();
-  await expect(preview).not.toBeVisible();
-  await page.locator('[data-open-publish]').click();
-  const publishDialog = page.locator('[data-publish-dialog]');
-  await expect(publishDialog).toBeVisible();
-  await expect(page.locator('[data-publish-readiness]')).toContainText('Ready');
-  await page.locator('[data-publish]').click();
-
-  const receipt = page.locator('[data-publication-receipt]');
-  await expect(receipt).toBeVisible({ timeout: 30_000 });
-  const livePath = new URL(await page.locator('[data-publication-live]').getAttribute('href') ?? '').pathname;
-  expect(livePath).toBe(`/stories/${expectedSlug}`);
-
-  const candidatePublicUrl = new URL(livePath, page.url());
-  const response = await page.request.get(candidatePublicUrl.href);
-  expect(response.status()).toBe(200);
-  expect(await response.text()).toContain(expectedTitle);
+test('designated staging article survives upload, reload, exact publication and anonymous mobile reading', async ({ page }, testInfo) => {
+  test.setTimeout(180000);
+  const profile = await loadStagingTestProfile();
+  const { runHostedPublicationJourney } = await import(pathToFileURL(resolve(profile.release, 'runtime/tests/staging-browser-journey.mjs')).href);
+  let evidence: Record<string, unknown> = { draftId: profile.draftId, origin: profile.origin };
+  let outcome = 'FAIL';
+  try {
+    evidence = await runHostedPublicationJourney({ page, ...profile, onEvidence: progress => { evidence = progress; } });
+    outcome = 'PASS';
+  } finally {
+    await testInfo.attach('publication-evidence', { body: JSON.stringify({ ...evidence, outcome, packageSha256: profile.packageSha256 }), contentType: 'application/json' });
+  }
 });

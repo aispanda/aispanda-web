@@ -40,11 +40,23 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
     for (const path of ['/', '/ai', '/assets', '/account', '/my-articles', '/manage/users', '/manage/collections', '/topics', '/stories']) {
       assert.equal((await fetch(origin + path)).status, 200, path);
     }
+    for (const path of ['/topics', '/stories']) {
+      const html = await (await fetch(origin + path)).text();
+      assert.match(html, /<title>[^<]+ · AIspanda<\/title>/, 'Public catalogue title uses the consumer profile');
+      assert.ok(html.includes('<a href="/">AIspanda</a>'), 'Public catalogue home link uses the consumer profile');
+    }
     catalogueApp = initializeApp({ projectId }, 'host-catalogue-test');
     const registry = getFirestore(catalogueApp).collection('contentCollections').doc('registry');
     const before = await registry.get();
     assert.equal(before.exists, false, 'Host catalogue test requires a clean disposable registry');
+    const seeded = await (await fetch(origin + '/api/content/collections')).json();
+    assert.deepEqual(seeded.collections.map(row => row.id).sort(), ['ai-access-independence', 'building-with-ai'], 'Empty production registries expose only approved editorial seeds, never staging QA');
+    assert.ok(seeded.collections.every(row => row.art?.src && row.art?.alt));
+    assert.equal((await registry.get()).exists, false, 'Reading migration seeds does not write a registry');
     try {
+      await registry.set({ revision: 2, collections: [{ id: 'existing-reader-choice', title: 'Existing choice', type: 'theme', order: 1 }] });
+      const existing = await (await fetch(origin + '/api/content/collections')).json();
+      assert.deepEqual(existing.collections.map(row => row.id), ['existing-reader-choice'], 'An existing registry remains authoritative');
       await registry.set({ revision: 0, collections: [
         { id: 'building-with-ai', title: 'Building with AI', type: 'practice', order: 10 },
         { id: 'ai-access-independence', title: 'AI Access & Independence', type: 'theme', order: 20 },
@@ -53,6 +65,8 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
         const page = await fetch(origin + '/topics/' + collection);
         assert.equal(page.status, 200);
         const html = await page.text();
+        assert.match(html, /<title>[^<]+ · AIspanda<\/title>/, 'Collection detail retains consumer branding');
+        assert.ok(html.includes('<a href="/">AIspanda</a>'));
         assert.ok(html.includes(`href="${path}"`), 'Use the original host article URL');
         assert.ok(html.includes(`/images/articles/${cover}.webp`), 'Collection card shows the article cover');
         const article = await fetch(origin + path);

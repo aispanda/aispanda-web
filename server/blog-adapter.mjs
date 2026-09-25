@@ -13,10 +13,11 @@ export async function loadBlogAdapter({ db, auth, bucket }) {
   const { createBlogServer } = await import(pathToFileURL(resolve(runtime, 'server/server.mjs')));
   const { loadStartupConfig } = await import(pathToFileURL(resolve(runtime, 'server/startup-config.mjs')));
   const { loadBuiltProductionProfile } = await import(pathToFileURL(resolve(runtime, 'server/production-profile.mjs')));
+  const { loadSiteProfile } = await import(pathToFileURL(resolve(runtime, 'site-profile.mjs')));
   const { mountBlog } = await import(pathToFileURL(resolve(release, 'assets/integrations/node-blog.mjs')));
   const config = loadStartupConfig();
   if (config.articleSiteOrigin !== config.siteOrigin) throw new Error('Native blog article origin must match the host origin');
-  if (!config.emulators) loadBuiltProductionProfile(config.siteOrigin, {
+  const site = config.emulators ? loadSiteProfile({ BLOG_SITE_PROFILE: resolve(root, 'config/blog-site.json') }) : loadBuiltProductionProfile(config.siteOrigin, {
     environment: config.environment,
     projectId: config.firebase.projectId,
     stagingProfilePath: config.environment === 'staging'
@@ -26,7 +27,7 @@ export async function loadBlogAdapter({ db, auth, bucket }) {
   const publicContent = await import(pathToFileURL(resolve(runtime, 'server/content-publishing.mjs')));
   const hostArticles = JSON.parse(await readFile(resolve(root, 'config/blog-articles.json'), 'utf8'));
   return {
-    handle: mountBlog({ distRoot, hostDistRoot: resolve(root, 'dist'), server: createBlogServer({ db, auth, bucket, siteOrigin: config.siteOrigin, runtimeConfig: config, distRoot, hostArticles }) }),
+    handle: mountBlog({ distRoot, hostDistRoot: resolve(root, 'dist'), server: createBlogServer({ db, auth, bucket, siteOrigin: config.siteOrigin, siteName: site.siteName, runtimeConfig: config, distRoot, hostArticles }) }),
     publicContent,
   };
 }

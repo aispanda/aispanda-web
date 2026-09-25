@@ -14,4 +14,9 @@ CONTROLLER="$REUSABLE_AI_ASSETS_ROOT/Deployment Automation/staged_release.sh"
 }
 
 export STAGED_RELEASE_CONFIG="${STAGED_RELEASE_CONFIG:-$REPO_ROOT/.staged-release.config}"
+# Detect absent test sessions/fixtures before cloud checks or an expensive build.
+# Hosted identity, role and publication checks still run against the candidate.
+case "${1:-}" in
+  --check|--stage|--verify-stage|--promote) node "$REPO_ROOT/scripts/staging-test-preflight.mjs" ;;
+esac
 exec bash "$CONTROLLER" "$@"
