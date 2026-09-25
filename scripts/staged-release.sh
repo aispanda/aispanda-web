@@ -17,6 +17,11 @@ export STAGED_RELEASE_CONFIG="${STAGED_RELEASE_CONFIG:-$REPO_ROOT/.staged-releas
 # Detect absent test sessions/fixtures before cloud checks or an expensive build.
 # Hosted identity, role and publication checks still run against the candidate.
 case "${1:-}" in
-  --check|--stage|--verify-stage|--promote) node "$REPO_ROOT/scripts/staging-test-preflight.mjs" ;;
+  --check|--stage|--verify-stage|--promote)
+    case "${STAGING_BROWSER_MODE:-isolated}" in
+      isolated) node "$REPO_ROOT/scripts/staging-test-preflight.mjs" ;;
+      inapp) node "$REPO_ROOT/scripts/inapp-release-verification.mjs" --check ;;
+      *) echo "ERROR: Unsupported staging browser mode." >&2; exit 1 ;;
+    esac ;;
 esac
 exec bash "$CONTROLLER" "$@"

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -90,7 +91,8 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
     } finally { await registry.delete(); }
     const installed = await installBlog();
     const { runEditorialBrowserJourney } = await import(pathToFileURL(resolve(installed.release, 'runtime/tests/editorial-browser-journey.mjs')));
-    const report = await runEditorialBrowserJourney({ origin, packageSha256: installed.packageSha256, artifactDirectory: resolve('.release-evidence/local-browser') });
+    const hostArticles = JSON.parse(await readFile(new URL('../config/blog-articles.json', import.meta.url), 'utf8'));
+    const report = await runEditorialBrowserJourney({ origin, packageSha256: installed.packageSha256, artifactDirectory: resolve('.release-evidence/local-browser'), hostArticles });
     console.log(JSON.stringify({ ...report, hostRoutes: 'PASS' }));
   } finally {
     if (catalogueApp) await deleteApp(catalogueApp);

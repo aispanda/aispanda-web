@@ -93,3 +93,11 @@ PASS; installed-package consumer emulator/Playwright journey PASS. The independe
 review's target-check ordering and failure-ledger findings were addressed. Hosted
 upload/publication remains UNPROVEN pending the isolated Google sign-in capture.
 No production promotion or complete hosted acceptance is claimed by these results.
+
+## Article-library consistency correction — 25 September
+
+Installed package `b949943e7a0a2a44c7901adcf080af93c61116a060c68ed141e9a56370eeb03e` fixes the mismatch between collection totals and the administrator's article list. Administrators now default to All site articles, with a separate My articles scope. Configured host pages and other authors' live articles have canonical View links without false Edit/Delete actions. The site view uses published titles and collection assignments; private revisions remain confined to the author's workspace. Unassigned articles are filterable, including retained legacy `collection:none` records. My articles excludes other authors' offline administrative rows and counts.
+
+Verification: 144 runtime tests PASS; 32 packaging/adoption/native adapter tests PASS (one Linux case-sensitivity test skipped on Windows); clean package installation and consumer runtime build PASS; the installed-package AIspanda emulator/Playwright journey PASS. It verifies both existing host article routes and collection filters, scope switching, private refinement isolation, offline scope, author submission, administrator publication, comments compatibility, and mobile administrator pages. The public catalogue contract verifies 101 entries without the former teaser cap and excludes private fields. Independent review found the offline-scope and legacy-unassigned edge cases; both were corrected before this package was tested.
+
+These are local and emulator results. Hosted staging and production deployment require their separate exact-image verification; this entry does not claim either deployment.
