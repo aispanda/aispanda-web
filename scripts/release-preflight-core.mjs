@@ -1,3 +1,29 @@
+import { isAbsolute, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+export const verifyReleaseImageAccess = async ({
+  reusableAssetsRoot, imageRepository, releaseProject, stagingProject, productionProject, runGcloud,
+}) => {
+  if (typeof reusableAssetsRoot !== 'string' || !isAbsolute(reusableAssetsRoot)) {
+    throw new Error('REUSABLE_AI_ASSETS_ROOT must select an absolute RA-002 owner path.');
+  }
+  if (typeof runGcloud !== 'function') throw new Error('Read-only gcloud adapter is required.');
+  const { verifyCloudRunImagePullAccess } = await import(pathToFileURL(resolve(reusableAssetsRoot,
+    'Deployment Automation/scripts/cloud-run-image-access.mjs')).href);
+  const query = args => {
+    const result = runGcloud(args);
+    if (result?.status !== 0 || result?.error) throw new Error('Read-only image access query failed.');
+    return result.stdout;
+  };
+  return verifyCloudRunImagePullAccess({
+    imageRepository, releaseProject, stagingProject, productionProject,
+    describeProject: project => JSON.parse(query(['projects', 'describe', project, '--format=json'])),
+    checkPermission: request => policyTroubleshooterAccess(query(policyTroubleshooterArgs({
+      ...request, billingProject: releaseProject,
+    }))),
+  });
+};
+
 const member = (serviceAccount) => `serviceAccount:${serviceAccount}`;
 
 export const rolesForMember = (policy, serviceAccount) => {

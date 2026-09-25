@@ -1,4 +1,4 @@
-import { policyTroubleshooterAccess, policyTroubleshooterArgs, releaseProjectListsBucket, validateEffectiveDenials, validatePinnedSecretDenials, validateReleaseIsolation } from './release-preflight-core.mjs';
+import { policyTroubleshooterAccess, policyTroubleshooterArgs, releaseProjectListsBucket, validateEffectiveDenials, validatePinnedSecretDenials, validateReleaseIsolation, verifyReleaseImageAccess } from './release-preflight-core.mjs';
 import { spawnGcloudSync } from './gcloud-process.mjs';
 
 const required = (name) => {
@@ -15,6 +15,13 @@ const gcloudJson = (args) => {
 const releaseProject = required('RELEASE_PROJECT');
 const stagingProject = required('STAGING_PROJECT');
 const productionProject = required('PRODUCTION_PROJECT');
+await verifyReleaseImageAccess({
+  reusableAssetsRoot: required('REUSABLE_AI_ASSETS_ROOT'),
+  imageRepository: required('IMAGE_REPOSITORY'),
+  releaseProject, stagingProject, productionProject,
+  runGcloud: args => spawnGcloudSync(args, { encoding: 'utf8' }),
+});
+console.log('PASS: staging and production Cloud Run service agents can pull the exact release repository.');
 const stagingService = required('STAGING_SERVICE');
 const productionService = required('PRODUCTION_SERVICE');
 const region = required('TARGET_REGION');

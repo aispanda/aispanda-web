@@ -10,9 +10,67 @@ import {
   validatePinnedSecretDenials,
   validateReleaseIsolation,
   validateRuntimePrerequisites,
+  verifyReleaseImageAccess,
 } from '../scripts/release-preflight-core.mjs';
 
 const binding = (role, serviceAccount) => ({ role, members: [`serviceAccount:${serviceAccount}`] });
+
+test('consumer image preflight uses the selected RA-002 helper and authoritative service agents before continuing', { skip: !process.env.REUSABLE_AI_ASSETS_ROOT }, async () => {
+  const reusableAssetsRoot = process.env.REUSABLE_AI_ASSETS_ROOT;
+  assert.ok(reusableAssetsRoot, 'Set REUSABLE_AI_ASSETS_ROOT to the RA-002 checkout for this integration test.');
+  for (const productionAccess of ['CAN_ACCESS', 'CANNOT_ACCESS', 'UNKNOWN_INFO']) {
+    const commands = [];
+    let continued = false;
+    const verify = async () => {
+      const result = await verifyReleaseImageAccess({
+        reusableAssetsRoot,
+        releaseProject: 'release-example', stagingProject: 'staging-example', productionProject: 'production-example',
+        imageRepository: 'us-east1-docker.pkg.dev/release-example/images/web',
+        runGcloud: args => {
+          commands.push(args);
+          if (args[0] === 'projects') return { status: 0, stdout: JSON.stringify({
+            projectId: args[2], projectNumber: args[2] === 'staging-example' ? '111111111111' : '222222222222',
+          }) };
+          return { status: 0, stdout: JSON.stringify({ overallAccessState:
+            args.includes('--principal-email=service-222222222222@serverless-robot-prod.iam.gserviceaccount.com')
+              ? productionAccess : 'CAN_ACCESS' }) };
+        },
+      });
+      continued = true;
+      return result;
+    };
+    if (productionAccess === 'CAN_ACCESS') {
+      assert.equal((await verify()).targets.length, 2);
+      assert.equal(continued, true);
+    } else {
+      await assert.rejects(verify(), /production Cloud Run service agent.*lacks verified/);
+      assert.equal(continued, false);
+    }
+    assert.deepEqual(commands.slice(0, 2), [
+      ['projects', 'describe', 'staging-example', '--format=json'],
+      ['projects', 'describe', 'production-example', '--format=json'],
+    ]);
+    assert.deepEqual(commands.slice(2), ['111111111111', '222222222222'].map(number => [
+      'policy-intelligence', 'troubleshoot-policy', 'iam',
+      '//artifactregistry.googleapis.com/projects/release-example/locations/us-east1/repositories/images',
+      `--principal-email=service-${number}@serverless-robot-prod.iam.gserviceaccount.com`,
+      '--permission=artifactregistry.repositories.downloadArtifacts',
+      '--billing-project=release-example', '--format=json',
+    ]));
+  }
+});
+
+test('consumer image preflight fails closed when owner selection or cloud query is unavailable', { skip: !process.env.REUSABLE_AI_ASSETS_ROOT }, async () => {
+  const options = {
+    reusableAssetsRoot: process.env.REUSABLE_AI_ASSETS_ROOT,
+    releaseProject: 'release-example', stagingProject: 'staging-example', productionProject: 'production-example',
+    imageRepository: 'us-east1-docker.pkg.dev/release-example/images/web',
+    runGcloud: () => ({ status: 1, stdout: 'sensitive diagnostic' }),
+  };
+  await assert.rejects(verifyReleaseImageAccess({ ...options, reusableAssetsRoot: undefined }), /absolute RA-002 owner path/);
+  await assert.rejects(verifyReleaseImageAccess(options), error => /metadata query failed/.test(error.message)
+    && !error.message.includes('sensitive diagnostic'));
+});
 
 test('gcloud launcher uses direct execution outside Windows', () => {
   assert.deepEqual(resolveGcloudInvocation(['projects', 'describe', 'example'], { platform: 'linux' }), {
