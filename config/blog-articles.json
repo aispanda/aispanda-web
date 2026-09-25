@@ -4,7 +4,11 @@
     "title": "The 10 principles of building with AI",
     "excerpt": "Practical principles for human-led AI work: clear intent, evidence, accountability and useful outcomes.",
     "path": "/principles",
-    "collectionIds": ["building-with-ai"]
+    "collectionIds": ["building-with-ai"],
+    "art": {
+      "src": "/images/articles/principles-visual.webp",
+      "alt": "A compass guides human-directed building through an evidence check to reusable foundations, with a return path for learning."
+    }
   },
   {
     "id": "open-the-ai",
@@ -12,6 +16,10 @@
     "excerpt": "An independent public shared track for AI: expand access, preserve choice and make providers compete on results.",
     "path": "/open-the-ai",
     "collectionIds": ["ai-access-independence"],
-    "readMinutes": 18
+    "readMinutes": 18,
+    "art": {
+      "src": "/images/articles/shared-track-visual.webp",
+      "alt": "Schools, workshops and researchers share a common track connected to three interchangeable engines through an open routing junction."
+    }
   }
 ]

@@ -49,14 +49,25 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
         { id: 'building-with-ai', title: 'Building with AI', type: 'practice', order: 10 },
         { id: 'ai-access-independence', title: 'AI Access & Independence', type: 'theme', order: 20 },
       ] });
-      for (const [collection, path] of [['building-with-ai', '/principles'], ['ai-access-independence', '/open-the-ai']]) {
+      for (const [collection, path, cover] of [['building-with-ai', '/principles', 'principles-visual'], ['ai-access-independence', '/open-the-ai', 'shared-track-visual']]) {
         const page = await fetch(origin + '/topics/' + collection);
         assert.equal(page.status, 200);
-        assert.ok((await page.text()).includes(`href="${path}"`), 'Use the original host article URL');
-        assert.equal((await fetch(origin + path)).status, 200, 'Original host route remains served');
+        const html = await page.text();
+        assert.ok(html.includes(`href="${path}"`), 'Use the original host article URL');
+        assert.ok(html.includes(`/images/articles/${cover}.webp`), 'Collection card shows the article cover');
+        const article = await fetch(origin + path);
+        assert.equal(article.status, 200, 'Original host route remains served');
+        const articleHtml = await article.text();
+        assert.ok(articleHtml.includes(`/images/articles/${cover}.webp`), 'Article includes the matching visual');
+        assert.ok(articleHtml.includes(`<meta property="og:image" content="https://aispanda.com/images/articles/${cover}.png"`), 'Social preview uses article-specific artwork');
+        const image = await fetch(origin + `/images/articles/${cover}.webp`);
+        assert.equal(image.status, 200);
+        assert.match(image.headers.get('content-type'), /^image\/webp/);
+        assert.ok((await image.arrayBuffer()).byteLength < 250000, 'Article cover stays within the lightweight image budget');
       }
       const publicArticles = (await (await fetch(origin + '/api/content/articles')).json()).articles;
       assert.deepEqual(publicArticles.filter(row => row.source === 'host').map(row => row.path).sort(), ['/open-the-ai', '/principles']);
+      assert.ok(publicArticles.filter(row => row.source === 'host').every(row => row.art?.src && row.art.alt), 'Public API preserves cover and description');
       for (const image of ['building-with-ai', 'ai-access-independence']) {
         const response = await fetch(origin + '/images/collections/' + image + '.png');
         assert.equal(response.status, 200);

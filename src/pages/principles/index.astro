@@ -1,11 +1,15 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { principles } from '@/data/site';
+import ArticleVisual from '@/components/ArticleVisual.astro';
+import articleCatalogue from '../../../config/blog-articles.json';
+const article = articleCatalogue.find(row => row.id === 'principles')!;
 ---
 
 <BaseLayout
   title="Principles"
   description="The 10 principles of building with AI: human intent, proof before trust, owned foundations, and value that beats empty token burn."
+  image="/images/articles/principles-visual.png" imageWidth={1536} imageHeight={1024} imageAlt={article.art.alt}
 >
   <article class="principles-page">
     <header class="principles-hero">
@@ -23,6 +27,10 @@ import { principles } from '@/data/site';
         </div>
       </div>
     </header>
+
+    <div class="shell">
+      <ArticleVisual art={article.art} summary="Human intent sets the direction. Test the work, build on reusable foundations, and carry each lesson into the next decision." />
+    </div>
 
     <div class="shell principles-layout" id="sutras">
       <details class="principles-jump">
