@@ -42,6 +42,31 @@ test('rewrites an upstream absolute redirect to the canonical AIspanda origin', 
   assert.equal(response.headers.get('location'), 'https://aispanda.com/cms/admin/login?redirect=%2Fcms%2Fadmin');
 });
 
+test('removes stale compression headers from decoded upstream responses', async () => {
+  let observed;
+  const proxy = createCmsProxy({
+    targetOrigin: 'https://image-cms.example.run.app',
+    identityToken: async () => 'Bearer cloud-run-token',
+    fetchImpl: async (_url, init) => {
+      observed = init;
+      return new Response('decoded html', {
+        headers: {
+          'content-encoding': 'gzip',
+          'content-length': '999',
+          'content-type': 'text/html',
+        },
+      });
+    },
+  });
+  const response = await proxy(new Request('https://aispanda.com/cms/admin/login', {
+    headers: { 'Accept-Encoding': 'gzip, br' },
+  }));
+  assert.equal(observed.headers.get('Accept-Encoding'), 'identity');
+  assert.equal(response.headers.has('content-encoding'), false);
+  assert.equal(response.headers.has('content-length'), false);
+  assert.equal(await response.text(), 'decoded html');
+});
+
 test('rejects non-HTTPS proxy targets', () => {
   assert.throws(() => createCmsProxy({ targetOrigin: 'http://image-cms.internal' }), /HTTPS origin/);
 });

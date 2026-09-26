@@ -46,6 +46,10 @@ export const createCmsProxy = ({
     headers.set('X-Serverless-Authorization', await resolveIdentityToken());
     headers.set('X-Forwarded-Host', incoming.host);
     headers.set('X-Forwarded-Proto', incoming.protocol.slice(0, -1));
+    // Node's fetch transparently decodes compressed upstream responses. Ask the
+    // CMS for identity encoding and remove stale representation headers below
+    // so browsers never try to decode an already-decoded stream.
+    headers.set('Accept-Encoding', 'identity');
 
     const response = await fetchImpl(upstreamURL, {
       method: request.method,
@@ -56,6 +60,8 @@ export const createCmsProxy = ({
     });
     const responseHeaders = new Headers(response.headers);
     for (const name of hopByHopHeaders) responseHeaders.delete(name);
+    responseHeaders.delete('content-encoding');
+    responseHeaders.delete('content-length');
     const location = responseHeaders.get('location');
     if (location) {
       const resolved = new URL(location, target);
