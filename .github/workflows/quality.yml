@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  checks: read
   issues: read
   pull-requests: read
 
@@ -27,8 +28,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:ai
+      - run: pnpm test:content
+      - run: pnpm test:rules
       - run: pnpm build
       - run: pnpm exec playwright install chromium
       - run: pnpm test:e2e
@@ -72,17 +79,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          candidate_short_sha="${CANDIDATE_SHA:0:7}"
           attempts=0
           preview_url=""
           until [ -n "$preview_url" ]; do
-            comments="$(gh pr view "$PULL_REQUEST_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments)"
-            preview_url="$(printf '%s' "$comments" | jq -r --arg sha "$candidate_short_sha" '
-              [ .comments[]
-                | select(.author.login == "cloudflare-workers-and-pages")
-                | select(.body | test("<code>" + $sha + "</code>"))
-                | try (.body | capture("Preview URL:</strong></td><td>[[:space:]]*<a href=.(?<url>https://[A-Za-z0-9._/-]+)").url) catch empty
-              ] | last // empty
+            checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$CANDIDATE_SHA/check-runs?per_page=100")"
+            preview_url="$(printf '%s' "$checks" | jq -r --arg sha "$CANDIDATE_SHA" '
+              [ .check_runs[]
+                | select(.app.slug == "cloudflare-workers-and-pages" and .name == "Cloudflare Pages")
+                | select(.head_sha == $sha and .conclusion == "success")
+              ] | sort_by(.completed_at) | reverse
+              | [ .[]
+                | try (.output.summary | capture("Preview URL:</strong></td><td>[[:space:]]*<a href=.(?<url>https://[a-f0-9]{8}\\.aispanda-web-preview\\.pages\\.dev)[\"\u0027]").url) catch empty
+              ] | first // empty
             ')"
             if [ -n "$preview_url" ]; then
               break

@@ -1,6 +1,9 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Comments from '@/components/Comments.astro';
+import ArticleVisual from '@/components/ArticleVisual.astro';
+import articleCatalogue from '../../../config/blog-articles.json';
+const article = articleCatalogue.find(row => row.id === 'open-the-ai')!;
 import { insights } from '@/data/site';
 import { getEntry, render } from 'astro:content';
 
@@ -20,7 +23,8 @@ const { Content, headings } = await render(entry);
 const toc = headings.filter((heading) => heading.depth === 2);
 ---
 
-<BaseLayout title={insight.title} description={insight.summary}>
+<BaseLayout title={insight.title} description={insight.summary}
+  image="/images/articles/shared-track-visual.png" imageWidth={1536} imageHeight={1024} imageAlt={article.art.alt}>
   <article class="insight-article">
     <div class="shell insight-layout">
       {
@@ -65,6 +69,8 @@ const toc = headings.filter((heading) => heading.depth === 2);
           <h1>{insight.title}</h1>
           <p class="lede">{insight.summary}</p>
         </header>
+
+        <ArticleVisual art={article.art} summary="Keep shared infrastructure open to different providers. Route work by demonstrated value so schools, researchers and smaller firms retain access and choice." />
 
         <section class="content-card insight-body">
           <div class="insight-prose">

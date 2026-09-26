@@ -1,0 +1,43 @@
+{
+  "schema_version": "governance-consumer-profiles-v1",
+  "profiles": [
+    {
+      "id": "aispanda-web",
+      "webhook_path": "authorize-build-start-ai95-candidate",
+      "repository": "github.com/aispanda/aispanda-web",
+      "actions": [
+        "local_build_start",
+        "pr_merge_gate"
+      ],
+      "callers": null,
+      "governance_policy_version": "governance-policy-v1.1",
+      "story_contract_version": "story-contract-v2"
+    },
+    {
+      "id": "aispanda-governance",
+      "webhook_path": "authorize-build-start-ai99-governance-candidate",
+      "repository": "github.com/aispanda/aispanda-governance",
+      "actions": [
+        "local_build_start"
+      ],
+      "callers": [
+        "codex"
+      ],
+      "governance_policy_version": "governance-policy-v1.1",
+      "story_contract_version": "story-contract-v2"
+    },
+    {
+      "id": "reusable-ai-assets-private",
+      "webhook_path": "authorize-build-start-reusable-ai-assets-private",
+      "repository": "github.com/aispanda/reusable-ai-assets-private",
+      "actions": [
+        "local_build_start"
+      ],
+      "callers": [
+        "codex"
+      ],
+      "governance_policy_version": "governance-policy-v1.1",
+      "story_contract_version": "story-contract-v2"
+    }
+  ]
+}

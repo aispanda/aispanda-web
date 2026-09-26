@@ -149,6 +149,9 @@ vite.config.ts.timestamp-*
 
 # Local deployment inputs and credentials
 .deployment.config
+.staged-release.config
+.release-evidence/
+.staging-auth/
 .claude/
 *.pem
 *.key
@@ -171,3 +174,5 @@ docs/Roadmap.pdf
 playwright-report/
 test-results/
 blob-report/
+.blog/
+.test-config/

@@ -1,0 +1,17 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-application
+    args:
+      - build
+      - --tag
+      - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+      - .
+  - name: gcr.io/cloud-builders/docker
+    id: push-application
+    args:
+      - push
+      - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+images:
+  - us-east1-docker.pkg.dev/$PROJECT_ID/aispanda-web/aispanda-web:$COMMIT_SHA
+options:
+  logging: CLOUD_LOGGING_ONLY

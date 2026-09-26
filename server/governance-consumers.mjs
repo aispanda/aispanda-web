@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
+
 import { GOVERNANCE_POLICY_VERSION, STORY_CONTRACT_VERSION } from './governance-contract.mjs';
+
+export const GOVERNANCE_CONSUMER_PROFILE_SCHEMA_VERSION = 'governance-consumer-profiles-v1';
+
+const PROFILE_DOCUMENT_KEYS = Object.freeze(['schema_version', 'profiles']);
 
 const PROFILE_KEYS = Object.freeze([
   'id',
@@ -12,29 +18,16 @@ const PROFILE_KEYS = Object.freeze([
 
 const REPOSITORY_SEGMENT = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/;
 
-export const GOVERNANCE_CONSUMER_PROFILES = Object.freeze([
-  Object.freeze({
-    id: 'aispanda-web',
-    webhook_path: 'authorize-build-start-ai95-candidate',
-    repository: 'github.com/aispanda/aispanda-web',
-    actions: Object.freeze(['local_build_start', 'pr_merge_gate']),
-    callers: null,
-    governance_policy_version: GOVERNANCE_POLICY_VERSION,
-    story_contract_version: STORY_CONTRACT_VERSION,
-  }),
-  Object.freeze({
-    id: 'aispanda-governance',
-    webhook_path: 'authorize-build-start-ai99-governance-candidate',
-    repository: 'github.com/aispanda/aispanda-governance',
-    actions: Object.freeze(['local_build_start']),
-    callers: Object.freeze(['codex']),
-    governance_policy_version: GOVERNANCE_POLICY_VERSION,
-    story_contract_version: STORY_CONTRACT_VERSION,
-  }),
-]);
-
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function freezeProfile(profile) {
+  return Object.freeze({
+    ...profile,
+    actions: Object.freeze([...profile.actions]),
+    callers: profile.callers === null ? null : Object.freeze([...profile.callers]),
+  });
 }
 
 export function normalizeConsumerRepository(value) {
@@ -74,6 +67,8 @@ export function normalizeConsumerRepository(value) {
 }
 
 export function validateConsumerProfiles(profiles = GOVERNANCE_CONSUMER_PROFILES) {
+  if (!Array.isArray(profiles) || profiles.length === 0) return ['CONSUMER_PROFILE_DOCUMENT_INVALID'];
+
   const violations = [];
   const ids = new Set();
   const webhookPaths = new Set();
@@ -101,7 +96,7 @@ export function validateConsumerProfiles(profiles = GOVERNANCE_CONSUMER_PROFILES
     if (!Array.isArray(profile.actions) || profile.actions.length === 0 || new Set(profile.actions).size !== profile.actions.length || profile.actions.some((action) => !['local_build_start', 'pr_merge_gate'].includes(action))) {
       violations.push('CONSUMER_PROFILE_INVALID');
     }
-    if (profile.callers !== null && (!Array.isArray(profile.callers) || profile.callers.length !== 1 || profile.callers.some((caller) => !/^[a-z0-9][a-z0-9._:-]{2,63}$/i.test(caller)))) {
+    if (profile.callers !== null && (!Array.isArray(profile.callers) || profile.callers.length !== 1 || profile.callers.some((caller) => typeof caller !== 'string' || !/^[a-z0-9][a-z0-9._:-]{2,63}$/i.test(caller)))) {
       violations.push('CONSUMER_PROFILE_INVALID');
     }
     if (profile.governance_policy_version !== GOVERNANCE_POLICY_VERSION) violations.push('POLICY_VERSION_MISMATCH');
@@ -110,6 +105,29 @@ export function validateConsumerProfiles(profiles = GOVERNANCE_CONSUMER_PROFILES
 
   return [...new Set(violations)];
 }
+
+export function validateConsumerProfileDocument(document) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) return ['CONSUMER_PROFILE_DOCUMENT_INVALID'];
+
+  const violations = [];
+  if (Object.keys(document).sort().join('|') !== [...PROFILE_DOCUMENT_KEYS].sort().join('|')) violations.push('CONSUMER_PROFILE_DOCUMENT_INVALID');
+  if (document.schema_version !== GOVERNANCE_CONSUMER_PROFILE_SCHEMA_VERSION) violations.push('CONSUMER_PROFILE_SCHEMA_VERSION_MISMATCH');
+  violations.push(...validateConsumerProfiles(document.profiles));
+  return [...new Set(violations)];
+}
+
+const loadedProfileDocument = JSON.parse(readFileSync(new URL('./governance-consumer-profiles.json', import.meta.url), 'utf8'));
+const loadedProfileViolations = validateConsumerProfileDocument(loadedProfileDocument);
+if (loadedProfileViolations.length) {
+  throw new Error(`Invalid governance consumer profile document: ${loadedProfileViolations.join(', ')}`);
+}
+
+export const GOVERNANCE_CONSUMER_PROFILE_DOCUMENT = Object.freeze({
+  schema_version: loadedProfileDocument.schema_version,
+  profiles: Object.freeze(loadedProfileDocument.profiles.map(freezeProfile)),
+});
+
+export const GOVERNANCE_CONSUMER_PROFILES = GOVERNANCE_CONSUMER_PROFILE_DOCUMENT.profiles;
 
 export function resolveConsumerProfile({
   consumerId,
@@ -131,6 +149,7 @@ export function resolveConsumerProfile({
   if (normalizedRepository !== profile.repository) violations.push('CONSUMER_REPOSITORY_MISMATCH');
   if (!profile.actions.includes(text(action))) violations.push('ACTION_NOT_APPROVED');
   if (profile.callers !== null && !profile.callers.includes(text(caller))) violations.push('CALLER_NOT_APPROVED');
+  if (profile.actions.includes('pr_merge_gate') && text(action) === 'pr_merge_gate' && text(caller) !== 'github-actions' && !violations.includes('CALLER_NOT_APPROVED')) violations.push('CALLER_NOT_APPROVED');
   if (text(governancePolicyVersion) !== profile.governance_policy_version) violations.push('POLICY_VERSION_MISMATCH');
   if (text(storyContractVersion) !== profile.story_contract_version) violations.push('SYNTAX_VERSION_MISMATCH');
   return {

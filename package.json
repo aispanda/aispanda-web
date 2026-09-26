@@ -9,9 +9,14 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-content-boundary.mjs dist",
+    "build": "pnpm run validate:profile && pnpm run validate:content && astro build && node scripts/validate-runtime-publication.mjs && node scripts/validate-content-boundary.mjs dist",
     "preview": "astro preview",
     "test:ai": "node --test tests/ai-connections.test.ts tests/ai-vault-core.test.mjs",
+    "test:content": "node --test tests/content-publishing.test.mjs",
+    "test:runtime": "node --test tests/runtime-config.test.mjs",
+    "test:release-preflight": "node --test tests/release-preflight.test.mjs",
+    "test:staging": "playwright test --config=playwright.staging.config.ts",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-aispanda \"node --test tests/firestore-rules.test.mjs\"",
     "test:governance": "node scripts/build-ai95-parent-candidate.mjs --check && node scripts/build-ai95-baseline-candidate.mjs --check && node scripts/build-ai95-github-governance-workflow.mjs --check && node --test --test-concurrency=1 tests/governance-contract.test.mjs tests/governance-consumers.test.mjs tests/governance-baseline.test.mjs tests/governed-task-launcher.test.mjs tests/authorize-build-start-workflow.test.mjs tests/ai95-governance-baseline-workflow.test.mjs tests/authorize-build-start-ai95-integration-candidate.test.mjs tests/ai95-governance-baseline-merge-candidate.test.mjs tests/ai-governance-workflow.test.mjs tests/pr-merge-gate.test.mjs",
     "test:e2e": "playwright test",
     "validate:profile": "node scripts/validate-site-profile.mjs",
@@ -19,11 +24,19 @@
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.3",
+    "@tiptap/core": "3.30.3",
+    "@tiptap/extension-link": "3.30.3",
+    "@tiptap/html": "3.30.3",
+    "@tiptap/starter-kit": "3.30.3",
     "astro": "7.2.0",
     "firebase": "^12.17.1",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "sanitize-html": "2.17.7",
+    "sharp": "0.35.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1"
+    "@firebase/rules-unit-testing": "5.0.2",
+    "@playwright/test": "^1.62.1",
+    "firebase-tools": "15.28.1"
   }
 }

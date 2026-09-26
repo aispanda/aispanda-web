@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  GOVERNANCE_CONSUMER_PROFILE_DOCUMENT,
+  GOVERNANCE_CONSUMER_PROFILE_SCHEMA_VERSION,
   GOVERNANCE_CONSUMER_PROFILES,
   normalizeConsumerRepository,
   resolveConsumerProfile,
+  validateConsumerProfileDocument,
   validateConsumerProfiles,
 } from '../server/governance-consumers.mjs';
 
@@ -17,15 +20,39 @@ const request = Object.freeze({
   storyContractVersion: 'story-contract-v2',
 });
 
+const privateRepositoryRequest = Object.freeze({
+  ...request,
+  consumerId: 'reusable-ai-assets-private',
+  repository: 'github.com/aispanda/reusable-ai-assets-private',
+});
+
 test('the approved consumer registry is exact, versioned, and free of duplicates', () => {
+  assert.equal(GOVERNANCE_CONSUMER_PROFILE_DOCUMENT.schema_version, GOVERNANCE_CONSUMER_PROFILE_SCHEMA_VERSION);
+  assert.deepEqual(validateConsumerProfileDocument(GOVERNANCE_CONSUMER_PROFILE_DOCUMENT), []);
   assert.deepEqual(validateConsumerProfiles(), []);
   assert.deepEqual(
     GOVERNANCE_CONSUMER_PROFILES.map(({ id, webhook_path, repository }) => ({ id, webhook_path, repository })),
     [
       { id: 'aispanda-web', webhook_path: 'authorize-build-start-ai95-candidate', repository: 'github.com/aispanda/aispanda-web' },
       { id: 'aispanda-governance', webhook_path: 'authorize-build-start-ai99-governance-candidate', repository: 'github.com/aispanda/aispanda-governance' },
+      { id: 'reusable-ai-assets-private', webhook_path: 'authorize-build-start-reusable-ai-assets-private', repository: 'github.com/aispanda/reusable-ai-assets-private' },
     ],
   );
+});
+
+test('the profile document schema rejects drift and caller-supplied trust fields', () => {
+  assert.deepEqual(validateConsumerProfileDocument({
+    ...GOVERNANCE_CONSUMER_PROFILE_DOCUMENT,
+    schema_version: 'governance-consumer-profiles-v2',
+  }), ['CONSUMER_PROFILE_SCHEMA_VERSION_MISMATCH']);
+  assert.ok(validateConsumerProfileDocument({
+    ...GOVERNANCE_CONSUMER_PROFILE_DOCUMENT,
+    self_registration: true,
+  }).includes('CONSUMER_PROFILE_DOCUMENT_INVALID'));
+  assert.deepEqual(validateConsumerProfileDocument({
+    schema_version: GOVERNANCE_CONSUMER_PROFILE_SCHEMA_VERSION,
+    profiles: [],
+  }), ['CONSUMER_PROFILE_DOCUMENT_INVALID']);
 });
 
 test('approved GitHub repository spellings normalize to one exact identity', () => {
@@ -39,7 +66,7 @@ test('approved GitHub repository spellings normalize to one exact identity', () 
   }
 });
 
-test('the website and governance repositories resolve only through trusted profiles', () => {
+test('all three approved repositories resolve only through trusted profiles', () => {
   assert.equal(resolveConsumerProfile(request).approved, true);
   assert.equal(resolveConsumerProfile({
     ...request,
@@ -48,6 +75,7 @@ test('the website and governance repositories resolve only through trusted profi
     action: 'pr_merge_gate',
     caller: 'github-actions',
   }).approved, true);
+  assert.equal(resolveConsumerProfile(privateRepositoryRequest).approved, true);
 });
 
 test('the governance consumer cannot broaden its approved action, caller, or versions', () => {
@@ -55,6 +83,15 @@ test('the governance consumer cannot broaden its approved action, caller, or ver
   assert.deepEqual(resolveConsumerProfile({ ...request, caller: 'github-actions' }).violation_codes, ['CALLER_NOT_APPROVED']);
   assert.deepEqual(resolveConsumerProfile({ ...request, governancePolicyVersion: 'governance-policy-v2' }).violation_codes, ['POLICY_VERSION_MISMATCH']);
   assert.deepEqual(resolveConsumerProfile({ ...request, storyContractVersion: 'story-contract-v3' }).violation_codes, ['SYNTAX_VERSION_MISMATCH']);
+});
+
+test('the private reusable-assets consumer is exact and limited to codex local build start', () => {
+  assert.equal(resolveConsumerProfile(privateRepositoryRequest).approved, true);
+  assert.deepEqual(resolveConsumerProfile({ ...privateRepositoryRequest, repository: 'github.com/aispanda/reusable-ai-assets-private-evil' }).violation_codes, ['CONSUMER_REPOSITORY_MISMATCH']);
+  assert.deepEqual(resolveConsumerProfile({ ...privateRepositoryRequest, action: 'pr_merge_gate' }).violation_codes, ['ACTION_NOT_APPROVED']);
+  assert.deepEqual(resolveConsumerProfile({ ...privateRepositoryRequest, caller: 'github-actions' }).violation_codes, ['CALLER_NOT_APPROVED']);
+  assert.deepEqual(resolveConsumerProfile({ ...privateRepositoryRequest, governancePolicyVersion: 'governance-policy-v2' }).violation_codes, ['POLICY_VERSION_MISMATCH']);
+  assert.deepEqual(resolveConsumerProfile({ ...privateRepositoryRequest, storyContractVersion: 'story-contract-v3' }).violation_codes, ['SYNTAX_VERSION_MISMATCH']);
 });
 
 test('lookalikes, wildcards, encoded paths, and non-GitHub hosts fail closed', () => {
@@ -128,6 +165,12 @@ test('invalid, duplicate, or secret-bearing profiles invalidate the registry', (
     actions: ['local_build_start', 'local_build_start'],
   };
   assert.ok(validateConsumerProfiles([duplicateAction]).includes('CONSUMER_PROFILE_INVALID'));
+
+  const nonStringCaller = {
+    ...GOVERNANCE_CONSUMER_PROFILES[1],
+    callers: [123],
+  };
+  assert.ok(validateConsumerProfiles([nonStringCaller]).includes('CONSUMER_PROFILE_INVALID'));
 });
 
 test('a trusted route profile cannot be replaced by cross-profile request claims', () => {

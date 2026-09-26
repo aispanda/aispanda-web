@@ -2,10 +2,18 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { evaluateMergeBaseline } from '../server/governance-baseline.mjs';
 
-import { resolveConsumerProfile } from '../server/governance-consumers.mjs';
+import {
+  addConsumerProfileRoutes,
+  AUTHORIZATION_REQUEST_CONTEXT_NODE,
+  consumerRepositoryRootPlaceholder,
+  GIT_ATTESTATION_VIOLATION_CODES,
+} from '../server/governance-consumer-workflow.mjs';
+import { GOVERNANCE_CONSUMER_PROFILES, resolveConsumerProfile } from '../server/governance-consumers.mjs';
 
 const workflowPath = new URL('../workflows/authorize-build-start-ai95.integration-candidate.local.json', import.meta.url);
+const sourceWorkflowPath = new URL('../workflows/authorize-build-start.local.json', import.meta.url);
 const contractFixturePath = new URL('./fixtures/governance-contract-v2.json', import.meta.url);
 
 async function loadWorkflow() {
@@ -22,6 +30,22 @@ function destination(workflow, from, output = 0) {
   const connections = workflow.connections[from]?.main?.[output];
   assert.equal(connections?.length, 1, `${from} output ${output} must have one destination`);
   return connections[0].node;
+}
+
+function consumerRoute(workflow, consumerId, profiles = GOVERNANCE_CONSUMER_PROFILES) {
+  const profile = profiles.find((candidate) => candidate.id === consumerId);
+  assert.ok(profile, `missing consumer profile: ${consumerId}`);
+  const webhook = workflow.nodes.find((candidate) => candidate.parameters?.path === profile.webhook_path);
+  assert.ok(webhook, `missing consumer webhook: ${consumerId}`);
+  const normalizer = workflowNode(workflow, destination(workflow, webhook.name));
+  const next = workflowNode(workflow, destination(workflow, normalizer.name));
+  const mergeRouter = next.type === 'n8n-nodes-base.if' ? next : null;
+  const pathGuard = mergeRouter ? workflowNode(workflow, destination(workflow, mergeRouter.name, 1)) : next;
+  const gitStatus = workflowNode(workflow, destination(workflow, pathGuard.name));
+  const gitHead = workflowNode(workflow, destination(workflow, gitStatus.name));
+  const gitOrigin = workflowNode(workflow, destination(workflow, gitHead.name));
+  const attestor = workflowNode(workflow, destination(workflow, gitOrigin.name));
+  return { profile, webhook, normalizer, mergeRouter, pathGuard, gitStatus, gitHead, gitOrigin, attestor };
 }
 
 function parentDecision(overrides = {}) {
@@ -79,6 +103,44 @@ function runFinalizer(code, child, parent) {
   }).json;
 }
 
+function classifyConsumerRequest(workflow, issue, consumerId, body, observed = {}) {
+  const route = consumerRoute(workflow, consumerId);
+  const normalizer = route.normalizer.parameters.jsCode;
+  const normalized = new Function('$json', normalizer)({ body }).json;
+  const runtimeRoot = `C:/Governed/${consumerId}`;
+  let attested = normalized;
+  if (!(route.mergeRouter && normalized.request.permitted_action === 'pr_merge_gate')) {
+  const guardCode = route.pathGuard.parameters.jsCode.replaceAll(consumerRepositoryRootPlaceholder(consumerId), runtimeRoot);
+  const guarded = new Function('$json', guardCode)(normalized).json;
+  const observedRepository = observed.repository ?? route.profile.repository;
+  const observedBranch = observed.branch ?? body.branch_name;
+  const observedHead = observed.head ?? body.head_sha;
+  const configItems = (observed.configItems ?? [{ 'remote.origin.url': `https://${observedRepository}.git` }]).map((json) => ({ json }));
+  attested = new Function('$input', '$', route.attestor.parameters.jsCode)(
+    { all: () => configItems },
+    (name) => {
+      if (name === route.pathGuard.name) return { first: () => ({ json: guarded }) };
+      if (name === route.gitStatus.name) return { first: () => ({ json: { current: observedBranch } }) };
+      if (name === route.gitHead.name) return { first: () => ({ json: { hash: observedHead } }) };
+      assert.fail(`unexpected attestor input: ${name}`);
+    },
+  )[0].json;
+  }
+  const context = new Function('$json', workflowNode(workflow, AUTHORIZATION_REQUEST_CONTEXT_NODE).parameters.jsCode)(attested).json;
+  const validator = workflowNode(workflow, 'Validate Contract and Branch').parameters.jsCode;
+  const validated = new Function('$json', '$', validator)({ data: { issue } }, (name) => {
+    assert.equal(name, AUTHORIZATION_REQUEST_CONTEXT_NODE);
+    return { first: () => ({ json: context }) };
+  }).json;
+  const hashed = {
+    ...validated,
+    computed_contract_hash: createHash('sha256').update(validated.contract_hash_input).digest('hex'),
+  };
+  const finalized = new Function('$json', workflowNode(workflow, 'Finalize Contract Hash').parameters.jsCode)(hashed).json;
+  const bounded = new Function('$json', workflowNode(workflow, 'Enforce Branch Boundary').parameters.jsCode)(finalized).json;
+  return new Function('$json', workflowNode(workflow, 'Classify Authorization Outcome').parameters.jsCode)(bounded).json;
+}
+
 test('inactive candidate calls storage only after an exact parent PASS', async () => {
   const workflow = await loadWorkflow();
   assert.equal(workflow.active, false);
@@ -87,15 +149,38 @@ test('inactive candidate calls storage only after an exact parent PASS', async (
   assert.equal(workflow.settings.saveDataErrorExecution, 'none');
   assert.equal(workflow.settings.saveManualExecutions, false);
   assert.equal(workflow.settings.saveExecutionProgress, false);
-  assert.equal(workflowNode(workflow, 'Authorized Build-Start Request').parameters.path, 'authorize-build-start-ai95-candidate');
-  assert.equal(workflowNode(workflow, 'Authorized Build-Start Request').parameters.authentication, 'headerAuth');
-  assert.equal(workflowNode(workflow, 'Governance Consumer Build-Start Request').parameters.path, 'authorize-build-start-ai99-governance-candidate');
-  assert.equal(workflowNode(workflow, 'Governance Consumer Build-Start Request').parameters.authentication, 'headerAuth');
-  assert.equal(workflowNode(workflow, 'Governance Consumer Build-Start Request').credentials, undefined);
-  assert.equal(destination(workflow, 'Governance Consumer Build-Start Request'), 'Normalize Governance Consumer Request');
-  assert.equal(destination(workflow, 'Normalize Governance Consumer Request'), 'Authorization Request Context');
-  assert.equal(destination(workflow, 'Normalize Authorization Request'), 'Authorization Request Context');
-  assert.equal(destination(workflow, 'Authorization Request Context'), 'Request Has Task ID');
+  assert.match(workflow.meta.governanceConsumerProfilesSha256, /^[0-9a-f]{64}$/);
+  assert.equal(workflow.meta.governanceConsumerProfileSchemaVersion, 'governance-consumer-profiles-v1');
+  for (const [index, profile] of GOVERNANCE_CONSUMER_PROFILES.entries()) {
+    const { webhook, normalizer, mergeRouter, pathGuard, gitStatus, gitHead, gitOrigin, attestor } = consumerRoute(workflow, profile.id);
+    assert.equal(webhook.parameters.path, profile.webhook_path);
+    assert.equal(webhook.parameters.authentication, 'headerAuth');
+    if (index > 0) assert.equal(webhook.credentials, undefined);
+    assert.equal(destination(workflow, webhook.name), normalizer.name);
+    assert.equal(destination(workflow, normalizer.name), mergeRouter?.name ?? pathGuard.name);
+    if (mergeRouter) {
+      assert.equal(destination(workflow, mergeRouter.name, 0), AUTHORIZATION_REQUEST_CONTEXT_NODE);
+      assert.equal(destination(workflow, mergeRouter.name, 1), pathGuard.name);
+      assert.deepEqual(mergeRouter.parameters.conditions.conditions[0], {
+        id: `merge-action-${profile.id}`,
+        leftValue: '={{ $json.request.permitted_action }}',
+        rightValue: 'pr_merge_gate',
+        operator: { type: 'string', operation: 'equals' },
+      });
+    }
+    assert.equal(destination(workflow, pathGuard.name), gitStatus.name);
+    assert.equal(destination(workflow, gitStatus.name), gitHead.name);
+    assert.equal(destination(workflow, gitHead.name), gitOrigin.name);
+    assert.equal(destination(workflow, gitOrigin.name), attestor.name);
+    assert.equal(destination(workflow, attestor.name), AUTHORIZATION_REQUEST_CONTEXT_NODE);
+    assert.equal(gitStatus.parameters.operation, 'status');
+    assert.equal(gitHead.parameters.operation, 'log');
+    assert.equal(gitOrigin.parameters.operation, 'listConfig');
+    assert.equal(gitStatus.parameters.repositoryPath, `={{ $('${pathGuard.name}').first().json.runtime.repository_path }}`);
+    assert.match(pathGuard.parameters.jsCode, new RegExp(consumerRepositoryRootPlaceholder(profile.id)));
+    assert.doesNotMatch(pathGuard.parameters.jsCode, /C:\\\\/);
+  }
+  assert.equal(destination(workflow, AUTHORIZATION_REQUEST_CONTEXT_NODE), 'Request Has Task ID');
   assert.equal(destination(workflow, 'Classify Authorization Outcome'), 'Parent Authorization Passed');
   assert.equal(destination(workflow, 'Parent Authorization Passed', 0), 'Prepare Governance Baseline');
   assert.equal(destination(workflow, 'Parent Authorization Passed', 1), 'Respond Authorization Outcome');
@@ -166,7 +251,7 @@ test('operation ID and all governed facts propagate unchanged to the child', asy
 
 test('the inactive n8n candidate derives repository authority from exact embedded consumer profiles', async () => {
   const workflow = await loadWorkflow();
-  const normalize = workflowNode(workflow, 'Normalize Governance Consumer Request').parameters.jsCode;
+  const normalize = consumerRoute(workflow, 'aispanda-governance').normalizer.parameters.jsCode;
   const execute = (body) => new Function('$json', 'URL', normalize)({ body }, undefined).json;
   const base = {
     task_id: 'AI-99',
@@ -200,7 +285,7 @@ test('the inactive n8n candidate derives repository authority from exact embedde
 
   const validator = workflowNode(workflow, 'Validate Contract and Branch').parameters.jsCode;
   const classifier = workflowNode(workflow, 'Classify Authorization Outcome').parameters.jsCode;
-  for (const code of ['INVALID_REPOSITORY_IDENTITY', 'CONSUMER_NOT_APPROVED', 'CONSUMER_REPOSITORY_MISMATCH', 'ACTION_NOT_APPROVED', 'CALLER_NOT_APPROVED']) {
+  for (const code of ['INVALID_REPOSITORY_IDENTITY', 'CONSUMER_NOT_APPROVED', 'CONSUMER_REPOSITORY_MISMATCH', 'ACTION_NOT_APPROVED', 'CALLER_NOT_APPROVED', ...GIT_ATTESTATION_VIOLATION_CODES]) {
     assert.match(validator, new RegExp(code));
     assert.match(classifier, new RegExp(code));
   }
@@ -208,10 +293,10 @@ test('the inactive n8n candidate derives repository authority from exact embedde
 
 test('server and generated n8n route enforcement have spoof-corpus parity', async () => {
   const workflow = await loadWorkflow();
-  const routes = {
-    'aispanda-web': workflowNode(workflow, 'Normalize Authorization Request').parameters.jsCode,
-    'aispanda-governance': workflowNode(workflow, 'Normalize Governance Consumer Request').parameters.jsCode,
-  };
+  const routes = Object.fromEntries(GOVERNANCE_CONSUMER_PROFILES.map((profile) => [
+    profile.id,
+    consumerRoute(workflow, profile.id).normalizer.parameters.jsCode,
+  ]));
   const base = {
     task_id: 'AI-99',
     governance_policy_version: 'governance-policy-v1.1',
@@ -240,6 +325,13 @@ test('server and generated n8n route enforcement have spoof-corpus parity', asyn
     ['aispanda-governance', { story_contract_version: 'story-contract-v3' }],
     ['aispanda-web', { repository: 'github.com/aispanda/aispanda-web', permitted_action: 'pr_merge_gate', caller: 'github-actions' }],
     ['aispanda-web', { repository: 'github.com/aispanda/aispanda-governance' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/reusable-ai-assets-private' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/reusable-ai-assets-private-evil' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/*' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/reusable-ai-assets-private', caller: 'github-actions' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/reusable-ai-assets-private', permitted_action: 'pr_merge_gate' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/reusable-ai-assets-private', governance_policy_version: 'governance-policy-v2' }],
+    ['reusable-ai-assets-private', { repository: 'github.com/aispanda/reusable-ai-assets-private', story_contract_version: 'story-contract-v3' }],
   ];
 
   for (const [consumerId, overrides] of corpus) {
@@ -255,14 +347,47 @@ test('server and generated n8n route enforcement have spoof-corpus parity', asyn
     const generated = new Function('$json', 'URL', routes[consumerId])({ body }, undefined).json;
     assert.deepEqual(generated.request.consumer_violation_codes, pure.violation_codes, `${consumerId}: ${JSON.stringify(overrides)}`);
     assert.equal(generated.request.expected_repository, pure.profile.repository);
-    if (consumerId === 'aispanda-governance') assert.equal(generated.runtime.caller, 'codex');
+    if (pure.profile.callers !== null) assert.equal(generated.runtime.caller, pure.profile.callers[0]);
   }
+});
+
+test('a new exact-profile fixture generates an isolated route without repository-specific generator code', async () => {
+  const sourceWorkflow = JSON.parse(await readFile(sourceWorkflowPath, 'utf8'));
+  const fictional = Object.freeze({
+    id: 'example-synthetic',
+    webhook_path: 'authorize-build-start-example-synthetic',
+    repository: 'github.com/example/governance-synthetic',
+    actions: Object.freeze(['local_build_start']),
+    callers: Object.freeze(['fixture-runner']),
+    governance_policy_version: 'governance-policy-v1.1',
+    story_contract_version: 'story-contract-v2',
+  });
+  const profiles = [...GOVERNANCE_CONSUMER_PROFILES, fictional];
+  const generated = addConsumerProfileRoutes(sourceWorkflow, profiles);
+  const route = consumerRoute(generated, fictional.id, profiles);
+  const result = new Function('$json', route.normalizer.parameters.jsCode)({ body: {
+    task_id: 'EX-1',
+    governance_policy_version: fictional.governance_policy_version,
+    story_contract_version: fictional.story_contract_version,
+    permitted_action: fictional.actions[0],
+    branch_name: 'codex/ex-1-synthetic',
+    head_sha: 'a'.repeat(40),
+    repository: fictional.repository,
+    caller: fictional.callers[0],
+    operation_id: 'fixture:build:00000001',
+  } }).json;
+
+  assert.equal(generated.nodes.filter((node) => node.type === 'n8n-nodes-base.webhook').length, profiles.length);
+  assert.equal(route.webhook.parameters.path, fictional.webhook_path);
+  assert.equal(route.webhook.credentials, undefined);
+  assert.equal(result.request.consumer_id, fictional.id);
+  assert.deepEqual(result.request.consumer_violation_codes, []);
 });
 
 test('cross-profile impersonation cannot select repository or caller authority', async () => {
   const workflow = await loadWorkflow();
-  const governanceRoute = workflowNode(workflow, 'Normalize Governance Consumer Request').parameters.jsCode;
-  const webRoute = workflowNode(workflow, 'Normalize Authorization Request').parameters.jsCode;
+  const governanceRoute = consumerRoute(workflow, 'aispanda-governance').normalizer.parameters.jsCode;
+  const webRoute = consumerRoute(workflow, 'aispanda-web').normalizer.parameters.jsCode;
   const body = {
     task_id: 'AI-99',
     governance_policy_version: 'governance-policy-v1.1',
@@ -287,9 +412,144 @@ test('cross-profile impersonation cannot select repository or caller authority',
   const webResult = new Function('$json', webRoute)({ body: { ...body, repository: 'github.com/aispanda/aispanda-governance' } }).json;
   assert.equal(webResult.request.consumer_id, 'aispanda-web');
   assert.deepEqual(webResult.request.consumer_violation_codes, ['CONSUMER_REPOSITORY_MISMATCH']);
+
+  const privateRoute = consumerRoute(workflow, 'reusable-ai-assets-private').normalizer.parameters.jsCode;
+  const privateResult = new Function('$json', privateRoute)({ body: {
+    ...body,
+    repository: 'github.com/aispanda/aispanda-web',
+    permitted_action: 'local_build_start',
+    caller: 'codex',
+    consumer_id: 'aispanda-web',
+    consumer_profiles: [{ id: 'aispanda-web', repository: 'github.com/aispanda/aispanda-web' }],
+  } }).json;
+  assert.equal(privateResult.request.consumer_id, 'reusable-ai-assets-private');
+  assert.deepEqual(privateResult.request.consumer_violation_codes, ['CONSUMER_REPOSITORY_MISMATCH']);
 });
 
-test('both authenticated routes execute through the shared context and classify a complete valid decision', async () => {
+test('private-consumer identity and authority denials cannot reach baseline storage', async () => {
+  const workflow = await loadWorkflow();
+  const fixture = JSON.parse(await readFile(contractFixturePath, 'utf8'));
+  const issue = {
+    ...fixture.base_issue,
+    identifier: 'AI-108',
+    description: fixture.descriptions.canonical,
+    state: { name: 'In Progress' },
+    branchName: 'rajeevkasat/ai-108-data-driven-consumers',
+  };
+  const base = {
+    task_id: 'AI-108',
+    governance_policy_version: 'governance-policy-v1.1',
+    story_contract_version: 'story-contract-v2',
+    permitted_action: 'local_build_start',
+    branch_name: 'codex/ai-108-data-driven-consumers',
+    head_sha: 'a'.repeat(40),
+    repository: 'github.com/aispanda/reusable-ai-assets-private',
+    caller: 'codex',
+    operation_id: 'ai108:build:00000001',
+    repository_path: 'C:/Governed/reusable-ai-assets-private/worktree',
+  };
+  const cases = [
+    [{ repository: 'github.com/other/reusable-ai-assets-private' }, 'CONSUMER_REPOSITORY_MISMATCH'],
+    [{ repository: 'github.com/aispanda/reusable-ai-assets-private-evil' }, 'CONSUMER_REPOSITORY_MISMATCH'],
+    [{ repository: 'github.com/aispanda/*' }, 'INVALID_REPOSITORY_IDENTITY'],
+    [{ repository: 'github.com/example/self-registered', consumer_profiles: [{ id: 'reusable-ai-assets-private', repository: 'github.com/example/self-registered' }] }, 'CONSUMER_REPOSITORY_MISMATCH'],
+    [{ repository: 'github.com/aispanda/aispanda-web', consumer_id: 'aispanda-web' }, 'CONSUMER_REPOSITORY_MISMATCH'],
+    [{ permitted_action: 'pr_merge_gate' }, 'ACTION_NOT_APPROVED'],
+    [{ caller: 'github-actions' }, 'CALLER_NOT_APPROVED'],
+    [{ governance_policy_version: 'governance-policy-v2' }, 'POLICY_VERSION_MISMATCH'],
+    [{ story_contract_version: 'story-contract-v3' }, 'SYNTAX_VERSION_MISMATCH'],
+  ];
+
+  for (const [overrides, expectedCode] of cases) {
+    const result = classifyConsumerRequest(workflow, issue, 'reusable-ai-assets-private', { ...base, ...overrides });
+    assert.equal(result.outcome, 'FAIL', JSON.stringify(overrides));
+    assert.equal(result.build_allowed, false, JSON.stringify(overrides));
+    assert.ok(result.violation_codes.includes(expectedCode), `${JSON.stringify(overrides)}: ${result.violation_codes.join(',')}`);
+  }
+  assert.equal(destination(workflow, 'Parent Authorization Passed', 1), 'Respond Authorization Outcome');
+});
+
+test('independently observed Git facts deny well-formed caller lies before baseline storage', async () => {
+  const workflow = await loadWorkflow();
+  const fixture = JSON.parse(await readFile(contractFixturePath, 'utf8'));
+  const issue = {
+    ...fixture.base_issue,
+    identifier: 'AI-108',
+    description: fixture.descriptions.canonical,
+    state: { name: 'In Progress' },
+    branchName: 'rajeevkasat/ai-108-data-driven-consumers',
+  };
+  const actual = {
+    repository: 'github.com/aispanda/reusable-ai-assets-private',
+    branch: 'codex/ai-108-data-driven-consumers',
+    head: 'a'.repeat(40),
+  };
+  const base = {
+    task_id: 'AI-108',
+    governance_policy_version: 'governance-policy-v1.1',
+    story_contract_version: 'story-contract-v2',
+    permitted_action: 'local_build_start',
+    branch_name: actual.branch,
+    head_sha: actual.head,
+    repository: actual.repository,
+    caller: 'codex',
+    operation_id: 'ai108:attestation:00000001',
+    repository_path: 'C:/Governed/reusable-ai-assets-private/worktree',
+  };
+
+  for (const suppliedHead of ['0'.repeat(40), '1'.repeat(40), 'b'.repeat(64)]) {
+    const result = classifyConsumerRequest(workflow, issue, 'reusable-ai-assets-private', { ...base, head_sha: suppliedHead }, actual);
+    assert.equal(result.outcome, 'FAIL');
+    assert.equal(result.build_allowed, false);
+    assert.equal(result.head_sha, actual.head);
+    assert.ok(result.violation_codes.includes('GIT_HEAD_ATTESTATION_MISMATCH'));
+  }
+
+  const wrongBranch = classifyConsumerRequest(workflow, issue, 'reusable-ai-assets-private', { ...base, branch_name: 'codex/ai-108-false' }, actual);
+  assert.equal(wrongBranch.outcome, 'FAIL');
+  assert.ok(wrongBranch.violation_codes.includes('GIT_BRANCH_ATTESTATION_MISMATCH'));
+
+  const wrongOrigin = classifyConsumerRequest(workflow, issue, 'reusable-ai-assets-private', base, {
+    ...actual,
+    repository: 'github.com/aispanda/aispanda-web',
+  });
+  assert.equal(wrongOrigin.outcome, 'FAIL');
+  assert.ok(wrongOrigin.violation_codes.includes('GIT_REPOSITORY_ATTESTATION_MISMATCH'));
+
+  const unavailableHead = classifyConsumerRequest(workflow, issue, 'reusable-ai-assets-private', base, { ...actual, head: '' });
+  assert.equal(unavailableHead.outcome, 'FAIL');
+  assert.ok(unavailableHead.violation_codes.includes('GIT_HEAD_ATTESTATION_UNAVAILABLE'));
+  assert.equal(destination(workflow, 'Parent Authorization Passed', 1), 'Respond Authorization Outcome');
+});
+
+test('repository-path locator is constrained by a runtime-only consumer root', async () => {
+  const workflow = await loadWorkflow();
+  const route = consumerRoute(workflow, 'reusable-ai-assets-private');
+  const body = {
+    task_id: 'AI-108',
+    governance_policy_version: 'governance-policy-v1.1',
+    story_contract_version: 'story-contract-v2',
+    permitted_action: 'local_build_start',
+    branch_name: 'codex/ai-108-data-driven-consumers',
+    head_sha: 'a'.repeat(40),
+    repository: route.profile.repository,
+    repository_path: 'C:/Outside/attacker-selected-repository',
+    caller: 'codex',
+    operation_id: 'ai108:path-guard:00000001',
+  };
+  const normalized = new Function('$json', route.normalizer.parameters.jsCode)({ body }).json;
+  const guardCode = route.pathGuard.parameters.jsCode.replaceAll(
+    consumerRepositoryRootPlaceholder(route.profile.id),
+    'C:/Governed/reusable-ai-assets-private',
+  );
+  assert.throws(
+    () => new Function('$json', guardCode)(normalized),
+    /outside the runtime-bound consumer root/,
+  );
+  assert.equal(workflow.nodes.some((node) => node.type === 'n8n-nodes-base.executeCommand'), false);
+});
+
+test('all authenticated routes execute through the shared context and classify a complete valid decision', async () => {
   const workflow = await loadWorkflow();
   const fixture = JSON.parse(await readFile(contractFixturePath, 'utf8'));
   const issue = {
@@ -299,9 +559,8 @@ test('both authenticated routes execute through the shared context and classify 
     state: { name: 'In Progress' },
     branchName: 'rajeevkasat/ai-99-onboard-aispanda-governance',
   };
-  const executeCode = (name, item) => new Function('$json', workflowNode(workflow, name).parameters.jsCode)(item).json;
-  const run = (normalizerName, repository, caller) => {
-    const normalized = executeCode(normalizerName, { body: {
+  const run = (consumerId, repository, caller) => {
+    return classifyConsumerRequest(workflow, issue, consumerId, {
       task_id: 'AI-99',
       governance_policy_version: 'governance-policy-v1.1',
       story_contract_version: 'story-contract-v2',
@@ -311,31 +570,67 @@ test('both authenticated routes execute through the shared context and classify 
       repository,
       caller,
       operation_id: 'ai99:build:00000001',
-    } });
-    const context = executeCode('Authorization Request Context', normalized);
-    const validator = workflowNode(workflow, 'Validate Contract and Branch').parameters.jsCode;
-    const validated = new Function('$json', '$', validator)({ data: { issue } }, (name) => {
-      assert.equal(name, 'Authorization Request Context');
-      return { first: () => ({ json: context }) };
-    }).json;
-    const hashed = {
-      ...validated,
-      computed_contract_hash: createHash('sha256').update(validated.contract_hash_input).digest('hex'),
-    };
-    const finalized = executeCode('Finalize Contract Hash', hashed);
-    const bounded = executeCode('Enforce Branch Boundary', finalized);
-    return executeCode('Classify Authorization Outcome', bounded);
+      repository_path: `C:/Governed/${consumerId}/worktree`,
+    });
   };
 
-  const governance = run('Normalize Governance Consumer Request', 'github.com/aispanda/aispanda-governance', 'codex');
+  const governance = run('aispanda-governance', 'github.com/aispanda/aispanda-governance', 'codex');
   assert.equal(governance.outcome, 'PASS');
   assert.equal(governance.build_allowed, true);
   assert.deepEqual(governance.violation_codes, []);
 
-  const web = run('Normalize Authorization Request', 'github.com/aispanda/aispanda-web', 'codex');
+  const web = run('aispanda-web', 'github.com/aispanda/aispanda-web', 'codex');
   assert.equal(web.outcome, 'PASS');
   assert.equal(web.build_allowed, true);
   assert.deepEqual(web.violation_codes, []);
+
+  const privateRepository = run('reusable-ai-assets-private', 'github.com/aispanda/reusable-ai-assets-private', 'codex');
+  assert.equal(privateRepository.outcome, 'PASS');
+  assert.equal(privateRepository.build_allowed, true);
+  assert.deepEqual(privateRepository.violation_codes, []);
+});
+
+test('pathless GitHub request retains exact facts and still requires a current matching baseline', async () => {
+  const workflow = await loadWorkflow();
+  const fixture = JSON.parse(await readFile(contractFixturePath, 'utf8'));
+  const issue = { ...fixture.base_issue, identifier: 'AI-99', description: fixture.descriptions.canonical,
+    state: { name: 'In Progress' }, branchName: 'codex/ai-99-consumer-onboarding' };
+  const body = {
+    task_id: 'AI-99', governance_policy_version: 'governance-policy-v1.1',
+    story_contract_version: 'story-contract-v2', permitted_action: 'pr_merge_gate',
+    branch_name: 'codex/ai-99-consumer-onboarding', head_sha: 'f'.repeat(40),
+    repository: 'github.com/aispanda/aispanda-web', caller: 'github-actions',
+    operation_id: 'github:pr:99:00000003',
+  };
+  const parent = classifyConsumerRequest(workflow, issue, 'aispanda-web', body,
+    new Proxy({}, { get() { assert.fail('GitHub merge must not read local Git observations'); } }));
+  assert.equal(parent.outcome, 'PASS');
+  assert.equal(parent.head_sha, body.head_sha);
+  assert.equal(parent.caller, 'github-actions');
+  assert.equal(Object.hasOwn(body, 'repository_path'), false);
+  const baseline = matchingBaseline(parent, {
+    permitted_action: 'local_build_start', caller_identity: 'codex',
+    operation_id: 'local:99:approved-head', expires_at: new Date(Date.now() + 60_000).toISOString(),
+  });
+  const records = [baseline];
+  const before = JSON.stringify(records);
+  assert.equal(evaluateMergeBaseline(records, parent).outcome, 'PASS');
+  assert.equal(evaluateMergeBaseline([], parent).code, 'BASELINE_MISSING');
+  assert.equal(evaluateMergeBaseline([baseline, { ...baseline }], parent).code, 'BASELINE_AMBIGUOUS');
+  for (const changed of [{ head_sha: '0'.repeat(40) }, { contract_hash: '0'.repeat(64) }, { linear_updated_at: '2020-01-01T00:00:00Z' }]) {
+    assert.equal(evaluateMergeBaseline(records, { ...parent, ...changed }).code, 'BASELINE_STALE');
+  }
+  assert.equal(JSON.stringify(records), before, 'merge validation must not alter the build-start baseline');
+  for (const changed of [{ caller: 'codex' }, { repository: 'github.com/other/aispanda-web' }]) {
+    const denied = classifyConsumerRequest(workflow, issue, 'aispanda-web', { ...body, ...changed });
+    assert.equal(denied.outcome, 'FAIL');
+    assert.equal(denied.build_allowed, false);
+  }
+  const local = { ...body, permitted_action: 'local_build_start', caller: 'codex' };
+  for (const repository_path of [undefined, 'C:/Outside/worktree']) {
+    assert.throws(() => classifyConsumerRequest(workflow, issue, 'aispanda-web', { ...local, repository_path }),
+      /outside the runtime-bound consumer root/);
+  }
 });
 
 test('merge PASS is bound to current PR facts and one matching build-start baseline', async () => {

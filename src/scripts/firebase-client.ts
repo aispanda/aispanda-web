@@ -1,20 +1,41 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
+import { browserLocalPersistence, browserPopupRedirectResolver, initializeAuth } from 'firebase/auth';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
-  authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
+type RuntimePublicConfig = {
+  environment: 'staging' | 'production';
+  firebase: {
+    apiKey: string;
+    authDomain: string;
+    projectId: string;
+    storageBucket: string;
+    messagingSenderId: string;
+    appId: string;
+  };
+  googleClientId: string;
 };
 
-export const googleClientId = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID;
+const runtimeConfig = (globalThis as typeof globalThis & {
+  __AISPANDA_RUNTIME_CONFIG__?: RuntimePublicConfig;
+}).__AISPANDA_RUNTIME_CONFIG__;
 
-export const isFirebaseConfigured = Object.values(firebaseConfig).every(
+// The same image is staged and promoted. Never bake production Firebase facts into it.
+const firebaseConfig = runtimeConfig?.firebase;
+
+export const googleClientId = runtimeConfig?.googleClientId;
+export const runtimeEnvironment = runtimeConfig?.environment ?? 'static-build';
+
+export const isFirebaseConfigured = Boolean(firebaseConfig && Object.values(firebaseConfig).every(
   (value) => typeof value === 'string' && value.trim().length > 0,
-) && typeof googleClientId === 'string' && googleClientId.trim().length > 0;
+) && typeof googleClientId === 'string' && googleClientId.trim().length > 0);
 
-export const getFirebaseClientApp = () => (
-  getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
-);
+export const getFirebaseClientApp = () => {
+  if (!isFirebaseConfigured || !firebaseConfig) throw new Error('Account services require the site runtime configuration.');
+  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  // Match the installed editorial runtime before Auth reads the shared session.
+  try {
+    initializeAuth(app, { persistence: browserLocalPersistence, popupRedirectResolver: browserPopupRedirectResolver });
+  } catch (error) {
+    if (!(error && typeof error === 'object' && 'code' in error && error.code === 'auth/already-initialized')) throw error;
+  }
+  return app;
+};

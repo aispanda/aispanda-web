@@ -16,10 +16,14 @@ const currentPath = Astro.url.pathname;
       {navigation.map((item) => (
         <a href={item.href} aria-current={currentPath.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>
       ))}
-      <a href="/studio" data-staff-signin>Sign in</a>
+      <a href="/account" data-staff-signin>Sign in</a>
       <a href="/account" data-member-entry hidden>My account</a>
       <a href="/ai" data-ai-tools-entry hidden>AI Tools</a>
-      <a href="/studio" data-studio-entry hidden>Content Studio</a>
+      <a href="/my-articles" data-studio-entry hidden>My articles</a>
+      <a href="/topics">Collections</a>
+      <a href="/review" data-review-entry hidden>Review submissions</a>
+      <a href="/manage/collections" data-admin-entry hidden>Manage collections</a>
+      <a href="/manage/users" data-admin-entry hidden>Manage users</a>
       <a class="button button-small" href="/contact">Write</a>
     </nav>
   </div>
@@ -34,8 +38,8 @@ const currentPath = Astro.url.pathname;
     nav?.toggleAttribute('data-open', !open);
   });
 
-  const sessionKey = 'aispanda-studio-authorized-session-v1';
-  const memberSessionKey = 'aispanda-member-session-v1';
+  const sessionKey = 'blog-studio-authorized-session-v1';
+  const memberSessionKey = 'blog-member-session-v1';
   const staffSignIn = document.querySelector<HTMLElement>('[data-staff-signin]');
   const memberEntry = document.querySelector<HTMLElement>('[data-member-entry]');
   const aiToolsEntry = document.querySelector<HTMLElement>('[data-ai-tools-entry]');
@@ -43,6 +47,7 @@ const currentPath = Astro.url.pathname;
   const refreshStudioNavigation = () => {
     let authorized = false;
     let signedIn = false;
+    let role = '';
     try {
       const session = JSON.parse(window.localStorage.getItem(sessionKey) ?? '{}') as { role?: string; expiresAt?: number };
       authorized = ['administrator', 'publisher', 'author'].includes(session.role ?? '')
@@ -50,6 +55,7 @@ const currentPath = Astro.url.pathname;
       const memberSession = JSON.parse(window.localStorage.getItem(memberSessionKey) ?? '{}') as { role?: string; expiresAt?: number };
       signedIn = ['administrator', 'publisher', 'author', 'commenter', 'viewer'].includes(memberSession.role ?? '')
         && Number(memberSession.expiresAt) > Date.now();
+      role = signedIn ? memberSession.role ?? '' : '';
     } catch {
       authorized = false;
       signedIn = false;
@@ -58,6 +64,9 @@ const currentPath = Astro.url.pathname;
     if (memberEntry) memberEntry.hidden = !signedIn;
     if (aiToolsEntry) aiToolsEntry.hidden = !signedIn;
     if (studioEntry) studioEntry.hidden = !authorized;
+    document.querySelectorAll<HTMLElement>('[data-admin-entry]').forEach(link => { link.hidden = role !== 'administrator'; });
+    const reviewEntry = document.querySelector<HTMLElement>('[data-review-entry]');
+    if (reviewEntry) reviewEntry.hidden = !['administrator', 'publisher'].includes(role);
   };
   refreshStudioNavigation();
   window.addEventListener('storage', (event) => {
