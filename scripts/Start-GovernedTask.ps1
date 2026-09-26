@@ -204,6 +204,7 @@ $request = [ordered]@{
   branch_name = $branch
   head_sha = $headSha
   repository = $repository
+  repository_path = $gitRoot
   caller = $Caller
   operation_id = $OperationId
   permitted_action = $PermittedAction

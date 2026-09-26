@@ -156,6 +156,7 @@ test('launcher sends independently observed Git state and accepts only an exact 
     branch_name: 'codex/ai-93-launcher-test',
     head_sha: await git(directory, 'rev-parse', 'HEAD'),
     repository: 'github.com/aispanda/aispanda-web',
+    repository_path: await git(directory, 'rev-parse', '--show-toplevel'),
     caller: 'launcher-test',
     operation_id: 'test:ai-93:00000001',
     permitted_action: 'local_build_start',
