@@ -1,11 +1,13 @@
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { createCmsProxy, isCmsPath } from './cms-proxy.mjs';
 import { getStorage } from 'firebase-admin/storage';
 import {
   SUPPORTED_AI_PROVIDERS,
@@ -60,6 +62,11 @@ const auth = getAuth(app);
 // browser is still denied vault access by rules; the dedicated Cloud Run
 // identity is the only server principal intended to access this collection.
 const db = getFirestore(app);
+const cmsProxy = process.env.CMS_PROXY_TARGET ? createCmsProxy({
+  targetOrigin: process.env.CMS_PROXY_TARGET,
+  audience: process.env.CMS_PROXY_AUDIENCE || process.env.CMS_PROXY_TARGET,
+  publicOrigin: SITE_ORIGIN,
+}) : null;
 const bucket = getStorage(app).bucket(RUNTIME_PUBLIC_CONFIG?.firebase.storageBucket);
 const blog = process.env.BLOG_CAPABILITY_ENABLED === 'true'
   ? await loadBlogAdapter({ db, auth, bucket }) : null;
@@ -540,11 +547,32 @@ const serveStatic = async (request, response, url) => {
   await serveFile(request, response, notFound, 404);
 };
 
+const proxyCms = async (request, response, url) => {
+  if (!cmsProxy) throw Object.assign(new Error('CMS route is not configured.'), { statusCode: 503 });
+  const body = ['GET', 'HEAD'].includes(request.method ?? 'GET') ? undefined : Readable.toWeb(request);
+  const upstream = await cmsProxy(new Request(url, {
+    method: request.method,
+    headers: request.headers,
+    body,
+    duplex: body ? 'half' : undefined,
+  }));
+  const headers = Object.fromEntries(upstream.headers.entries());
+  const cookies = upstream.headers.getSetCookie?.();
+  if (cookies?.length) headers['set-cookie'] = cookies;
+  response.writeHead(upstream.status, headers);
+  if (request.method === 'HEAD' || !upstream.body) response.end();
+  else {
+    for await (const chunk of upstream.body) response.write(chunk);
+    response.end();
+  }
+};
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', requestOrigin(request));
   try {
     if (handleBlog?.(request, response)) return;
-    if (url.pathname.startsWith('/api/')) await handleApi(request, response, url);
+    if (isCmsPath(url.pathname)) await proxyCms(request, response, url);
+    else if (url.pathname.startsWith('/api/')) await handleApi(request, response, url);
     else if (url.pathname.startsWith('/__/auth')) await proxyFirebaseAuth(request, response, url);
     else if ((request.method === 'GET' || request.method === 'HEAD') && /^\/content-assets\/[a-f0-9-]+$/.test(url.pathname)) {
       await serveContentAsset(request, response, url.pathname.slice('/content-assets/'.length));
