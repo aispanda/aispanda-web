@@ -7,9 +7,16 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { setTimeout as delay } from 'node:timers/promises';
+
+const requireAvailablePort = port => new Promise((resolve, reject) => {
+  const probe = createServer();
+  probe.once('error', error => reject(new Error(`Isolated browser-test port ${port} is unavailable: ${error.code ?? error.message}`)));
+  probe.listen(port, '127.0.0.1', () => probe.close(resolve));
+});
 
 test('installed package preserves host and editorial UI across desktop/mobile roles', { timeout: 180000 }, async () => {
   assert.equal(process.env.FIREBASE_AUTH_EMULATOR_HOST, '127.0.0.1:9099');
@@ -18,6 +25,7 @@ test('installed package preserves host and editorial UI across desktop/mobile ro
   process.env.METADATA_SERVER_DETECTION = 'none';
   const projectId = 'demo-blog-community';
   const origin = 'http://127.0.0.1:18771';
+  await requireAvailablePort(18771);
   let host;
   let catalogueApp;
   try {
