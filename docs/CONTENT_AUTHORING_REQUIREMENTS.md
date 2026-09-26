@@ -112,7 +112,7 @@ The default workspace must provide:
 - Filters for content type, author, tag and access level.
 - Newest/oldest and recently updated sorting.
 - Each row shows title, author, status, last update or publication time and content type.
-- Keep the primary row action contextual: `Edit` for drafts and `Edit draft` when a public version exists.
+- Keep the primary row action contextual: `Edit` for a never-published draft, `Create revision draft` when the public and working versions match, and `Continue draft` when unpublished changes already exist.
 - Put secondary actions in an overflow menu: preview, duplicate, archive and status-dependent publication actions.
 - Show `Unpublish` only when a public version exists. Show `Move to trash` only for content with no public version; never place either destructive action directly in the row.
 - A clear empty state and a prominent `New` action.
@@ -123,7 +123,7 @@ Use three plain author-facing states:
 - `Published`: the public and working versions match.
 - `Published · Draft changes`: a public version exists and newer edits remain unpublished.
 
-`Drafts` includes `Draft` and `Published · Draft changes`; `Published` includes `Published` and `Published · Draft changes`. When a public version exists, selecting the title opens that read-only version and `Edit draft` opens the working version.
+`Drafts` includes `Draft` and `Published · Draft changes`; `Published` includes `Published` and `Published · Draft changes`. When a public version exists, selecting the title opens that read-only version. `Create revision draft` opens a working copy without changing the live article, while `Continue draft` resumes existing unpublished work.
 
 ## Article editor
 
