@@ -6,7 +6,8 @@
 | Version | `v0.2-astro-trial`, 2026-11-24 |
 | Owner and approver | Rajeev Kasat |
 | Code baseline | `review/astro-component-enrichment` at `36504ae`, built on `main` at `078a7b0` |
-| Source draft | Antigravity local trial draft `02-design-system.md` (2026-11-24), enriched and checked against code by Claude |
+| Local trial | Antigravity branch `antigravity/astro-framework-trial`, based on `36504ae`, **not pushed**. Its contents are reported by Antigravity and could not be inspected by Claude. |
+| Source draft | Antigravity local trial draft `02-design-system.md` (2026-11-24), enriched and checked against code by Claude, then reconciled with Antigravity's report on 2026-11-24 |
 | Process | [Reusable Delivery UI/UX framework](https://github.com/aispanda/Reusable-Delivery/tree/main/docs/ui-ux-delivery), stage 2 (Foundations) |
 | Brand owner document | [`docs/SITE_FOUNDATION.md`, Brand direction](../SITE_FOUNDATION.md). That document owns accepted brand decisions; this one records how they are implemented and what is still open. |
 
@@ -16,10 +17,13 @@ Every value carries one of four labels.
 
 | Label | Meaning |
 |---|---|
-| **Verified in code** | Present in `src/styles/global.css` or `src/components/` at `36504ae`. Contrast ratios were recomputed with the WCAG 2.x relative luminance formula on 2026-11-24. |
 | **Accepted** | Recorded as accepted in `docs/SITE_FOUNDATION.md`. |
-| **Provisional** | In code on the review branch but awaiting Rajeev's sign off. |
-| **Proposed** | Suggested here or in the Antigravity draft; not yet in code at `36504ae`. |
+| **Verified at 36504ae** | Present in `src/styles/global.css` or `src/components/` at `36504ae`, read by Claude. Contrast ratios recomputed with the WCAG 2.x relative luminance formula on 2026-11-24. |
+| **Verified in Antigravity local trial, unpushed** | Reported by Antigravity as present and tested on `antigravity/astro-framework-trial`. Not in GitHub; Claude could not inspect it. Claude recomputed the contrast ratios only. |
+| **Provisional** | In code (at `36504ae` or in the local trial) but awaiting Rajeev's sign off. |
+| **Open** | No decision and no agreed value yet. |
+
+A row can carry two labels, for example a value that is both verified in the local trial and provisional.
 
 Nothing in this document says that Storybook, Open Design, Chromatic or an automated accessibility suite has passed. See [Evidence and limits](#evidence-and-limits).
 
@@ -41,50 +45,71 @@ Audiences come from `site-profile.json` and `SITE_FOUNDATION.md`; this document 
 | `src/styles/global.css` (`36504ae`) | Runtime source of every token in this document | Canonical for what ships |
 | `docs/SITE_FOUNDATION.md` | Accepted brand direction (colours, type, logo) | Agrees with code |
 | [Design sheet](https://docs.google.com/spreadsheets/d/19fdTDh7Cexn10k4TOz8_LMz7sO8uRDHD4oGc5eq5Kzg/edit), Design System tab | Earlier role and psychology catalogue | **Diverges.** The sheet lists Bright Blue `#598BE2`, Info Blue `#3C8FE6`, Success `#16A34A`, Error `#DC2626`, Soft Peach `#F5BC97` and a `1200px` container. None of these hex values appears in `global.css`. The sheet should be reconciled to code, or code changed by decision; until then code wins. |
-| Drive `ai-spanda.tokens.json` (`1mkiqaw_sXdoOtxaGPjusqNq2irs28Vfo`) | Cited by the Antigravity draft | **Not checked in this pass.** |
-| `src/styles/tokens.css` | Antigravity draft says it is the canonical token file shared by Astro, Storybook and Open Design | **Proposed.** It does not exist at `36504ae`. Tokens live at the top of `global.css`. |
+| Drive `ai-spanda.tokens.json` (`1mkiqaw_sXdoOtxaGPjusqNq2irs28Vfo`) | Older DTCG token export | **Diverges** (checked by Antigravity, not by Claude). It mirrors the sheet palette (`#598BE2`, `1200px`), not `global.css`. Regenerate it from `tokens.css` once tokens are approved. |
+| `src/styles/tokens.css` | Single token file imported first by `global.css`, Storybook preview and the Open Design package | **Verified in Antigravity local trial, unpushed.** Absent at `36504ae`, where tokens live at the top of `global.css`. |
 
-Recommended mapping once approved: extract the `:root` block of `global.css` into `src/styles/tokens.css`, import it first from `global.css`, and generate any DTCG JSON from that file rather than editing JSON by hand.
+Mapping once approved: `tokens.css` is the only place token values are edited; `global.css`, Storybook and Open Design import it; the DTCG JSON and the sheet are generated or updated from it, never edited first.
 
 ## 3. Colour roles
 
-All values verified in code. Ratios recomputed; where the Antigravity draft differed, the corrected value is shown and the draft value noted.
+Ratios recomputed by Claude. Where an earlier draft value differed, the recomputed value is shown.
 
 ### Core tokens
 
-| Token | Value | Role | Key pairing | Ratio | Result |
+| Token | Value | Role | Key pairing | Ratio | Status |
 |---|---|---|---|---|---|
-| `--canvas` | `#f3f1ea` | Warm cream page ground | `--ink` text | 16.29:1 | AAA |
-| `--surface` | `#ffffff` | Cards, header, form panels | `--ink` text | 18.41:1 | AAA |
-| `--ink` | `#12141a` | Text, borders, primary button fill, dark sections | white text | 18.41:1 | AAA |
-| `--muted` | `#5a5f68` | Secondary prose and meta | on `--canvas` / `--surface` | 5.68:1 / 6.42:1 | AA |
-| `--line` | `#d9d6cc` | Card and divider borders | decorative only | n/a | Not a control boundary |
-| `--solar` | `#e8a01a` | Offset shadows, principle numbers, links in dark contact panel | `--ink` on solar; solar on `--ink` | 8.31:1 | AAA |
-| `--solar-deep` | `#c97810` | Deeper amber | not audited | n/a | Usage not reviewed |
-| `--clarity` | `#2f6fe0` | Accepted clarity blue: wordmark span, focus ring, links, dark section eyebrow | see below | see below | Mixed |
-| `--clarity-text` | `#2459c4` | **Provisional.** Deeper blue for small text on light grounds | see below | see below | AA |
-| `--soft-solar` | `#fff3d6` | Featured and `Pilot-ready` tint | `#754705` text | 7.16:1 | AAA |
-| `--soft-clarity` | `#e8f0ff` | `Reusable` tint | `#244e9d` text | 6.92:1 | AA |
-| `--spectrum-teal`, `--coral` | `#2eb8b0`, `#ff7058` | Mark and ambient glow only | not for text | n/a | Reserved |
+| `--canvas` | `#f3f1ea` | Warm cream page ground | `--ink` text | 16.29:1 | Accepted; Verified at 36504ae |
+| `--surface` | `#ffffff` | Cards, header, form panels | `--ink` text | 18.41:1 | Accepted; Verified at 36504ae |
+| `--ink` | `#12141a` | Text, borders, primary button fill, dark sections | white text | 18.41:1 | Accepted; Verified at 36504ae |
+| `--muted` | `#5a5f68` | Secondary prose and meta | on `--canvas` / `--surface` | 5.68:1 / 6.42:1 | Verified at 36504ae |
+| `--line` | `#d9d6cc` | Card and divider borders | decorative only | n/a | Verified at 36504ae; not a control boundary |
+| `--solar` | `#e8a01a` | Offset shadows, principle numbers, contact panel links | `--ink` on solar; solar on `--ink` | 8.31:1 | Accepted; Verified at 36504ae |
+| `--solar-deep` | `#c97810` | Featured card border (local trial) | on `--canvas` / `--soft-solar` / white | 3.01:1 / 3.08:1 / 3.40:1 | Verified at 36504ae as a token; use as border Verified in Antigravity local trial, unpushed. Antigravity reports 3.12:1; passes 3:1 narrowly |
+| `--clarity` | `#2f6fe0` | Accepted clarity blue: large accents and non text indicators | see below | see below | Accepted; Verified at 36504ae |
+| `--clarity-text` | `#2459c4` | Deeper blue for small text on light grounds | see below | see below | **Provisional** |
+| `--clarity-on-dark` | `#6ea2ff` | Small blue text on the dark section ground | on `--ink` / over `.16` amber glow | 7.25:1 / 5.55:1 | **Provisional**; Verified in Antigravity local trial, unpushed |
+| `--soft-solar` | `#fff3d6` | Featured and `Pilot-ready` tint | `#754705` text | 7.16:1 | Verified at 36504ae |
+| `--soft-clarity` | `#e8f0ff` | `Reusable` tint | `#244e9d` text | 6.92:1 | Verified at 36504ae |
+| `--spectrum-teal`, `--coral` | `#2eb8b0`, `#ff7058` | Mark and ambient glow only | not for text | n/a | Accepted (spectrum reserved for the mark) |
 
 Legacy aliases `--lime`, `--blue`, `--soft-blue` and `--soft-lime` map to the tokens above. `--lime` is amber, not green; new code should use the semantic names.
 
-### Blue: accepted, provisional and where each fails
+The `5.55:1` glow figure assumes the strongest amber glow stop (`rgba(232, 160, 26, .16)`) composited over `#12141a`, which gives `#342a1a`. On the same ground `--solar` gives `6.35:1`.
+
+### Blue pairings
 
 | Pairing | Ratio | Normal text (4.5:1) | Large text or UI (3:1) |
 |---|---|---|---|
-| `--clarity` on `--canvas` | 4.16:1 (draft said 4.02) | Fail | Pass |
+| `--clarity` on `--canvas` | 4.16:1 | Fail | Pass |
 | `--clarity` on `--surface` | 4.70:1 | Pass | Pass |
-| `--clarity` on `--ink` (dark section eyebrow) | 3.92:1 (draft said 4.57) | **Fail** | Pass |
-| `--clarity-text` on `--canvas` | 5.63:1 (draft 5.61) | Pass | Pass |
-| `--clarity-text` on `--surface` | 6.36:1 (draft 6.34) | Pass | Pass |
-| `--clarity-text` on proof block `#f5f6f3` | 5.86:1 (draft 5.53) | Pass | Pass |
+| `--clarity` on `--ink` | 3.92:1 | **Fail** | Pass |
+| `--clarity-text` on `--canvas` | 5.63:1 | Pass | Pass |
+| `--clarity-text` on `--surface` | 6.36:1 | Pass | Pass |
+| `--clarity-text` on proof block `#f5f6f3` | 5.86:1 | Pass | Pass |
+| `--clarity-on-dark` on `--ink` | 7.25:1 | Pass | Pass |
 
-Where `--clarity-text` is applied at `36504ae`: `.eyebrow` on light grounds and `.asset-proof-links a`. That is all.
+### Where each blue is applied
 
-Where small blue text still uses `--clarity` at `36504ae`: `.brand-wordmark span`, `.asset-how li`, `.audience-card b`, `.support-demo-aside a`, `.insight-prose a`, `.insight-row:hover h3`. The Antigravity draft lists most of these as already moved to `--clarity-text`; in this commit they are not. Moving them is a **proposed** follow up that depends on the same sign off. The wordmark span is the one remaining serious axe contrast finding on the home page from the earlier comparison run.
+| Selector | At 36504ae | Antigravity local trial, unpushed |
+|---|---|---|
+| `.eyebrow` on light grounds | `--clarity-text` | `--clarity-text` |
+| `.asset-proof-links a` | `--clarity-text` | `--clarity-text` |
+| `.brand-wordmark span` | `--clarity` (the one remaining serious axe finding on the home page) | `--clarity-text` |
+| Body links (`.asset-how li`, `.audience-card b`, `.support-demo-aside a`, `.insight-prose a`) | `--clarity` | `--clarity-text` |
+| `:focus-visible` outline | `--clarity` | `--clarity-text` |
+| `.section-alt .eyebrow` | `--clarity`, **3.92:1, fails 1.4.3** | `--clarity-on-dark`, 7.25:1 |
+| `.contact-details .eyebrow` | `--clarity-text` inherited from `.eyebrow` on the ink panel, **2.89:1, fails**. This regression came from the `36504ae` eyebrow change; it was 3.92:1 on `main` and also failed. | `--solar`, 8.31:1 |
 
-Open finding: `.section-alt .eyebrow` keeps `--clarity` on the dark ground at 3.92:1. The eyebrow is `.78rem` bold uppercase, which is normal text under WCAG, so this fails 1.4.3. A lighter blue for dark grounds needs a design decision; it is not fixed here.
+### Dark eyebrow decision (Open, for Rajeev)
+
+The `.section-alt` eyebrow is `.78rem` bold uppercase, which is normal text under WCAG, so `3.92:1` fails. Axe did not flag it because it skips text over the section's radial gradient background; Claude found it by calculation and Antigravity confirmed it.
+
+| Option | Ratio | For | Against |
+|---|---|---|---|
+| `--clarity-on-dark: #6ea2ff` (local trial default) | 7.25:1 on ink; 5.55:1 over glow | Keeps blue as the eyebrow colour on every ground, so section labels read as one system | Adds a fourth blue token that needs brand approval |
+| `--solar: #e8a01a` | 8.31:1 on ink; 6.35:1 over glow | No new token; matches `.contact-details .eyebrow` | Amber on dark eyebrows competes with principle numbers and the offset gesture, which spends the "one bold gesture" more widely |
+
+Claude recommends `--clarity-on-dark` because it keeps the blue meaning of eyebrows consistent and leaves amber for the signature gesture. Either option passes; the choice is a brand decision.
 
 ### Prohibited pairings
 
@@ -93,7 +118,7 @@ Open finding: `.section-alt .eyebrow` keeps `--clarity` on the dark ground at 3.
 * `--clarity` for normal weight text under 24px on `--canvas`, or on the dark section ground.
 * Any spectrum token as text.
 
-### Maturity status badges (verified in code)
+### Maturity status badges (Verified at 36504ae)
 
 | Status | Text on fill | Ratio | Non colour cue |
 |---|---|---|---|
@@ -104,9 +129,16 @@ Open finding: `.section-alt .eyebrow` keeps `--clarity` on the dark ground at 3.
 
 `StatusBadge.astro` renders the visible status text with a visually hidden "Maturity: " prefix, so screen readers announce the category as well as the value.
 
+### Other contrast fixes
+
+| Element | At 36504ae | Antigravity local trial, unpushed |
+|---|---|---|
+| `/principles` TOC numbers (`.principles-toc a span`) | `#8a9189` on cream, 2.86:1 by Claude's calculation (Antigravity reports 2.74:1), fails | `--muted`, 5.68:1 |
+| Featured asset card border (`.asset-card.featured`) | `#99be5e`, 1.93:1 against its `--soft-solar` fill, below 3:1 | `--solar-deep`, 3.01:1 to 3.40:1 |
+
 ## 4. Typography, spacing and layout
 
-**Accepted** in `SITE_FOUNDATION.md` and **verified in code**.
+Accepted in `SITE_FOUNDATION.md` (fonts); all values Verified at 36504ae.
 
 | Role | Value |
 |---|---|
@@ -127,28 +159,28 @@ Pending decision: the sheet records a `1200px` container. Code ships `1180px`. K
 
 | Element | Value | Status |
 |---|---|---|
-| `--radius` | `1.15rem` for cards | Verified |
-| Feature panels | `1.5rem` radius, `2px solid var(--ink)` border, `10px 10px 0 var(--solar)` offset (`.contact-panel`, `.support-form-card`, `.support-confirmation-card`, principles panel) | Verified |
-| Pills | `999px` for buttons, status badges and topic chips | Verified |
-| Functional depth | `--shadow: 0 18px 60px rgba(18, 20, 26, .1)` | Verified |
-| Signature offset | `4px 4px 0 var(--solar)` on `.button` | Verified |
+| `--radius` | `1.15rem` for cards | Verified at 36504ae |
+| Feature panels | `1.5rem` radius, `2px solid var(--ink)` border, `10px 10px 0 var(--solar)` offset (`.contact-panel`, `.support-form-card`, `.support-confirmation-card`, principles panel) | Verified at 36504ae |
+| Pills | `999px` for buttons, status badges and topic chips | Verified at 36504ae |
+| Functional depth | `--shadow: 0 18px 60px rgba(18, 20, 26, .1)` | Verified at 36504ae |
+| Signature offset | `4px 4px 0 var(--solar)` on `.button` | Verified at 36504ae |
 
-Motion: ambient and entrance keyframes (`brand-rise`, `brand-pulse`, `spanda-hum`, `principles-rise`) plus button transitions of `.18s`. Under `prefers-reduced-motion: reduce`, smooth scroll is turned off, all animation and transition durations collapse to `.01ms`, and named hero and section animations are set to `none`. Colour and focus changes remain immediate. Verified in code; not verified in a browser in this pass.
+Motion: ambient and entrance keyframes (`brand-rise`, `brand-pulse`, `spanda-hum`, `principles-rise`) plus button transitions of `.18s`. Under `prefers-reduced-motion: reduce`, smooth scroll is turned off, all animation and transition durations collapse to `.01ms`, and named hero and section animations are set to `none`. Colour and focus changes remain immediate. Verified at 36504ae; not checked in a browser by Claude.
 
 ## 6. Interaction, focus and keyboard
 
-| Rule | At `36504ae` | Status |
-|---|---|---|
-| Focus ring | `:focus-visible { outline: 3px solid var(--clarity); outline-offset: 4px }` everywhere. As a non text indicator this meets 3:1 on cream (4.16), white (4.70) and the dark ground (3.92). | Verified |
-| Focus ring, draft proposal | `--clarity-text` on light grounds and `--solar` on dark sections and the contact panel (8.31:1) | **Proposed**, not in code |
-| Primary button | Ink fill, white text, `min-height: 48px`, amber offset. Hover moves `translate(2px, 2px)` with a `2px` offset. | Verified |
-| Primary button pressed state | Draft proposes `translate(4px, 4px)` with no offset | **Proposed**, no `:active` rule in code |
-| Secondary button | Transparent, ink text, no offset | Verified |
-| Secondary hover and pressed tint | Draft proposes an ink tint | **Proposed**, no rule in code |
-| Skip link | Fixed, ink fill, slides in on focus, targets `<main id="main">` | Verified |
-| Skip target focus | Draft says `<main tabindex="-1">` | **Proposed.** `BaseLayout.astro` renders `<main id="main">` without `tabindex`. |
-| Mobile menu | `.menu-button` toggles `aria-expanded` and `aria-controls="site-navigation"`; Escape closes the open menu and returns focus to the button (added in `36504ae`, covered by `tests/e2e/components.spec.ts`) | Verified |
-| Menu button target size | Draft states at least 44 by 44 | **Not verified.** No explicit minimum size rule; measure in a browser. |
+| Rule | At 36504ae | Antigravity local trial, unpushed | Status |
+|---|---|---|---|
+| Focus ring | `3px solid var(--clarity)`, `outline-offset: 4px`; as a non text indicator meets 3:1 on cream (4.16), white (4.70) and ink (3.92) | `--clarity-text` on light grounds (5.63 to 6.36) | Light ground change **Provisional**, tied to `--clarity-text` sign off |
+| Focus ring on dark grounds | `--clarity` (3.92:1) | `--solar` on `.section-alt` and `.contact-details` (8.31:1), as reported in the source draft | **Provisional** |
+| Primary button | Ink fill, white text, `min-height: 48px`, amber `4px` offset; hover `translate(2px, 2px)` with `2px` offset | Unchanged | Verified at 36504ae |
+| Primary pressed state | No `:active` rule | `:active` `translate(4px, 4px)`, `0` offset | Verified in Antigravity local trial, unpushed |
+| Secondary button | Transparent, ink text, no resting offset. **Defect:** it also matches `.button:hover`, so hover shows a `2px` solar shadow | Ink wash hover and active with `box-shadow: none` | Verified in Antigravity local trial, unpushed |
+| Button row spacing | No `.button-row` gap rule | `.button-row` gap `13.6px` | Verified in Antigravity local trial, unpushed |
+| Skip link | Fixed, ink fill, slides in on focus, targets `<main id="main">` | Unchanged | Verified at 36504ae |
+| Skip target focus | `<main id="main">` without `tabindex` | `<main id="main" tabindex="-1">` | Verified in Antigravity local trial, unpushed |
+| Mobile menu | `aria-expanded`, `aria-controls="site-navigation"`; Escape closes and returns focus (tested in `tests/e2e/components.spec.ts`) | Unchanged | Verified at 36504ae |
+| Menu button target size | No minimum size rule | `min-height` and `min-width: 44px`; `44.39px` measured at `390px` | Verified in Antigravity local trial, unpushed |
 
 ## 7. Content voice
 
@@ -170,7 +202,17 @@ Shared Astro components present in `src/components/` at `36504ae`:
 | `Header.astro` | Site header and mobile menu | Escape handling added |
 | `Footer.astro`, `BrandMark.astro`, `ArticleVisual.astro`, `Comments.astro` | Existing site components | Not changed in the candidate |
 
-Named in the Antigravity draft but **absent at `36504ae`**: `ActionLink.astro`, `PageHero.astro`, `src/stories/*.stories.ts` (`@storybook-astro/framework`), `.storybook/preview.ts`, and the Open Design `open-design-system/` package. These may exist on Antigravity's local branch; they are not in GitHub at this commit. The repository guidance also says Storybook is optional and markup should not be duplicated in another framework only to create stories.
+Additional files reported on `antigravity/astro-framework-trial` (Verified in Antigravity local trial, unpushed; absent at `36504ae`):
+
+| File | Purpose |
+|---|---|
+| `src/styles/tokens.css` | Single token source |
+| `ActionLink.astro` | Shared primary and secondary action link |
+| `PageHero.astro` | Shared page hero |
+| `src/stories/*.stories.ts`, `.storybook/preview.ts` | Native `.astro` stories with `@storybook-astro/framework@1.18.0` |
+| `open-design-system/` | Open Design `v0.27.2` package and static HTML specimen |
+
+Repository guidance says Storybook is optional and markup should not be duplicated in another framework only to create stories. The local trial uses native `.astro` stories, which renders the real components rather than copies; Rajeev should still confirm that Storybook is worth keeping.
 
 Tests: `tests/e2e/components.spec.ts` (six Playwright tests) at `36504ae`.
 
@@ -180,28 +222,38 @@ Tests: `tests/e2e/components.spec.ts` (six Playwright tests) at `36504ae`.
 |---|---|---|
 | Warm light ground, ink structure, solar proof accent, clarity blue, spectrum reserved for the mark | Accepted (`SITE_FOUNDATION.md`) | Rajeev |
 | Sora display and Source Sans 3 body | Accepted | Rajeev |
-| `--clarity-text: #2459c4` for small text on light grounds | **Provisional**, awaiting sign off | Rajeev |
-| Extend `--clarity-text` to wordmark, `.asset-how li`, audience labels, support and insight links | **Proposed**, depends on the decision above | Rajeev |
-| Accessible blue for small text on dark sections | **Open**, no value chosen | Rajeev |
-| Solar focus ring on dark grounds | **Proposed** | Rajeev |
-| Primary pressed state and secondary hover tint | **Proposed** | Rajeev |
-| Container `1180px` versus sheet `1200px` | **Open**, `1180px` kept | Rajeev |
-| Sheet colours (`#598BE2` and others) versus code | **Open**, reconcile sheet to code or record a change | Rajeev |
-| Separate `tokens.css`, Storybook and Open Design package | **Proposed** | Rajeev |
-| Register this document in `DOCUMENTATION_ROUTER.md` | **Pending** owner approval | Rajeev |
+| `--clarity-text: #2459c4` for small text and focus on light grounds | **Provisional** | Rajeev |
+| Dark eyebrow: `--clarity-on-dark: #6ea2ff` (recommended) or `--solar` | **Open**; local trial uses `#6ea2ff` provisionally | Rajeev |
+| Solar focus ring and solar eyebrow inside `.contact-details` | **Provisional** | Rajeev |
+| Primary pressed state, secondary ink wash, button row gap, 44px menu target, `tabindex="-1"` on main | Verified in Antigravity local trial, unpushed; needs push and review | Rajeev |
+| TOC numbers to `--muted`; featured border to `--solar-deep` | Verified in Antigravity local trial, unpushed | Rajeev |
+| Container `1180px` versus sheet and Drive JSON `1200px` | **Open**; `1180px` kept | Rajeev |
+| Sheet and Drive JSON colours (`#598BE2` and others) versus code | **Open**; regenerate both from `tokens.css` after approval | Rajeev |
+| Keep `tokens.css`, native Storybook and Open Design package | **Open** | Rajeev |
+| Register this document in `DOCUMENTATION_ROUTER.md` | **Open**; needs owner approval | Rajeev |
 
 ## Evidence and limits
 
-What was checked for this document on 2026-11-24:
+### Checked by Claude on 2026-11-24
 
-* Every token, selector and component claim above was read from the code at `36504ae`.
-* Contrast ratios were recomputed with the WCAG relative luminance formula. Gradient overlays on the dark section were ignored, so its real ground is slightly lighter than `#12141a`.
-* Earlier on the same day, against the same commit: `pnpm build` with its validators passed; `tests/e2e/components.spec.ts` passed 6 of 6 (and failed 6 of 6 on `main`); the full end to end suite passed 7 of 7 on the dev server; an axe run on the home page showed serious findings falling from 10 to 1.
+* Every claim labelled Verified at 36504ae was read from the code at that commit.
+* All contrast ratios in this document were recomputed with the WCAG relative luminance formula, including those reported by Antigravity. They agree except the TOC (2.86 versus 2.74) and `--solar-deep` (3.01 to 3.40 versus 3.12); both differences depend on the assumed ground.
+* Earlier the same day at `36504ae`: `pnpm build` with validators passed; `tests/e2e/components.spec.ts` passed 6 of 6 (failed 6 of 6 on `main`); the full end to end suite passed 7 of 7 on the dev server; home page axe serious findings fell from 10 to 1.
 
-Not done or not available:
+### Reported by Antigravity, local trial, macOS Chrome 158, 2026-11-24 (not reproduced by Claude)
 
-* No Storybook, Open Design or Chromatic run. None exists at this commit.
-* No browser rendering, screenshot or axe run was repeated for this document.
-* The live site at https://aispanda.com could not be loaded from the test environment's shell; earlier comparisons used `main` built locally. Live parity is assumed from `main`, not observed.
-* The Drive token JSON was not opened in this pass.
-* No human review or brand approval has been recorded.
+* `pnpm build`: 25 pages plus validators.
+* Storybook: 21 of 21 native `.astro` stories.
+* Open Design `v0.27.2` static specimen: 0 axe violations at `390px` and `1280px`.
+* Playwright: 10 of 10 with axe and local `@chromatic-com/playwright` archives; 0 violations and 0 horizontal overflow across 8 routes from `320px` to `1440px`.
+* Three way comparison against live https://aispanda.com, `main` and the trial.
+* Axe passes do not cover text over the dark section gradient; the dark eyebrow failure was found by calculation.
+
+### Not done
+
+* Cloud Chromatic (`chromatic --playwright`): no `CHROMATIC_PROJECT_TOKEN`.
+* `vela` login.
+* Push of `antigravity/astro-framework-trial`, and any merge or deploy.
+* Claude could not load the live site from its shell.
+* Human visual review, VoiceOver, browser zoom and real device testing.
+* Brand approval of any provisional value.
