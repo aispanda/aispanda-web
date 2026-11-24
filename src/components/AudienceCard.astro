@@ -1,0 +1,23 @@
+---
+interface Props {
+  /** Audience name, such as "Technology leaders". */
+  label: string;
+  /** Optional benefit headline; shown only in the card variant. */
+  title?: string;
+  /** "strip" matches the compact home page band; "card" matches the About page cards. */
+  variant?: 'strip' | 'card';
+  level?: 2 | 3;
+}
+const { label, title, variant = 'card', level = 3 } = Astro.props;
+const Heading = `h${level}` as 'h2' | 'h3';
+---
+
+{variant === 'strip' ? (
+  <div class="trust-item"><strong>{label}</strong><span><slot /></span></div>
+) : (
+  <article class="audience-card">
+    <b>{label}</b>
+    {title && <Heading class="audience-title">{title}</Heading>}
+    <p><slot /></p>
+  </article>
+)}

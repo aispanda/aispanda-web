@@ -1,0 +1,12 @@
+---
+import type { AssetStatus } from '@/data/site';
+
+interface Props {
+  status: AssetStatus;
+}
+const { status } = Astro.props;
+---
+
+<span class="status-badge" data-status={status}>
+  <span class="status-marker" aria-hidden="true"></span><span class="sr-only">Maturity: </span>{status}
+</span>

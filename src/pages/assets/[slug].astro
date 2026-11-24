@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { assetDetails } from '@/data/site';
+import TagList from '@/components/TagList.astro';
 
 export function getStaticPaths() {
   return assetDetails.map((asset) => ({ params: { slug: asset.slug }, props: { asset } }));
@@ -26,9 +27,7 @@ const { asset } = Astro.props;
       <aside class="sticky-aside">
         <p class="eyebrow">Use when</p>
         <p>{asset.useWhen}</p>
-        <ul class="tag-list" aria-label="Asset topics">
-          {asset.tags.map((tag) => <li>{tag}</li>)}
-        </ul>
+        <TagList tags={asset.tags} label="Asset topics" />
       </aside>
 
       <div class="content-stack">

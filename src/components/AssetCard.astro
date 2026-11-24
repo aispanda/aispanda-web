@@ -1,31 +1,35 @@
 ---
 import type { CatalogueAsset } from '@/data/site';
+import ProofBlock from '@/components/ProofBlock.astro';
+import StatusBadge from '@/components/StatusBadge.astro';
+import TagList from '@/components/TagList.astro';
 
 interface Props {
   asset: CatalogueAsset;
   featured?: boolean;
+  /** Card title level; use 2 when the card list has no section heading above it. */
+  headingLevel?: 2 | 3 | 4;
 }
-const { asset, featured = false } = Astro.props;
+const { asset, featured = false, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
 ---
 
 <article class:list={['asset-card', { featured, 'is-draft': asset.status === 'Draft' }]} id={asset.id}>
   <div class="asset-meta">
     <span>{asset.type}</span>
-    <span class="status-badge" data-status={asset.status} aria-label={`Maturity: ${asset.status}`}>
-      <span class="status-marker" aria-hidden="true"></span>{asset.status}
-    </span>
+    <StatusBadge status={asset.status} />
   </div>
-  <h3>{asset.name}</h3>
+  <Heading class="asset-title">{asset.name}</Heading>
   <p>{asset.summary}</p>
   <p class="asset-outcome"><strong>Why it matters:</strong> {asset.outcome}</p>
-  <section class="asset-proof" aria-labelledby={`${asset.id}-proof-heading`}>
-    <h4 class="asset-proof-label" id={`${asset.id}-proof-heading`}>Proof</h4>
-    <p>{asset.proof.note}</p>
-    <p class="asset-verified">Last verified: <time datetime={asset.proof.lastVerified}>{asset.proof.lastVerified}</time></p>
-    <div class="asset-proof-links">
-      {asset.proof.links.map((link) => <a href={link.href} aria-label={`${link.label}: ${asset.name}`}>{link.label}</a>)}
-    </div>
-  </section>
-  <div class="tag-list" aria-label="Asset topics">{asset.tags.map((tag) => <span>{tag}</span>)}</div>
-  <a class="text-link" href={asset.href}>Explore asset <span aria-hidden="true">→</span></a>
+  <ProofBlock
+    id={asset.id}
+    subject={asset.name}
+    note={asset.proof.note}
+    lastVerified={asset.proof.lastVerified}
+    links={asset.proof.links}
+    headingLevel={(headingLevel + 1) as 3 | 4 | 5}
+  />
+  <TagList tags={asset.tags} label="Asset topics" />
+  <a class="text-link" href={asset.href}>Explore asset<span class="sr-only">: {asset.name}</span> <span aria-hidden="true">→</span></a>
 </article>

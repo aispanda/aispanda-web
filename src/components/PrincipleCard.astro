@@ -1,0 +1,16 @@
+---
+interface Props {
+  number: string;
+  title: string;
+  summary: string;
+  level?: 2 | 3 | 4;
+}
+const { number, title, summary, level = 3 } = Astro.props;
+const Heading = `h${level}` as 'h2' | 'h3' | 'h4';
+---
+
+<article class="principle-card">
+  <span class="principle-number" aria-hidden="true">{number}</span>
+  <Heading><span class="sr-only">Principle {number}: </span>{title}</Heading>
+  <p>{summary}</p>
+</article>

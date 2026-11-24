@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
+import AudienceCard from '@/components/AudienceCard.astro';
+import SectionHeading from '@/components/SectionHeading.astro';
 ---
 
 <BaseLayout title="About" description="AIspanda is a public learning and proof platform for practical AI strategy, engineering and delivery.">
@@ -10,15 +12,14 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
   </header>
   <section class="section" style="padding-top: 1rem">
     <div class="shell audience-grid">
-      <article class="audience-card"><b>For business leaders</b><h3>See the path to value.</h3><p>Understand what a small proof can establish, what it cannot, and which decisions deserve investment.</p></article>
-      <article class="audience-card"><b>For technology leaders</b><h3>Inspect the system.</h3><p>Review architecture, governance, cost, scalability, portability and operational consequences.</p></article>
-      <article class="audience-card"><b>For builders</b><h3>Reuse the work.</h3><p>Start with practical templates, code, tools, prompts and quality checks instead of a blank page.</p></article>
+      <AudienceCard label="For business leaders" title="See the path to value." level={2}>Understand what a small proof can establish, what it cannot, and which decisions deserve investment.</AudienceCard>
+      <AudienceCard label="For technology leaders" title="Inspect the system." level={2}>Review architecture, governance, cost, scalability, portability and operational consequences.</AudienceCard>
+      <AudienceCard label="For builders" title="Reuse the work." level={2}>Start with practical templates, code, tools, prompts and quality checks instead of a blank page.</AudienceCard>
     </div>
   </section>
   <section class="section section-alt">
-    <div class="shell section-head">
-      <div><p class="eyebrow">Long-term direction</p><h2>A credible AI delivery brand, built one proof at a time.</h2></div>
+    <SectionHeading class="shell" eyebrow="Long-term direction" title="A credible AI delivery brand, built one proof at a time.">
       <p>Over time, AIspanda will grow from articles and assets into a place where practitioners can discuss, improve and contribute reusable work. Community features will follow real demand and responsible operating capacity.</p>
-    </div>
+    </SectionHeading>
   </section>
 </BaseLayout>

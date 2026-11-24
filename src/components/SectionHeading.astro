@@ -1,0 +1,16 @@
+---
+interface Props {
+  eyebrow?: string;
+  title: string;
+  level?: 2 | 3;
+  id?: string;
+  class?: string;
+}
+const { eyebrow, title, level = 2, id, class: className } = Astro.props;
+const Heading = `h${level}` as 'h2' | 'h3';
+---
+
+<div class:list={['section-head', className]}>
+  <div>{eyebrow && <p class="eyebrow">{eyebrow}</p>}<Heading id={id}>{title}</Heading></div>
+  <slot />
+</div>

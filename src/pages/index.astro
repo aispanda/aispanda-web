@@ -1,6 +1,9 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import AssetCard from '@/components/AssetCard.astro';
+import AudienceCard from '@/components/AudienceCard.astro';
+import PrincipleCard from '@/components/PrincipleCard.astro';
+import SectionHeading from '@/components/SectionHeading.astro';
 import { assets, principles } from '@/data/site';
 ---
 
@@ -32,18 +35,17 @@ import { assets, principles } from '@/data/site';
 
   <section class="trust-strip" aria-label="Who this is for">
     <div class="shell trust-grid">
-      <div class="trust-item"><strong>Everyday professionals</strong><span>Survive and evolve with AI without a priesthood.</span></div>
-      <div class="trust-item"><strong>Technology leaders</strong><span>Judgment, architecture, cost and evidence — not theatre.</span></div>
-      <div class="trust-item"><strong>Builders &amp; policy</strong><span>Reusable patterns and sober open-vs-closed questions.</span></div>
+      <AudienceCard variant="strip" label="Everyday professionals">Survive and evolve with AI without a priesthood.</AudienceCard>
+      <AudienceCard variant="strip" label="Technology leaders">Judgment, architecture, cost and evidence — not theatre.</AudienceCard>
+      <AudienceCard variant="strip" label="Builders & policy">Reusable patterns and sober open-vs-closed questions.</AudienceCard>
     </div>
   </section>
 
   <section class="section">
     <div class="shell">
-      <div class="section-head">
-        <div><p class="eyebrow">Reusable assets</p><h2>Start from something that works.</h2></div>
+      <SectionHeading eyebrow="Reusable assets" title="Start from something that works.">
         <p>Each card shows the asset's maturity, recorded verification date and inspectable proof, including gaps that remain open.</p>
-      </div>
+      </SectionHeading>
       <div class="card-grid">
         {assets.map((asset, index) => <AssetCard asset={asset} featured={index === 0} />)}
       </div>
@@ -52,17 +54,12 @@ import { assets, principles } from '@/data/site';
 
   <section class="section section-alt">
     <div class="shell">
-      <div class="section-head">
-        <div><p class="eyebrow">How the work is judged</p><h2>Fast does not mean careless.</h2></div>
+      <SectionHeading eyebrow="How the work is judged" title="Fast does not mean careless.">
         <p>AI reduces the cost of producing code and analysis. Good judgment, source ownership and verification become more important—not less.</p>
-      </div>
+      </SectionHeading>
       <div class="principle-grid">
         {principles.slice(0, 4).map((principle) => (
-          <article class="principle-card">
-            <span class="principle-number">{principle.number}</span>
-            <h3>{principle.title}</h3>
-            <p>{principle.summary}</p>
-          </article>
+          <PrincipleCard number={principle.number} title={principle.title} summary={principle.summary} />
         ))}
       </div>
       <p style="margin-top: 2rem"><a class="text-link" href="/principles">Read all principles <span aria-hidden="true">→</span></a></p>

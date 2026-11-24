@@ -37,6 +37,13 @@ const currentPath = Astro.url.pathname;
     button.setAttribute('aria-expanded', String(!open));
     nav?.toggleAttribute('data-open', !open);
   });
+  // Escape closes the open mobile menu and returns focus to its button.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || button?.getAttribute('aria-expanded') !== 'true') return;
+    button.setAttribute('aria-expanded', 'false');
+    nav?.removeAttribute('data-open');
+    button.focus();
+  });
 
   const sessionKey = 'blog-studio-authorized-session-v1';
   const memberSessionKey = 'blog-member-session-v1';

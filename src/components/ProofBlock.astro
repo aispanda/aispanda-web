@@ -1,0 +1,26 @@
+---
+interface Props {
+  /** Unique prefix for the heading id, usually the asset id. */
+  id: string;
+  /** Name used to make each proof link's accessible name unique. */
+  subject: string;
+  note: string;
+  lastVerified: string;
+  links: { label: string; href: string }[];
+  headingLevel?: 3 | 4 | 5;
+}
+const { id, subject, note, lastVerified, links, headingLevel = 4 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h3' | 'h4' | 'h5';
+const headingId = `${id}-proof-heading`;
+---
+
+<div class="asset-proof" role="group" aria-labelledby={headingId}>
+  <Heading class="asset-proof-label" id={headingId}>Proof</Heading>
+  <p>{note}</p>
+  <p class="asset-verified">Last verified: <time datetime={lastVerified}>{lastVerified}</time></p>
+  {links.length > 0 && (
+    <div class="asset-proof-links">
+      {links.map((link) => <a href={link.href} aria-label={`${link.label}: ${subject}`}>{link.label}</a>)}
+    </div>
+  )}
+</div>
