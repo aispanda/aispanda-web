@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title">
+  <title id="title">JSON Views</title>
+  <style>
+    :root { color: #000; }
+    @media (prefers-color-scheme: dark) { :root { color: #fff; } }
+  </style>
+  <g fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <path id="brace" d="M32 14 C26 11 25 21 32 21 C43 21 41 7 30 7 C13 7 11 23 18 35 C24 45 28 49 23 53 C19 57 13 56 13 52 C13 48 20 49 23 53 C28 59 23 66 18 75 C10 89 18 96 30 93 C42 91 43 79 33 78 C25 77 24 88 31 86" />
+    <use href="#brace" transform="translate(100 0) scale(-1 1)" />
+  </g>
+</svg>

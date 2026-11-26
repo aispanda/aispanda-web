@@ -1,0 +1,171 @@
+{
+  "$jsonviews": {
+    "version": 1,
+    "schema": {
+      "$.articles[*].title": {
+        "type": "text",
+        "title": "Title"
+      },
+      "$.articles[*].topic": {
+        "type": "select",
+        "title": "Topic",
+        "options": [
+          "Overview",
+          "The idea",
+          "Origin",
+          "Files",
+          "Format",
+          "Getting started",
+          "Privacy"
+        ],
+        "optionColors": {
+          "Overview": "blue",
+          "The idea": "purple",
+          "Origin": "orange",
+          "Files": "green",
+          "Format": "yellow",
+          "Getting started": "gray"
+        }
+      },
+      "$.articles[*].body": {
+        "type": "markdown",
+        "title": "Article"
+      },
+      "$.articles[*].audience": {
+        "type": "multi-select",
+        "title": "Audience",
+        "options": [
+          "Everyone",
+          "Developers",
+          "Agents",
+          "Notion Lovers",
+          "Script.it Fans"
+        ],
+        "optionColors": {
+          "Everyone": "blue",
+          "Developers": "purple",
+          "Agents": "green"
+        }
+      },
+      "$.articles[*].reading_time": {
+        "type": "number",
+        "title": "Reading time (sec)",
+        "minimum": 1,
+        "description": "Estimated seconds: title and visible article word count × 60 ÷ 238, rounded up."
+      },
+      "$.articles[*].done": {
+        "title": "Done",
+        "type": "checkbox"
+      }
+    },
+    "views": [
+      {
+        "id": "welcome",
+        "name": "Welcome",
+        "path": "$.articles[0].body"
+      },
+      {
+        "id": "articles",
+        "name": "Articles",
+        "path": "$.articles",
+        "columns": [
+          {
+            "label": "Article",
+            "path": "$.articles[*].title"
+          },
+          {
+            "label": "Topic",
+            "path": "$.articles[*].topic"
+          },
+          {
+            "label": "Audience",
+            "path": "$.articles[*].audience"
+          },
+          {
+            "label": "Done",
+            "path": "$.articles[*].done"
+          },
+          {
+            "label": "Reading time (sec)",
+            "path": "$.articles[*].reading_time"
+          }
+        ]
+      }
+    ]
+  },
+  "articles": [
+    {
+      "title": "What is this?",
+      "topic": "Overview",
+      "body": "# JSON Views\n\nToday, the formats we use for structured data leave a gap:\n\n-  **CSV** is not expressive enough.\n-  **JSON** is hard for humans to navigate and edit.\n-  **Excel (XLSX)** is cumbersome for agents to navigate and edit.\n\nJSON Views closes that gap with an editor that makes JSON files look like a **Notion database**. People can browse records, open pages, and edit fields while agents work with the same underlying JSON.\n\nA small **`$jsonviews`** property inside the file holds the column schema and saved views of its important parts. Users can jump straight to the useful tables and pages instead of navigating the whole JSON tree. Agents can edit this property to help humans navigate JSON easily.\n\n## The Markdown Analogy\n\nWhat Markdown does for documents, JSON Views does for structured data: it makes an expressive, machine-friendly format comfortable for people too.\n\n<svg viewBox=\"0 0 640 620\" width=\"100%\" role=\"img\" aria-label=\"Structured data: machine friendly, human friendly, and expressive.\"><text x=\"320\" y=\"38\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"32\" font-weight=\"700\">Structured data</text><circle cx=\"215\" cy=\"285\" r=\"180\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" /><circle cx=\"425\" cy=\"285\" r=\"180\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" /><circle cx=\"320\" cy=\"425\" r=\"180\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" /><text x=\"140\" y=\"230\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">Machine</text><text x=\"140\" y=\"264\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">friendly</text><text x=\"500\" y=\"247\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">Expressive</text><text x=\"320\" y=\"520\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">Human</text><text x=\"320\" y=\"554\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">friendly</text><text x=\"320\" y=\"220\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.52 0.15 60), oklch(0.855 0.088 60))\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"600\">JSON</text><text x=\"220\" y=\"430\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.52 0.15 60), oklch(0.855 0.088 60))\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"600\">CSV</text><text x=\"420\" y=\"430\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.52 0.15 60), oklch(0.855 0.088 60))\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"600\">XLSX</text><text x=\"320\" y=\"326\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.49 0.22 295), oklch(0.855 0.088 295))\" font-family=\"system-ui, sans-serif\" font-size=\"26\" font-weight=\"700\">JSON</text><text x=\"320\" y=\"358\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.49 0.22 295), oklch(0.855 0.088 295))\" font-family=\"system-ui, sans-serif\" font-size=\"26\" font-weight=\"700\">Views</text></svg><svg viewBox=\"0 0 640 620\" width=\"100%\" role=\"img\" aria-label=\"Text documents: machine friendly, human friendly, and expressive.\"><text x=\"320\" y=\"38\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"32\" font-weight=\"700\">Text documents</text><circle cx=\"215\" cy=\"285\" r=\"180\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" /><circle cx=\"425\" cy=\"285\" r=\"180\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" /><circle cx=\"320\" cy=\"425\" r=\"180\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" /><text x=\"140\" y=\"230\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">Machine</text><text x=\"140\" y=\"264\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">friendly</text><text x=\"500\" y=\"247\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">Expressive</text><text x=\"320\" y=\"520\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">Human</text><text x=\"320\" y=\"554\" text-anchor=\"middle\" fill=\"currentColor\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"500\">friendly</text><text x=\"320\" y=\"220\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.52 0.15 60), oklch(0.855 0.088 60))\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"600\">HTML</text><text x=\"220\" y=\"430\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.52 0.15 60), oklch(0.855 0.088 60))\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"600\">Text</text><text x=\"420\" y=\"430\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.52 0.15 60), oklch(0.855 0.088 60))\" font-family=\"system-ui, sans-serif\" font-size=\"28\" font-weight=\"600\">DOCX</text><text x=\"320\" y=\"342\" text-anchor=\"middle\" fill=\"light-dark(oklch(0.49 0.22 295), oklch(0.855 0.088 295))\" font-family=\"system-ui, sans-serif\" font-size=\"26\" font-weight=\"700\">Markdown</text></svg>\n\n<a href=\"#/files/About%20JSON%20Views.json/views/Articles\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/read-more-dark.svg\"><img src=\"./landing-assets/read-more-light.svg\" width=\"105\" height=\"38\" alt=\"Read More\"></picture></a>\n\n## How do humans and agents collaborate on Structured Data?\n\n<picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/leads-demo-dark.webp\"><img src=\"./landing-assets/leads-demo-light.webp\" width=\"1120\" height=\"630\" alt=\"leads.json open in JSON Views next to Claude: the leads table, a Kanban board by status and an HTML lead dashboard, one lead approved in the table, then Claude re-runs the outreach and drafts that lead’s intro\"></picture>\n\n## Install JSON Views in your AI agent with one click\n\n| <a href=\"claude://code/new?q=Install%20the%20JSON%20Views%20skill%3A%20npx%20skills%20add%20script-it%2Fjson-views%20-g\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/claude-code-dark.svg\"><img src=\"./landing-assets/claude-code-light.svg\" width=\"144\" height=\"38\" alt=\"Claude Code\"></picture></a> | <a href=\"codex://new?prompt=Install%20the%20JSON%20Views%20skill%3A%20npx%20skills%20add%20script-it%2Fjson-views%20-g\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/codex-dark.svg\"><img src=\"./landing-assets/codex-light.svg\" width=\"101\" height=\"38\" alt=\"Codex\"></picture></a> | <a href=\"cursor://anysphere.cursor-deeplink/prompt?text=Install%20the%20JSON%20Views%20skill%3A%20npx%20skills%20add%20script-it%2Fjson-views%20-g\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/cursor-dark.svg\"><img src=\"./landing-assets/cursor-light.svg\" width=\"104\" height=\"38\" alt=\"Cursor\"></picture></a> | <a href=\"https://grok.com/?q=Install%20the%20JSON%20Views%20skill%3A%20npx%20skills%20add%20script-it%2Fjson-views%20-g\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/grok-bot-dark.svg\"><img src=\"./landing-assets/grok-bot-light.svg\" width=\"117\" height=\"38\" alt=\"Grok Bot\"></picture></a> |\n|---|---|---|---|\n\nUsing another agent? Click **Agent Guide** in the top-left corner of the screen and copy the prompt.\n\nRun it locally:\n\n```bash\nnpx @script-it/json-views ./data.json\n```\n\n## Examples\n\n| <a href=\"#/files/Research%20Sprint.json/views/Verification%20board\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/example-research-sprint-dark.webp\"><img src=\"./landing-assets/example-research-sprint-light.webp\" width=\"232\" height=\"156\" alt=\"Research Sprint\"></picture></a> | <a href=\"#/files/Decision%20Comparison.json/views/Option%20comparison\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/example-decision-comparison-dark.webp\"><img src=\"./landing-assets/example-decision-comparison-light.webp\" width=\"232\" height=\"156\" alt=\"Decision Comparison\"></picture></a> |\n|---|---|\n| <a href=\"#/files/Task%20Management.json/views/Task%20board\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/example-task-management-dark.webp\"><img src=\"./landing-assets/example-task-management-light.webp\" width=\"232\" height=\"156\" alt=\"Task Management\"></picture></a> | <a href=\"#/files/App%20Views%2FStripe%20Payments.json/views/Stripe%20payments\"><picture><source media=\"(prefers-color-scheme: dark)\" srcset=\"./landing-assets/example-stripe-payments-dark.webp\"><img src=\"./landing-assets/example-stripe-payments-light.webp\" width=\"232\" height=\"156\" alt=\"Stripe Payments\"></picture></a> |\n",
+      "audience": [
+        "Everyone",
+        "Notion Lovers"
+      ],
+      "reading_time": 43,
+      "done": false
+    },
+    {
+      "title": "Why we built this?",
+      "topic": "Origin",
+      "body": "We needed a great JSON viewer for [**Script.it**](https://script.it/), a file-based workflow product we are building. Workflow blocks often produce JSON because it's a great format for structured data, but a wall of braces is not always a great interface, and makes it hard to validate the blocks.\n\nWe wanted people to inspect those files comfortably, and we wanted agents to help them navigate to the useful parts.\n\nPutting a small `$jsonviews` property inside the JSON makes that straightforward. An agent can write the view settings directly into a file—or into the Python code that generates it. The next time the file opens, its pages, tables, and boards come with it.",
+      "audience": [
+        "Everyone",
+        "Script.it Fans"
+      ],
+      "reading_time": 30,
+      "done": false
+    },
+    {
+      "title": "How the Editor Works",
+      "topic": "Files",
+      "body": "json-views render JSON files as **tables, Kanban or html views**.\n\n### Views and schemas\n\nThe **`$jsonviews`** property saves the interface settings inside the JSON file. **Views** choose which part of the data to show and how to display it. **Schemas** describe the columns and their types, such as text, dates, or select options. You can have several views of the same data.\n\nWhen these settings are absent, the editor infers useful views and field types from the data.\n\n### Records\n\nEach row or card represents a **record**: an item with structured properties, such as a task with a title, status, and due date. Open a record to see and edit its properties. A body property can display longer content as a document.\n\n### Tables inside records\n\nA record can also have a column that contains another table. For example, a project can contain milestones, and each milestone can contain checks. Click a nested collection to browse and edit its records, then return to the parent. Everything stays nested in the same JSON file.\n\n### HTML views\n\nTurn JSON into an editable interface with HTML and CSS. Try **Task Management → Project dashboard**.\n\n**App views:** [Gmail](#/files/App%20Views%2FGmail%20Message.json), [HubSpot](#/files/App%20Views%2FHubSpot%20Contacts.json), [Slack](#/files/App%20Views%2FSlack%20Channel.json), [Notion](#/files/App%20Views%2FNotion%20Project.json), [Stripe](#/files/App%20Views%2FStripe%20Payments.json), [LinkedIn mock](#/files/App%20Views%2FLinkedIn%20Messages%20%28Mock%29.json).\n\nThese use sample data; edits stay in the file. [API notes](./representative-examples/App%20Views/README.md) · [Build an HTML view](https://github.com/script-it/json-views/blob/main/skills/json-views/references/html-views.md).",
+      "audience": [
+        "Everyone"
+      ],
+      "reading_time": 56,
+      "done": false
+    },
+    {
+      "title": "The file schema",
+      "topic": "Format",
+      "body": "The property is called **`$jsonviews`**. It contains `version: 1`, **`views`**, and **`schema`**.\n\n**`views`** describes where to look and how to show it: a named page, a table with chosen columns, or a board grouped by status. **`schema`** describes fields by path: a date, a checkbox, a choice, or the body of a page.\n\n```json\n{\n  \"$jsonviews\": {\n    \"version\": 1,\n    \"schema\": { \"$.note.body\": { \"type\": \"body\" } },\n    \"views\": [{ \"name\": \"Note\", \"path\": \"$.note\" }]\n  },\n  \"note\": { \"title\": \"Hello\", \"body\": \"A page inside a file.\" }\n}\n```\n\nWithout `$jsonviews`, the app infers useful field types and views from the data. You can then make those choices explicit. Invalid settings are shown as issues rather than silently replaced. In the current format, the view list is named `views`, not `use`.",
+      "audience": [
+        "Developers",
+        "Agents"
+      ],
+      "reading_time": 31,
+      "done": false
+    },
+    {
+      "title": "Multiple ways to use json-views",
+      "topic": "Getting started",
+      "body": "There are two ways to use JSON Views.\n\n### 1. Use this website\n\nOpen JSON and CSV files or folders directly in your browser. Your files are read and edited on your own machine and are never uploaded to a server. Choose a view, edit your data, then download a copy or share a snapshot link. Imported files are cached in this browser.\n\n### 2. Build from source and use the CLI\n\nClone the [open-source repository](https://github.com/script-it/json-views), run `npm ci` and `npm run build`, then open a local file:\n\n```sh\nnode packages/cli/bin/json-views.js ./data.json\n```\n\nThe CLI runs the viewer locally and saves accepted edits back to the file. It also gives your agent a local API to work with the same document.\n\n### Work with your agent\n\nUse the **Agent Guide** on this website, or give your agent the [JSON Views skill](https://github.com/script-it/json-views/tree/main/skills/json-views). Ask it to organize data, add views, or help you navigate a file. You and your agent work with the same JSON and its view settings.",
+      "audience": [
+        "Everyone"
+      ],
+      "reading_time": 44,
+      "done": false
+    },
+    {
+      "audience": [
+        "Everyone"
+      ],
+      "body": "The website is client-only: files are read and edited in your browser. Imported documents are cached here and can return after a reload. Download a copy to keep your work beyond browser storage.\n\nShare puts a snapshot of one file in the link itself. Anyone with the link can open their own copy; later edits do not sync. Large files can be shared as downloads instead.\n\nNo backend server stores your shared files. We use minimal anonymous usage statistics to improve the app - you can disable them in Settings.",
+      "reading_time": 24,
+      "title": "A very private web app",
+      "topic": "Privacy",
+      "done": false
+    },
+    {
+      "title": "Embed json-views in your app",
+      "audience": [
+        "Developers"
+      ],
+      "topic": "Getting started",
+      "reading_time": 27,
+      "body": "JSON Views can be embedded directly in other apps—the same way it is embedded in [Script.it](https://script.it/) to display and edit JSON produced by workflow blocks.\n\nUse the **React component** to give your users pages, tables, boards, and a source editor inside your own interface. Pass it JSON; the data and its `$jsonviews` settings determine what appears.\n\n**Your app owns the files and saving.** Connect a save callback to let users edit, or leave it out for a read-only viewer. You control storage, permissions, and how changes reach your agents or workflows.\n\nSee the [React integration guide](https://github.com/script-it/json-views/blob/main/packages/react/README.md#react-integration) to get started.",
+      "done": false
+    }
+  ]
+}

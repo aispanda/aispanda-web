@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "schema": {
+    "$.decision": { "type": "text", "title": "Decision", "required": true },
+    "$.decision_owner": { "type": "text", "title": "Owner" },
+    "$.due_date": { "type": "date", "title": "Due date" },
+    "$.criteria[*].criterion": { "type": "text", "title": "Criterion", "required": true },
+    "$.criteria[*].weight": { "type": "number", "title": "Weight", "minimum": 1, "maximum": 5, "step": 1 },
+    "$.criteria[*].notes": { "type": "markdown", "title": "Why it matters" },
+    "$.options[*].id": { "type": "text", "title": "Option ID", "required": true, "pattern": "^OPT-[0-9]+$" },
+    "$.options[*].option": { "type": "text", "title": "Option", "required": true },
+    "$.options[*].status": {
+      "type": "select", "title": "Status", "required": true,
+      "options": ["Captured", "Evaluated", "Shortlisted", "Selected"],
+      "optionColors": { "Captured": "gray", "Evaluated": "blue", "Shortlisted": "purple", "Selected": "green" }
+    },
+    "$.options[*].recommendation": {
+      "type": "select", "title": "Recommendation",
+      "options": ["Preferred", "Fallback", "Not now"],
+      "optionColors": { "Preferred": "green", "Fallback": "yellow", "Not now": "gray" }
+    },
+    "$.options[*].weighted_score": { "type": "number", "title": "Score", "minimum": 0, "maximum": 100 },
+    "$.options[*].setup_days": { "type": "number", "title": "Setup days", "minimum": 0 },
+    "$.options[*].cost_band": {
+      "type": "select", "title": "Cost",
+      "options": ["Low", "Medium", "High"],
+      "optionColors": { "Low": "green", "Medium": "yellow", "High": "red" }
+    },
+    "$.options[*].strengths": {
+      "type": "multi-select", "title": "Strengths",
+      "options": ["Structured", "Agent-friendly", "Versionable", "Familiar", "Collaborative", "Tailored UI", "Readable", "Portable"]
+    },
+    "$.options[*].risks": {
+      "type": "multi-select", "title": "Risks",
+      "options": ["Unfamiliar format", "Weak nesting", "Schema drift", "Build time", "Maintenance", "Hard to validate", "Manual comparison"]
+    },
+    "$.options[*].rationale": { "type": "markdown", "title": "Rationale" }
+  },
+  "views": [
+    {
+      "id": "option-comparison",
+      "name": "Option comparison",
+      "path": "$.options",
+      "columns": [
+        { "label": "Option", "path": "$.options[*].option" },
+        { "label": "Recommendation", "path": "$.options[*].recommendation" },
+        { "label": "Score", "path": "$.options[*].weighted_score" },
+        { "label": "Setup days", "path": "$.options[*].setup_days" },
+        { "label": "Cost", "path": "$.options[*].cost_band" },
+        { "label": "Strengths", "path": "$.options[*].strengths" },
+        { "label": "Risks", "path": "$.options[*].risks" }
+      ],
+      "sort": [{ "path": "$.options[*].weighted_score", "direction": "desc" }]
+    },
+    {
+      "id": "decision-board",
+      "name": "Decision board",
+      "path": "$.options",
+      "display": "kanban",
+      "groupBy": "$.options[*].recommendation",
+      "columns": [
+        { "label": "Option", "path": "$.options[*].option" },
+        { "label": "Score", "path": "$.options[*].weighted_score" },
+        { "label": "Cost", "path": "$.options[*].cost_band" }
+      ]
+    },
+    {
+      "id": "shortlist",
+      "name": "Shortlist",
+      "path": "$.options",
+      "columns": [
+        { "label": "Option", "path": "$.options[*].option" },
+        { "label": "Score", "path": "$.options[*].weighted_score" },
+        { "label": "Setup days", "path": "$.options[*].setup_days" },
+        { "label": "Strengths", "path": "$.options[*].strengths" }
+      ],
+      "filter": { "rules": [{ "path": "$.options[*].status", "operator": "eq", "value": "Shortlisted" }] },
+      "sort": [{ "path": "$.options[*].weighted_score", "direction": "desc" }]
+    },
+    {
+      "id": "criteria",
+      "name": "Criteria",
+      "path": "$.criteria",
+      "columns": [
+        { "label": "Criterion", "path": "$.criteria[*].criterion" },
+        { "label": "Weight", "path": "$.criteria[*].weight" }
+      ],
+      "sort": [{ "path": "$.criteria[*].weight", "direction": "desc" }]
+    }
+  ]
+}

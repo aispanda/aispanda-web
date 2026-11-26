@@ -1,0 +1,68 @@
+# JSON Views agent guide
+
+AI agents can use json-views.com—a client-only app—through WebMCP or its JavaScript API (`window.jsonViews.help()`).
+
+Direct the user with `<site>/#/files/<filename-or-folder-path>/views/<view-name>`; URL-encode each name. `jsonViews.link("tasks.json", "Board")` or WebMCP `json_views_get_link` generates it without navigating. The file must already exist in the user's browser workspace.
+
+Or run the open-source app (https://github.com/script-it/json-views) locally. Consider installing its agent skill (https://github.com/script-it/json-views/tree/main/skills/json-views).
+
+JSON Views is an open-source JSON viewer and editor. It can infer useful typed fields and views from ordinary JSON, or render a declared interface from JSON Views annotations.
+
+## Use this website in a browser
+
+- Use the Upload button in the left sidebar to add a `.json` file. Each file remains a separate entry in the sidebar.
+- Use the plus at the end of the sidebar list to create a blank JSON document.
+- Open Source to edit raw JSON. Apply source validates browser-only edits.
+- Use the small download icon beside the active filename to save its current JSON.
+- The public browser app has no upload backend: it does not send JSON to a server.
+
+## Use local files without a browser
+
+The public static site has no upload API, so a non-browser agent cannot upload a file to it. Use the local CLI instead.
+
+- Run `npx @script-it/json-views ./data.json --no-open`.
+- In a source checkout, run `npm ci`, `npm run build`, then `node packages/cli/bin/json-views.js ./data.json --no-open`.
+- The command prints a loopback API endpoint and a random token. `GET /api/document?token=...` returns `{ content, filename, revision }`.
+- `PUT /api/document?token=...` with `Content-Type: application/json` and `{ content, revision }` saves valid JSON. Retain the accepted revision. On HTTP `409`, reload before retrying an intentional edit.
+- The API exposes only the requested local file. Do not share its capability URL or token.
+
+Browser uploads are separate tab-local copies; they cannot overwrite a file opened by the CLI.
+
+## Add annotations
+
+Plain JSON works immediately. JSON Views infers field types, tables, record pages, and useful grouped views without changing source. To declare the interface explicitly, add a top-level `$jsonviews` object with `"version": 1`.
+
+Embed annotations only in an object root: `{ "$jsonviews": { "version": 1, "schema": { ... }, "views": [ ... ] }, "data": ... }`. A root array cannot contain `$jsonviews`; wrap it in an object, commonly under `data`, before adding persistent metadata.
+
+`$jsonviews.schema` maps JSONPath expressions to field descriptors. Paths start at `$`; use `$.contacts[*].email` for every email in an array, and use concrete paths for view roots. Built-in types are `text`, `number`, `checkbox`, `select`, `multi-select`, `date`, `url`, `email`, and `body`. Descriptors may include `title`, `description`, `required`, `pattern`, `minimum`, `maximum`, `options`, and `optionColors`. Select options are suggestions, not a closed enum.
+
+`$jsonviews.views` is an array of named views. Each view needs `name` and a concrete `path`. Collection views can use `columns`, `filter`, `sort`, and `display: "kanban"` with `groupBy`; Kanban views can use `groupOrder` to persist lane order. Omit `display` for automatic layout: a record page for one record, a table for record collections. Collection-field paths normally include the item wildcard, for example `$.contacts[*].name`.
+
+The `$jsonviews` property itself looks like this:
+
+```json
+"$jsonviews": {
+  "version": 1,
+  "schema": {
+    "$.contacts[*].email": { "type": "email", "title": "Email" }
+  },
+  "views": [{
+    "id": "contacts",
+    "name": "Contacts",
+    "path": "$.contacts",
+    "columns": [{ "label": "Email", "path": "$.contacts[*].email" }]
+  }]
+}
+```
+
+Use only paths that exist in the document and preserve application data exactly.
+
+## Work with local files
+
+For a local development server, clone https://github.com/script-it/json-views, run `npm ci`, then run `npm run dev`. `npx @script-it/json-views ./data.json` opens a local file with revision-safe saves.
+
+Read the repository README and the annotation specification in packages/core/README.md for the complete annotation contract.
+
+For the complete schema and view contract, including HTML layouts and editable bindings, call WebMCP `json_views_help` or `window.jsonViews.help()` in the app.
+
+Put the field that best identifies each record first in `columns`: it supplies table record links, Kanban headings, and opened record headings. Reordering or hiding it changes the label. Schema `title` remains a field label.

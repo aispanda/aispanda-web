@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "schema": {
+    "$.tasks[*].id": {
+      "type": "text",
+      "title": "Task ID",
+      "required": true,
+      "pattern": "^TASK-[0-9]+$"
+    },
+    "$.tasks[*].title": {
+      "type": "text",
+      "title": "Task",
+      "required": true
+    },
+    "$.tasks[*].status": {
+      "type": "select",
+      "title": "Status",
+      "required": true,
+      "options": ["To do", "In progress", "Done"],
+      "optionColors": {
+        "To do": "blue",
+        "In progress": "purple",
+        "Done": "green"
+      }
+    },
+    "$.tasks[*].priority": {
+      "type": "select",
+      "title": "Priority",
+      "required": true,
+      "options": ["Low", "Medium", "High", "Urgent"],
+      "optionColors": {
+        "Low": "gray",
+        "Medium": "blue",
+        "High": "orange",
+        "Urgent": "red"
+      }
+    },
+    "$.tasks[*].project": {
+      "type": "select",
+      "title": "Project",
+      "required": true,
+      "options": ["Website launch", "Data migration", "Developer experience"],
+      "optionColors": {
+        "Website launch": "purple",
+        "Data migration": "blue",
+        "Developer experience": "green"
+      }
+    },
+    "$.tasks[*].assignee": {
+      "type": "select",
+      "title": "Assignee",
+      "options": ["Maya Chen", "Theo Martin", "Ari Patel", "Noah Williams", "Lena Ortiz"]
+    },
+    "$.tasks[*].due_date": {
+      "type": "date",
+      "title": "Due date"
+    },
+    "$.tasks[*].tags": {
+      "type": "multi-select",
+      "title": "Tags",
+      "options": ["Launch", "Planning", "Content", "Review", "Frontend", "Bug", "Data", "Docs", "API", "Analytics"],
+      "optionColors": {
+        "Launch": "purple",
+        "Planning": "blue",
+        "Content": "pink",
+        "Review": "yellow",
+        "Frontend": "blue",
+        "Bug": "red",
+        "Data": "green",
+        "Docs": "gray",
+        "API": "orange",
+        "Analytics": "green"
+      }
+    },
+    "$.tasks[*].done": {
+      "type": "checkbox",
+      "title": "Done",
+      "required": true
+    },
+    "$.tasks[*].position": {
+      "type": "number",
+      "title": "Position",
+      "required": true,
+      "minimum": 0,
+      "step": 1
+    },
+    "$.tasks[*].description": {
+      "type": "markdown",
+      "title": "Description",
+      "description": "Details and acceptance criteria for the task."
+    }
+  },
+  "views": [
+    {
+      "id": "task-board",
+      "name": "Task board",
+      "path": "$.tasks",
+      "display": "kanban",
+      "groupBy": "$.tasks[*].status",
+      "groupOrder": ["To do", "In progress", "Done"],
+      "orderPath": "$.tasks[*].position",
+      "columns": [
+        { "label": "Task", "path": "$.tasks[*].title" },
+        { "label": "Priority", "path": "$.tasks[*].priority" },
+        { "label": "Assignee", "path": "$.tasks[*].assignee" },
+        { "label": "Due date", "path": "$.tasks[*].due_date" },
+        { "label": "Tags", "path": "$.tasks[*].tags" }
+      ]
+    },
+    {
+      "id": "project-dashboard",
+      "name": "Project dashboard",
+      "path": "$",
+      "display": "html",
+      "html": "<main><header><div><span class=\"eyebrow\">PROJECT COMMAND CENTER</span><h1>Launch work, at a glance</h1><p>Review priorities, update ownership, and check off completed work without leaving the dashboard.</p></div><div class=\"legend\"><span><i class=\"dot urgent\"></i>Urgent</span><span><i class=\"dot active\"></i>Active</span><span><i class=\"dot done\"></i>Done</span></div></header><section class=\"task-grid\" aria-label=\"Project tasks\"><jv-repeat source=\"$.tasks\" as=\"task\" key=\"id\"><article class=\"task-card\"><div class=\"card-top\"><small><jv-value bind=\"task.id\"></jv-value></small><label class=\"complete\"><input type=\"checkbox\" jv-bind=\"task.done\" jv-attr-aria-label=\"task.title\"> Complete</label></div><h2><jv-field bind=\"task.title\"></jv-field></h2><p class=\"description\"><jv-field bind=\"task.description\"></jv-field></p><dl><div><dt>Status</dt><dd><jv-field bind=\"task.status\"></jv-field></dd></div><div><dt>Priority</dt><dd><jv-field bind=\"task.priority\"></jv-field></dd></div><div><dt>Owner</dt><dd><jv-field bind=\"task.assignee\"></jv-field></dd></div><div><dt>Due</dt><dd><jv-field bind=\"task.due_date\"></jv-field></dd></div></dl><footer><span><jv-value bind=\"task.project\"></jv-value></span><span class=\"tags\"><jv-repeat source=\"task.tags\" as=\"tag\"><span class=\"tag\"><jv-value bind=\"tag\"></jv-value></span></jv-repeat></span></footer></article></jv-repeat></section></main>",
+      "css": ":root{color-scheme:light dark}*{box-sizing:border-box}body{margin:0;background:light-dark(#f3f5f1,#171b18);color:light-dark(#1d2821,#e8eee9);font:14px/1.45 system-ui,sans-serif}main{max-width:1180px;margin:auto;padding:42px 28px 64px}header{display:flex;justify-content:space-between;align-items:end;gap:32px;padding-bottom:28px;border-bottom:1px solid light-dark(#cfd8d1,#364139)}.eyebrow{font-size:11px;font-weight:750;letter-spacing:2px;color:light-dark(#356548,#9bd0a9)}h1{margin:10px 0 8px;font:600 clamp(32px,5vw,52px)/1.05 Georgia,serif}header p{max-width:620px;margin:0;color:light-dark(#617066,#afbbb2)}.legend{display:flex;gap:16px;white-space:nowrap}.legend span{display:flex;align-items:center;gap:6px;font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:#77817a}.dot.urgent{background:#d96b55}.dot.active{background:#8a6ac8}.dot.done{background:#4f9a68}.task-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:24px}.task-card{display:flex;flex-direction:column;min-height:330px;padding:22px;border:1px solid light-dark(#d8dfda,#354039);border-radius:16px;background:light-dark(#fff,#222824);box-shadow:0 10px 30px light-dark(#26352a0a,#00000026)}.card-top{display:flex;justify-content:space-between;align-items:center}.card-top small{font-weight:700;letter-spacing:.08em;color:light-dark(#738077,#9ba79f)}.complete{display:flex;align-items:center;gap:7px;font-size:12px}input{accent-color:#4f9a68}h2{margin:20px 0 10px;font:600 23px/1.2 Georgia,serif}.description{min-height:62px;margin:0 0 22px;color:light-dark(#617066,#b5c0b8)}dl{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:auto 0 0}dl div{min-width:0}dt{margin-bottom:3px;font-size:10px;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:light-dark(#7a867e,#96a29a)}dd{margin:0;font-weight:600}footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-top:22px;padding-top:14px;border-top:1px solid light-dark(#e3e8e4,#374139);font-size:11px;color:light-dark(#657168,#a9b4ac)}.tags{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}.tag{padding:2px 7px;border-radius:999px;background:light-dark(#edf1ee,#303a33)}@media(max-width:680px){main{padding:26px 16px}header{align-items:start;flex-direction:column}.legend{white-space:normal}.task-grid{grid-template-columns:1fr}}"
+    },
+    {
+      "id": "all-tasks",
+      "name": "All tasks",
+      "path": "$.tasks",
+      "columns": [
+        { "label": "Task", "path": "$.tasks[*].title" },
+        { "label": "Status", "path": "$.tasks[*].status" },
+        { "label": "Priority", "path": "$.tasks[*].priority" },
+        { "label": "Project", "path": "$.tasks[*].project" },
+        { "label": "Assignee", "path": "$.tasks[*].assignee" },
+        { "label": "Due date", "path": "$.tasks[*].due_date" },
+        { "label": "Done", "path": "$.tasks[*].done" }
+      ],
+      "sort": [{ "path": "$.tasks[*].position", "direction": "asc" }]
+    },
+    {
+      "id": "open-tasks",
+      "name": "Open tasks",
+      "path": "$.tasks",
+      "columns": [
+        { "label": "Task", "path": "$.tasks[*].title" },
+        { "label": "Status", "path": "$.tasks[*].status" },
+        { "label": "Priority", "path": "$.tasks[*].priority" },
+        { "label": "Assignee", "path": "$.tasks[*].assignee" },
+        { "label": "Due date", "path": "$.tasks[*].due_date" }
+      ],
+      "filter": {
+        "rules": [{ "path": "$.tasks[*].done", "operator": "eq", "value": false }]
+      },
+      "sort": [{ "path": "$.tasks[*].due_date", "direction": "asc" }]
+    }
+  ]
+}

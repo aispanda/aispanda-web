@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open your agent — JSON Views</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px/1.6 system-ui, sans-serif; }
+    body { max-width: 38rem; margin: 12vh auto; padding: 1.5rem; }
+    a { color: inherit; }
+    #launch { display: inline-block; padding: .65rem 1rem; border: 1px solid; border-radius: .6rem; text-decoration: none; }
+    #launch[hidden] { display: none; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1rem; background: light-dark(#f3f3f5, #242428); border-radius: .6rem; }
+  </style>
+</head>
+<body>
+  <a href="/">JSON Views</a>
+  <h1 id="title">Set up JSON Views</h1>
+  <p id="description">Copy this prompt into your agent:</p>
+  <p><a id="launch" hidden>Open desktop app</a></p>
+  <pre>Install the JSON Views skill: npx skills add script-it/json-views -g</pre>
+  <p>The desktop app must be installed. If it doesn't open, copy the prompt above into your agent. Review the prompt before sending it.</p>
+  <script>
+    const agents = {
+      claude: { name: 'Claude Code', url: 'claude://code/new?q=' },
+      codex: { name: 'Codex', url: 'codex://new?prompt=' },
+      cursor: { name: 'Cursor', url: 'cursor://anysphere.cursor-deeplink/prompt?text=' },
+    };
+    const key = new URLSearchParams(location.search).get('agent');
+    const agent = Object.hasOwn(agents, key) ? agents[key] : undefined;
+    if (agent) {
+      document.getElementById('title').textContent = 'Open ' + agent.name;
+      document.getElementById('description').textContent = 'Open the desktop app with the install prompt ready to review.';
+      const launch = document.getElementById('launch');
+      launch.href = agent.url + encodeURIComponent('Install the JSON Views skill: npx skills add script-it/json-views -g');
+      launch.textContent = 'Open ' + agent.name;
+      launch.hidden = false;
+    }
+  </script>
+</body>
+</html>

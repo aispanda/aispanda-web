@@ -1,0 +1,61 @@
+{
+  "decision": "Choose a format for the customer handoff",
+  "decision_owner": "Project lead",
+  "due_date": "2026-09-10",
+  "criteria": [
+    { "criterion": "Easy for the customer to review", "weight": 5, "notes": "The customer should understand the result without installing tools." },
+    { "criterion": "Easy for an agent to update", "weight": 4, "notes": "The format should support precise programmatic edits." },
+    { "criterion": "Preserves structure", "weight": 4, "notes": "Tables and relationships should remain explicit." },
+    { "criterion": "Low setup effort", "weight": 3, "notes": "The handoff is due this week." }
+  ],
+  "options": [
+    {
+      "id": "OPT-01",
+      "option": "Annotated JSON",
+      "status": "Shortlisted",
+      "recommendation": "Preferred",
+      "weighted_score": 82,
+      "setup_days": 1,
+      "cost_band": "Low",
+      "strengths": ["Structured", "Agent-friendly", "Versionable"],
+      "risks": ["Unfamiliar format"],
+      "rationale": "Strong fit when both people and agents need to inspect and revise the same structured artifact."
+    },
+    {
+      "id": "OPT-02",
+      "option": "Shared spreadsheet",
+      "status": "Shortlisted",
+      "recommendation": "Fallback",
+      "weighted_score": 73,
+      "setup_days": 1,
+      "cost_band": "Low",
+      "strengths": ["Familiar", "Collaborative"],
+      "risks": ["Weak nesting", "Schema drift"],
+      "rationale": "Quick for flat records, but nested evidence and agent-generated structure become awkward."
+    },
+    {
+      "id": "OPT-03",
+      "option": "Custom mini app",
+      "status": "Evaluated",
+      "recommendation": "Not now",
+      "weighted_score": 58,
+      "setup_days": 5,
+      "cost_band": "High",
+      "strengths": ["Tailored UI"],
+      "risks": ["Build time", "Maintenance"],
+      "rationale": "The interface could be ideal, but the one-time handoff does not justify a new application."
+    },
+    {
+      "id": "OPT-04",
+      "option": "Markdown document",
+      "status": "Evaluated",
+      "recommendation": "Not now",
+      "weighted_score": 61,
+      "setup_days": 1,
+      "cost_band": "Low",
+      "strengths": ["Readable", "Portable"],
+      "risks": ["Hard to validate", "Manual comparison"],
+      "rationale": "Readable for the customer, but poor for repeated structured edits and scoring."
+    }
+  ]
+}

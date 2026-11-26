@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "schema": {
+    "$.project": { "type": "text", "title": "Project", "required": true },
+    "$.research_question": { "type": "markdown", "title": "Research question" },
+    "$.deadline": { "type": "date", "title": "Deadline" },
+    "$.findings[*].id": { "type": "text", "title": "Finding ID", "required": true, "pattern": "^RES-[0-9]+$" },
+    "$.findings[*].claim": { "type": "text", "title": "Finding", "required": true },
+    "$.findings[*].theme": {
+      "type": "select", "title": "Theme", "required": true,
+      "options": ["Setup", "Migration", "Workflow", "Automation", "Portability"],
+      "optionColors": { "Setup": "blue", "Migration": "purple", "Workflow": "green", "Automation": "orange", "Portability": "pink" }
+    },
+    "$.findings[*].source_type": {
+      "type": "select", "title": "Source type",
+      "options": ["Product docs", "API docs", "Pricing page", "Hands-on test", "Community report"]
+    },
+    "$.findings[*].source_url": { "type": "url", "title": "Source" },
+    "$.findings[*].confidence": {
+      "type": "select", "title": "Confidence", "required": true,
+      "options": ["Low", "Medium", "High"],
+      "optionColors": { "Low": "red", "Medium": "yellow", "High": "green" }
+    },
+    "$.findings[*].status": {
+      "type": "select", "title": "Status", "required": true,
+      "options": ["Captured", "Needs verification", "Follow up", "Verified"],
+      "optionColors": { "Captured": "gray", "Needs verification": "yellow", "Follow up": "purple", "Verified": "green" }
+    },
+    "$.findings[*].supports": {
+      "type": "select", "title": "Supports",
+      "options": ["Option A", "Option B", "Option C", "Undecided"]
+    },
+    "$.findings[*].verified": { "type": "checkbox", "title": "Verified", "required": true },
+    "$.findings[*].notes": { "type": "markdown", "title": "Evidence notes" }
+  },
+  "views": [
+    {
+      "id": "research-findings",
+      "name": "Research findings",
+      "path": "$.findings",
+      "columns": [
+        { "label": "Finding", "path": "$.findings[*].claim" },
+        { "label": "Theme", "path": "$.findings[*].theme" },
+        { "label": "Source type", "path": "$.findings[*].source_type" },
+        { "label": "Confidence", "path": "$.findings[*].confidence" },
+        { "label": "Status", "path": "$.findings[*].status" },
+        { "label": "Supports", "path": "$.findings[*].supports" },
+        { "label": "Verified", "path": "$.findings[*].verified" }
+      ]
+    },
+    {
+      "id": "verification-board",
+      "name": "Verification board",
+      "path": "$.findings",
+      "display": "kanban",
+      "groupBy": "$.findings[*].status",
+      "columns": [
+        { "label": "Finding", "path": "$.findings[*].claim" },
+        { "label": "Theme", "path": "$.findings[*].theme" },
+        { "label": "Confidence", "path": "$.findings[*].confidence" },
+        { "label": "Supports", "path": "$.findings[*].supports" }
+      ]
+    },
+    {
+      "id": "needs-verification",
+      "name": "Needs verification",
+      "path": "$.findings",
+      "columns": [
+        { "label": "Finding", "path": "$.findings[*].claim" },
+        { "label": "Source", "path": "$.findings[*].source_url" },
+        { "label": "Confidence", "path": "$.findings[*].confidence" },
+        { "label": "Status", "path": "$.findings[*].status" }
+      ],
+      "filter": { "rules": [{ "path": "$.findings[*].verified", "operator": "eq", "value": false }] }
+    }
+  ]
+}
