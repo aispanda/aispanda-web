@@ -1,0 +1,290 @@
+{
+  "tasks": [
+    {
+      "id": "TASK-101",
+      "title": "Define the launch checklist",
+      "status": "In progress",
+      "priority": "High",
+      "project": "Website launch",
+      "assignee": "Maya Chen",
+      "due_date": "2026-09-10",
+      "tags": [
+        "Launch",
+        "Planning"
+      ],
+      "done": false,
+      "position": 1,
+      "description": "List the product, documentation, support, and announcement checks that must be complete before launch."
+    },
+    {
+      "id": "TASK-102",
+      "title": "Review onboarding copy",
+      "status": "To do",
+      "priority": "Medium",
+      "project": "Website launch",
+      "assignee": "Theo Martin",
+      "due_date": "2026-09-12",
+      "tags": [
+        "Content",
+        "Review"
+      ],
+      "done": false,
+      "position": 2,
+      "description": "Check the first-run instructions for clarity and make sure every action matches the current interface."
+    },
+    {
+      "id": "TASK-103",
+      "title": "Fix mobile navigation spacing",
+      "status": "In progress",
+      "priority": "Urgent",
+      "project": "Website launch",
+      "assignee": "Ari Patel",
+      "due_date": "2026-09-09",
+      "tags": [
+        "Frontend",
+        "Bug"
+      ],
+      "done": false,
+      "position": 3,
+      "description": "The navigation wraps at narrow widths. Confirm the intended breakpoint before changing the layout."
+    },
+    {
+      "id": "TASK-104",
+      "title": "Prepare customer import sample",
+      "status": "To do",
+      "priority": "Low",
+      "project": "Data migration",
+      "assignee": "Noah Williams",
+      "due_date": null,
+      "tags": [
+        "Data",
+        "Docs"
+      ],
+      "done": false,
+      "position": 4,
+      "description": "Create a small anonymized file that demonstrates the supported import fields and validation errors."
+    },
+    {
+      "id": "TASK-105",
+      "title": "Publish API error reference",
+      "status": "In progress",
+      "priority": "High",
+      "project": "Developer experience",
+      "assignee": "Lena Ortiz",
+      "due_date": "2026-09-11",
+      "tags": [
+        "API",
+        "Docs"
+      ],
+      "done": false,
+      "position": 5,
+      "description": "Document the public error codes with a cause, a recovery action, and one minimal request example for each."
+    },
+    {
+      "id": "TASK-106",
+      "title": "Confirm analytics events",
+      "status": "Done",
+      "priority": "Medium",
+      "project": "Website launch",
+      "assignee": "Maya Chen",
+      "due_date": "2026-09-06",
+      "tags": [
+        "Analytics",
+        "Launch"
+      ],
+      "done": true,
+      "position": 6,
+      "description": "Verify that sign-up, workspace creation, and first successful edit are recorded once with the expected properties."
+    },
+    {
+      "id": "TASK-107",
+      "title": "Prepare the customer newsletter",
+      "status": "To do",
+      "priority": "Medium",
+      "project": "Website launch",
+      "assignee": "Theo Martin",
+      "due_date": "2026-09-13",
+      "tags": [
+        "Content",
+        "Launch"
+      ],
+      "done": false,
+      "position": 7,
+      "description": "Draft the monthly product update with three highlights and a clear link to the release notes."
+    },
+    {
+      "id": "TASK-108",
+      "title": "Test the sign-up flow",
+      "status": "In progress",
+      "priority": "High",
+      "project": "Website launch",
+      "assignee": "Ari Patel",
+      "due_date": "2026-09-14",
+      "tags": [
+        "Frontend",
+        "Review"
+      ],
+      "done": false,
+      "position": 8,
+      "description": "Check account creation on desktop and mobile, including validation messages and the welcome email."
+    },
+    {
+      "id": "TASK-109",
+      "title": "Approve launch visuals",
+      "status": "Done",
+      "priority": "Medium",
+      "project": "Website launch",
+      "assignee": "Maya Chen",
+      "due_date": "2026-09-15",
+      "tags": [
+        "Content",
+        "Review"
+      ],
+      "done": true,
+      "position": 9,
+      "description": "Review the homepage illustrations and campaign images, then export the approved assets."
+    },
+    {
+      "id": "TASK-110",
+      "title": "Map legacy customer fields",
+      "status": "In progress",
+      "priority": "High",
+      "project": "Data migration",
+      "assignee": "Noah Williams",
+      "due_date": "2026-09-16",
+      "tags": [
+        "Data",
+        "Planning"
+      ],
+      "done": false,
+      "position": 10,
+      "description": "Match each legacy field to the new customer schema and document any required transformations."
+    },
+    {
+      "id": "TASK-111",
+      "title": "Review duplicate customer records",
+      "status": "To do",
+      "priority": "Medium",
+      "project": "Data migration",
+      "assignee": "Lena Ortiz",
+      "due_date": "2026-09-17",
+      "tags": [
+        "Data",
+        "Review"
+      ],
+      "done": false,
+      "position": 11,
+      "description": "Identify duplicate email addresses and agree on a merge rule before running the import."
+    },
+    {
+      "id": "TASK-112",
+      "title": "Back up the staging dataset",
+      "status": "Done",
+      "priority": "High",
+      "project": "Data migration",
+      "assignee": "Noah Williams",
+      "due_date": "2026-09-18",
+      "tags": [
+        "Data"
+      ],
+      "done": true,
+      "position": 12,
+      "description": "Create a staging backup and confirm that a small sample can be restored successfully."
+    },
+    {
+      "id": "TASK-113",
+      "title": "Write the migration handover guide",
+      "status": "To do",
+      "priority": "Medium",
+      "project": "Data migration",
+      "assignee": "Theo Martin",
+      "due_date": "2026-09-19",
+      "tags": [
+        "Docs",
+        "Planning"
+      ],
+      "done": false,
+      "position": 13,
+      "description": "Explain the import steps, validation checks, rollback procedure, and owners for the support team."
+    },
+    {
+      "id": "TASK-114",
+      "title": "Add API pagination examples",
+      "status": "In progress",
+      "priority": "Medium",
+      "project": "Developer experience",
+      "assignee": "Lena Ortiz",
+      "due_date": "2026-09-20",
+      "tags": [
+        "API",
+        "Docs"
+      ],
+      "done": false,
+      "position": 14,
+      "description": "Show how to request the next page and handle an empty result using a short runnable example."
+    },
+    {
+      "id": "TASK-115",
+      "title": "Triage customer support feedback",
+      "status": "To do",
+      "priority": "High",
+      "project": "Developer experience",
+      "assignee": "Maya Chen",
+      "due_date": "2026-09-21",
+      "tags": [
+        "Review",
+        "Planning"
+      ],
+      "done": false,
+      "position": 15,
+      "description": "Group recent support questions by theme and select the three documentation improvements with the greatest impact."
+    },
+    {
+      "id": "TASK-116",
+      "title": "Update the new-hire setup checklist",
+      "status": "Done",
+      "priority": "Low",
+      "project": "Developer experience",
+      "assignee": "Theo Martin",
+      "due_date": "2026-09-22",
+      "tags": [
+        "Docs"
+      ],
+      "done": true,
+      "position": 16,
+      "description": "Refresh the workstation setup steps and check that every link works for a new team member."
+    },
+    {
+      "id": "TASK-117",
+      "title": "Check dashboard event coverage",
+      "status": "Done",
+      "priority": "Medium",
+      "project": "Website launch",
+      "assignee": "Ari Patel",
+      "due_date": "2026-09-13",
+      "tags": [
+        "Analytics",
+        "Review"
+      ],
+      "done": true,
+      "position": 17,
+      "description": "Compare the event list with the launch checklist and record the result of each verification."
+    },
+    {
+      "id": "TASK-118",
+      "title": "Schedule the launch rehearsal",
+      "status": "To do",
+      "priority": "High",
+      "project": "Website launch",
+      "assignee": "Maya Chen",
+      "due_date": "2026-09-14",
+      "tags": [
+        "Launch",
+        "Planning"
+      ],
+      "done": false,
+      "position": 18,
+      "description": "Arrange a walkthrough with engineering, marketing, and support; assign an owner to each launch step."
+    }
+  ]
+}

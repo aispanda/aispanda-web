@@ -1,0 +1,79 @@
+{
+  "project": "Choose a support inbox for the launch team",
+  "research_question": "Which option best supports a two-week product launch without adding heavy administration?",
+  "deadline": "2026-09-11",
+  "findings": [
+    {
+      "id": "RES-01",
+      "claim": "Option A can import the current shared inbox",
+      "theme": "Migration",
+      "source_type": "Product docs",
+      "source_url": "https://example.com/research/option-a-import",
+      "confidence": "High",
+      "status": "Verified",
+      "supports": "Option A",
+      "verified": true,
+      "notes": "The documented import covers messages and labels. Historical assignment data needs a separate export."
+    },
+    {
+      "id": "RES-02",
+      "claim": "Option B has the fastest initial setup",
+      "theme": "Setup",
+      "source_type": "Hands-on test",
+      "source_url": "https://example.com/research/setup-test",
+      "confidence": "Medium",
+      "status": "Verified",
+      "supports": "Option B",
+      "verified": true,
+      "notes": "A synthetic five-person workspace was ready in under thirty minutes."
+    },
+    {
+      "id": "RES-03",
+      "claim": "Option C supports routing rules on the entry plan",
+      "theme": "Workflow",
+      "source_type": "Pricing page",
+      "source_url": "https://example.com/research/option-c-pricing",
+      "confidence": "Low",
+      "status": "Needs verification",
+      "supports": "Option C",
+      "verified": false,
+      "notes": "The pricing table is ambiguous about whether advanced conditions require an upgrade."
+    },
+    {
+      "id": "RES-04",
+      "claim": "Option A exposes conversation data through an API",
+      "theme": "Automation",
+      "source_type": "API docs",
+      "source_url": "https://example.com/research/option-a-api",
+      "confidence": "High",
+      "status": "Verified",
+      "supports": "Option A",
+      "verified": true,
+      "notes": "The documented endpoints cover conversations, messages, tags, and assignees."
+    },
+    {
+      "id": "RES-05",
+      "claim": "Option B may limit export access",
+      "theme": "Portability",
+      "source_type": "Community report",
+      "source_url": "https://example.com/research/option-b-export",
+      "confidence": "Low",
+      "status": "Follow up",
+      "supports": "Undecided",
+      "verified": false,
+      "notes": "Confirm the current export behavior with the vendor before making a recommendation."
+    },
+    {
+      "id": "RES-06",
+      "claim": "Option C includes a public status page integration",
+      "theme": "Workflow",
+      "source_type": "Product docs",
+      "source_url": "https://example.com/research/option-c-status",
+      "confidence": "Medium",
+      "status": "Verified",
+      "supports": "Option C",
+      "verified": true,
+      "notes": "Incidents can be linked to active support conversations."
+    }
+  ]
+}

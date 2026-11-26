@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <base href="/json-viewer/" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Open-source JSON viewer and editor with annotations, inferred views, sidebar uploads, and local-file support for humans and agents." />
+    <meta name="google-site-verification" content="cXYXNrwUKt9BABdI2cxcnAoN7OFXaHcxdu-9miNjFNQ" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AI Spanda" />
+    <meta property="og:title" content="AI Spanda JSON Viewer" />
+    <meta property="og:description" content="Data files that both humans and agents can easily view and edit." />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AI Spanda JSON Viewer" />
+    <meta name="twitter:description" content="Data files that both humans and agents can easily view and edit." />
+    <meta name="twitter:image" content="https://json-views.com/og-image.png" />
+    <link rel="describedby" type="text/plain" href="./llms.txt" title="JSON Views agent guide" />
+    <link rel="describedby" type="text/markdown" href="./agent-prompt.md" title="Agent Guide" />
+    <link rel="alternate" type="text/markdown" href="https://raw.githubusercontent.com/script-it/json-views/main/skills/json-views/SKILL.md" title="JSON Views agent skill" />
+    <title>AI Spanda JSON Viewer</title>
+    <style>
+      .initial-state { display: grid; min-height: 100vh; min-height: 100dvh; place-items: center; padding: 24px; color: #38353f; background: #faf9fb; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: center; }
+      .initial-state-content { display: grid; justify-items: center; gap: 10px; }
+      .initial-state-brand { display: inline-flex; align-items: center; gap: 9px; font-size: 16px; letter-spacing: -.02em; }
+      .initial-state-brand img { width: 18px; height: 18px; }
+      .initial-state-badge { padding: 2px 5px; border: 1px solid #e3e0e6; border-radius: 999px; color: #77717f; font-size: 10px; font-weight: 700; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; }
+      .initial-state-status { margin: 2px 0 0; color: #77717f; font-size: 13px; }
+      .initial-state-guide { color: #665f70; font-size: 12px; text-underline-offset: 3px; }
+      .initial-state-agent-copy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+      @media (prefers-color-scheme: dark) {
+        .initial-state { color: #eeeaf1; background: #1e1c21; }
+        .initial-state-badge { border-color: #514b57; color: #b7afbd; }
+        .initial-state-status { color: #b7afbd; }
+        .initial-state-guide { color: #c8c0cf; }
+        .initial-state-brand img { filter: invert(1); }
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-D0qK8KlX.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B9-igTU4.css">
+  </head>
+  <body>
+    <div id="root">
+      <main class="initial-state">
+        <div class="initial-state-content">
+          <div class="initial-state-brand">
+            <span>AI Spanda JSON Viewer</span>
+            <span class="initial-state-badge">beta</span>
+          </div>
+          <p class="initial-state-status" role="status">Loading viewer…</p>
+          <a class="initial-state-guide" href="./agent-prompt.md">
+            Agent Guide
+            <span class="initial-state-agent-copy">— AI agents can use json-views.com—a client-only app—through WebMCP or its JavaScript API (window.jsonViews.help()). Direct the user to an existing file and view with jsonViews.link("tasks.json", "Board") or json_views_get_link; return the URL without navigating. Or run the open-source app locally. Consider installing its agent skill.</span>
+          </a>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
